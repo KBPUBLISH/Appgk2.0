@@ -1,22 +1,39 @@
 # 🚀 Quick Reference - Git Workflow
 
+## ⚠️ Important: Tool Differences
+- **Cursor**: Can run `npm run sync` and `npm run push` directly
+- **Gemini 3**: Cannot run commands - you must run them manually in terminal
+
 ## ⚡ Most Common Commands
 
 ### Before Starting Work (ALWAYS DO THIS FIRST!)
+
+**In Cursor:**
 ```bash
 npm run sync
 # OR
 ./scripts/sync-from-github.sh
-# OR
-git pull origin main
 ```
 
+**In Gemini 3:**
+```bash
+git pull origin main
+```
+Then copy file contents into Gemini 3 prompt
+
 ### After Making Changes
+
+**In Cursor:**
 ```bash
 npm run push
 # OR
 ./scripts/push-to-github.sh
-# OR manually:
+```
+
+**In Gemini 3:**
+1. Save modified files
+2. In terminal:
+```bash
 git add .
 git commit -m "Your message"
 git pull origin main
@@ -47,9 +64,17 @@ git quickpush   # Pull then push (after committing)
 3. `npm run push` - Save and push
 
 ### In Gemini 3:
-1. `npm run sync` - Get latest changes (including Cursor's)
-2. Make your changes
-3. `npm run push` - Save and push
+1. **Terminal:** `git pull origin main` - Get latest changes
+2. **Copy file contents** into Gemini 3 prompt
+3. **Gemini 3 makes changes** - Provides modified code
+4. **Save files** to your project
+5. **Terminal:**
+   ```bash
+   git add .
+   git commit -m "Changes from Gemini 3"
+   git pull origin main
+   git push origin main
+   ```
 
 ## 🆘 Emergency Commands
 
