@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useAudio } from '../../context/AudioContext';
 
 interface WoodButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'dark' | 'light' | 'gold';
@@ -11,9 +12,16 @@ const WoodButton: React.FC<WoodButtonProps> = ({
   className = '', 
   variant = 'primary', 
   fullWidth = false,
+  onClick,
   ...props 
 }) => {
+  const { playClick } = useAudio();
   
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    playClick();
+    if (onClick) onClick(e);
+  };
+
   // Removed text-white from base so variants can control it
   const baseStyles = "relative overflow-hidden font-display font-bold transition-transform active:scale-95 rounded-lg shadow-xl border-b-4";
   
@@ -28,6 +36,7 @@ const WoodButton: React.FC<WoodButtonProps> = ({
 
   return (
     <button 
+      onClick={handleClick}
       className={`${baseStyles} ${variants[variant]} ${widthClass} ${className} px-6 py-3`}
       {...props}
     >

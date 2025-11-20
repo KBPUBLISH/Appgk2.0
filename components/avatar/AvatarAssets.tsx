@@ -449,9 +449,9 @@ export const AVATAR_ASSETS: Record<string, React.ReactNode> = {
   ),
   'arm-l-wand': (
     <g transform="rotate(10 25 0)">
-       <rect x="5" y="0" width="10" height="40" fill="#333" />
+       <rect x="10" y="0" width="10" height="40" fill="#333" />
        <circle cx="10" cy="40" r="6" fill="#e0e0e0" />
-       <rect x="8" y="30" width="4" height="50" fill="#8d6e63" stroke="#5d4037" />
+       <rect x="13" y="30" width="4" height="50" fill="#8d6e63" stroke="#5d4037" />
        <circle cx="10" cy="80" r="4" fill="#ffeb3b" className="animate-pulse" />
     </g>
   ),
@@ -608,8 +608,8 @@ export const AVATAR_ASSETS: Record<string, React.ReactNode> = {
   ),
   'legs-chicken': (
     <g>
-       <path d="M30,0 L30,50 L20,60 M30,50 L30,60 M30,50 L40,60" stroke="#ffab00" strokeWidth="4" />
-       <path d="M70,0 L70,50 L60,60 M70,50 L70,60 M70,50 L80,60" stroke="#ffab00" strokeWidth="4" />
+       <path d="M30,0 L30,50 L20,60 M30,50 L30,60 M30,50 L40,60" stroke="#ffab00" strokeWidth="4" fill="none" />
+       <path d="M70,0 L70,50 L60,60 M70,50 L70,60 M70,50 L80,60" stroke="#ffab00" strokeWidth="4" fill="none" />
     </g>
   ),
   'legs-rocket': (

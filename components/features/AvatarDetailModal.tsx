@@ -25,32 +25,27 @@ const AvatarDetailModal: React.FC<AvatarDetailModalProps> = ({ isOpen, onClose, 
   };
 
   const content = (
-    <div className="fixed inset-0 z-[100] flex justify-center px-4 pointer-events-auto overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex justify-center px-4 pointer-events-auto overflow-y-auto no-scrollbar">
       {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black/90 backdrop-blur-md animate-in fade-in duration-300"
         onClick={onClose}
       ></div>
 
-      {/* Card Container - using py-10 and margin-auto to center vertically but allow scroll */}
-      <div className="relative w-full max-w-sm flex flex-col items-center animate-in zoom-in-90 duration-300 my-10 z-10">
+      {/* Scrollable Content Container */}
+      <div className="relative w-full max-w-sm flex flex-col items-center min-h-full py-10 animate-in zoom-in-90 duration-300 z-10">
           
           {/* Close Button */}
           <button 
             onClick={onClose} 
-            className="absolute top-0 right-0 text-white hover:text-gray-300 transition-colors z-50 bg-black/20 rounded-full p-2"
+            className="absolute top-4 right-0 text-white hover:text-gray-300 transition-colors z-50 bg-black/20 rounded-full p-2"
           >
               <X size={24} />
           </button>
 
-          {/* Avatar Large View */}
-          {/* 
-              NOTE: Because the AvatarCompositor extends significantly downwards (Body + Legs),
-              we need a large bottom margin so the buttons below don't overlap the feet.
-              Head (100%) + Body (~70%) + Legs (~60%) = ~230% total height.
-              We reserve space using margin-bottom.
-          */}
-          <div className="w-48 h-48 md:w-64 md:h-64 relative mb-48 md:mb-64 shrink-0 mt-10">
+          {/* Avatar Large View - INCREASED MARGIN FOR LEGS */}
+          {/* The avatar compositor can extend significantly downwards. We use a large margin-bottom to reserve space. */}
+          <div className="w-48 h-48 md:w-64 md:h-64 relative mb-[18rem] md:mb-[22rem] shrink-0 mt-10">
               {/* Glow */}
               <div className="absolute inset-0 bg-[#FFD700] rounded-full blur-3xl opacity-20 animate-pulse"></div>
               
@@ -66,10 +61,10 @@ const AvatarDetailModal: React.FC<AvatarDetailModalProps> = ({ isOpen, onClose, 
               </div>
           </div>
 
-          {/* Text Info Panel - Added background for better legibility against potential long legs */}
-          <div className="text-center relative z-20 bg-black/40 p-4 rounded-2xl backdrop-blur-sm w-full mb-4 border border-white/5">
+          {/* Text Info Panel */}
+          <div className="text-center relative z-20 bg-black/40 p-4 rounded-2xl backdrop-blur-sm w-full mb-4 border border-white/5 shadow-xl">
              <h2 className="font-display font-extrabold text-white text-3xl mb-1 text-shadow-lg tracking-wide">YOUR AVATAR</h2>
-             <p className="text-white/70 font-bold">Look at this weird creation!</p>
+             <p className="text-white/70 font-bold">Ready for adventure!</p>
           </div>
 
           {/* Buttons */}

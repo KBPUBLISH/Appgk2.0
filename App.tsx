@@ -11,13 +11,15 @@ import ProfileSelectionPage from './pages/ProfileSelectionPage';
 import CreateProfilePage from './pages/CreateProfilePage';
 import AudioPlayerPage from './pages/AudioPlayerPage';
 import PaywallPage from './pages/PaywallPage';
+import SettingsPage from './pages/SettingsPage';
 import BottomNavigation from './components/layout/BottomNavigation';
 import { BooksProvider } from './context/BooksContext';
 import { UserProvider } from './context/UserContext';
+import { AudioProvider } from './context/AudioContext';
 
 // --- ASSETS & HELPERS ---
 
-// 1. The 4-Point "Diamond" Star from the reference image
+// 1. The 4-Point "Diamond" Star - Optimized (No filters)
 const StarSVG: React.FC<{ className?: string; size?: number; color?: string; opacity?: number }> = ({ className, size = 24, color = "#FFD700", opacity = 1 }) => (
   <svg 
     width={size} 
@@ -26,18 +28,17 @@ const StarSVG: React.FC<{ className?: string; size?: number; color?: string; opa
     className={className}
     style={{ overflow: 'visible', opacity }}
   >
-    {/* Core Diamond Shape */}
+    {/* Core Diamond Shape - No drop shadow filter for mobile perf */}
     <path 
       d="M12 0 C12 0 15 9 24 12 C15 15 12 24 12 24 C12 24 9 15 0 12 C9 9 12 0 12 0 Z" 
       fill={color}
-      filter="drop-shadow(0 0 3px rgba(255,255,255,0.9))"
     />
-    {/* Center Glow */}
-    <circle cx="12" cy="12" r="2" fill="white" filter="blur(1px)" />
+    {/* Center Glow - Opacity instead of blur */}
+    <circle cx="12" cy="12" r="3" fill="white" opacity="0.6" />
   </svg>
 );
 
-// 2. Stylized "Toy Story" Cloud
+// 2. Stylized "Toy Story" Cloud - Optimized
 const CloudSVG: React.FC<{ width: number; opacity?: number; flip?: boolean }> = ({ width, opacity = 0.9, flip = false }) => (
     <svg 
       width={width} 
@@ -45,8 +46,8 @@ const CloudSVG: React.FC<{ width: number; opacity?: number; flip?: boolean }> = 
       fill="none" 
       style={{ opacity, transform: flip ? 'scaleX(-1)' : 'none' }}
     >
-        {/* Soft Bottom Shadow */}
-        <path d="M20,85 Q40,115 90,105 Q140,120 180,85" stroke="rgba(20, 50, 100, 0.2)" strokeWidth="12" strokeLinecap="round" filter="blur(6px)" />
+        {/* Soft Bottom Shadow - Opacity instead of blur */}
+        <path d="M20,85 Q40,115 90,105 Q140,120 180,85" stroke="rgba(20, 50, 100, 0.2)" strokeWidth="12" strokeLinecap="round" opacity="0.5" />
         
         {/* Main Cloud Shape - Union of circles with gradients */}
         <g>
@@ -85,7 +86,8 @@ const PanoramaBackground: React.FC = () => {
     if (path === '/profile') return 5;
     if (path === '/create-profile') return 5;
     if (path.startsWith('/player/')) return 5;
-    if (path === '/paywall') return 5; // Hide background or move it out of way
+    if (path === '/paywall') return 5; 
+    if (path === '/settings') return 5;
     return 1; 
   }, [location.pathname]);
 
@@ -256,6 +258,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isProfile = location.pathname === '/profile';
   const isCreateProfile = location.pathname === '/create-profile';
   const isPaywall = location.pathname === '/paywall';
+  const isSettings = location.pathname === '/settings';
 
   return (
     <div className="relative h-screen w-full overflow-hidden text-white flex flex-col">
@@ -268,33 +271,36 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </div>
 
       {/* Only show BottomNavigation on main tab pages */}
-      {!isLanding && !isBookDetail && !isPlayer && !isProfile && !isCreateProfile && !isPaywall && <BottomNavigation />}
+      {!isLanding && !isBookDetail && !isPlayer && !isProfile && !isCreateProfile && !isPaywall && !isSettings && <BottomNavigation />}
     </div>
   );
 };
 
 const App: React.FC = () => {
   return (
-    <UserProvider>
-      <BooksProvider>
-        <HashRouter>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/home" element={<HomePage />} />
-              <Route path="/listen" element={<ListenPage />} />
-              <Route path="/read" element={<ReadPage />} />
-              <Route path="/library" element={<LibraryPage />} />
-              <Route path="/book/:id" element={<BookDetailPage />} />
-              <Route path="/player/:bookId/:chapterId" element={<AudioPlayerPage />} />
-              <Route path="/profile" element={<ProfileSelectionPage />} />
-              <Route path="/create-profile" element={<CreateProfilePage />} />
-              <Route path="/paywall" element={<PaywallPage />} />
-            </Routes>
-          </Layout>
-        </HashRouter>
-      </BooksProvider>
-    </UserProvider>
+    <AudioProvider>
+      <UserProvider>
+        <BooksProvider>
+          <HashRouter>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/home" element={<HomePage />} />
+                <Route path="/listen" element={<ListenPage />} />
+                <Route path="/read" element={<ReadPage />} />
+                <Route path="/library" element={<LibraryPage />} />
+                <Route path="/book/:id" element={<BookDetailPage />} />
+                <Route path="/player/:bookId/:chapterId" element={<AudioPlayerPage />} />
+                <Route path="/profile" element={<ProfileSelectionPage />} />
+                <Route path="/create-profile" element={<CreateProfilePage />} />
+                <Route path="/paywall" element={<PaywallPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Routes>
+            </Layout>
+          </HashRouter>
+        </BooksProvider>
+      </UserProvider>
+    </AudioProvider>
   );
 };
 

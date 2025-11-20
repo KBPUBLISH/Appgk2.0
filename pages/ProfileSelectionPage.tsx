@@ -48,7 +48,7 @@ const ProfileSelectionPage: React.FC = () => {
         <div className="flex items-center gap-3">
             {/* Settings Button */}
             <button 
-              onClick={() => {}} 
+              onClick={() => navigate('/settings')} 
               className="w-10 h-10 bg-[#5c2e0b] hover:bg-[#70380d] border-2 border-[#8B4513] rounded-full flex items-center justify-center text-[#eecaa0] shadow-lg active:scale-95 transition-transform"
             >
                 <Settings size={20} />
@@ -142,8 +142,31 @@ const ProfileSelectionPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Go Premium Banner (If Not Subscribed) */}
+          {!isSubscribed && (
+              <div 
+                onClick={() => navigate('/paywall')}
+                className="w-full max-w-xs mt-8 mb-2 bg-gradient-to-r from-[#FFD700] to-[#FDB931] rounded-xl p-1 shadow-lg cursor-pointer transform transition-transform active:scale-95 group"
+              >
+                  <div className="bg-[#fff8e1] rounded-[10px] px-4 py-3 flex items-center justify-between border border-[#FDB931]">
+                      <div className="flex items-center gap-3">
+                           <div className="w-10 h-10 bg-[#FFD700] rounded-full flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                                <Crown size={20} className="text-[#B8860B]" fill="#B8860B" />
+                           </div>
+                           <div className="flex flex-col">
+                               <span className="font-display font-extrabold text-[#B8860B] text-sm leading-tight">GO PREMIUM</span>
+                               <span className="text-[10px] text-[#B8860B] font-bold opacity-80">Unlock all stories & items</span>
+                           </div>
+                      </div>
+                      <div className="bg-[#B8860B] text-[#FFD700] rounded-full p-1">
+                          <ChevronLeft size={16} className="rotate-180" />
+                      </div>
+                  </div>
+              </div>
+          )}
+
           {/* Bottom Buttons */}
-          <div className="w-full max-w-xs flex gap-4 mt-8">
+          <div className={`w-full max-w-xs flex gap-4 ${!isSubscribed ? 'mt-2' : 'mt-8'}`}>
              <WoodButton variant="light" fullWidth className="text-sm py-3 rounded-xl border-b-4 shadow-lg" onClick={() => {}}>
                 EDIT PROFILE
              </WoodButton>
