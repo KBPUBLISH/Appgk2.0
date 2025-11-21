@@ -1,6 +1,283 @@
+
 import React from 'react';
 
 export const AVATAR_ASSETS: Record<string, React.ReactNode> = {
+  // --- FUNNY HEADS (NEW) ---
+  'head-toast': (
+    <g>
+      <rect x="20" y="15" width="60" height="70" rx="10" fill="#fbc02d" stroke="#e65100" strokeWidth="3" />
+      <path d="M25,15 Q50,5 75,15" fill="#ffe082" />
+      <path d="M20,15 L20,25 Q50,15 80,25 L80,15" fill="#f57f17" opacity="0.3" />
+      <circle cx="35" cy="45" r="4" fill="#3e2723" />
+      <circle cx="65" cy="45" r="4" fill="#3e2723" />
+      <path d="M45,55 Q50,60 55,55" fill="none" stroke="#3e2723" strokeWidth="2" strokeLinecap="round" />
+      {/* Butter */}
+      <rect x="35" y="25" width="15" height="10" rx="2" fill="#fff176" stroke="#fdd835" transform="rotate(-10 42 30)" />
+    </g>
+  ),
+  'head-burger': (
+    <g>
+      {/* Bottom Bun */}
+      <path d="M20,70 L80,70 Q80,85 50,85 Q20,85 20,70" fill="#fbc02d" stroke="#e65100" strokeWidth="2" />
+      {/* Lettuce */}
+      <path d="M15,65 Q25,75 35,65 Q45,75 55,65 Q65,75 75,65 Q85,75 85,65" fill="#4caf50" stroke="#2e7d32" strokeWidth="2" />
+      {/* Patty */}
+      <rect x="20" y="50" width="60" height="15" rx="5" fill="#5d4037" stroke="#3e2723" strokeWidth="2" />
+      {/* Cheese */}
+      <path d="M20,50 L80,50 L80,55 L70,65 L60,55 L50,65 L40,55 L30,65 L20,55 Z" fill="#ffeb3b" stroke="#fbc02d" />
+      {/* Top Bun */}
+      <path d="M15,50 L85,50 Q85,10 50,10 Q15,10 15,50" fill="#fbc02d" stroke="#e65100" strokeWidth="2" />
+      {/* Seeds */}
+      <ellipse cx="35" cy="25" rx="2" ry="1" fill="#fff9c4" />
+      <ellipse cx="50" cy="20" rx="2" ry="1" fill="#fff9c4" />
+      <ellipse cx="65" cy="25" rx="2" ry="1" fill="#fff9c4" />
+      {/* Face */}
+      <circle cx="40" cy="35" r="3" fill="#3e2723" />
+      <circle cx="60" cy="35" r="3" fill="#3e2723" />
+      <path d="M45,42 Q50,45 55,42" fill="none" stroke="#3e2723" strokeWidth="1.5" />
+    </g>
+  ),
+  'head-tv': (
+    <g>
+      {/* Antenna */}
+      <line x1="50" y1="20" x2="30" y2="5" stroke="#9e9e9e" strokeWidth="2" />
+      <line x1="50" y1="20" x2="70" y2="5" stroke="#9e9e9e" strokeWidth="2" />
+      <circle cx="30" cy="5" r="2" fill="#f44336" />
+      <circle cx="70" cy="5" r="2" fill="#f44336" />
+      {/* Box */}
+      <rect x="15" y="20" width="70" height="60" rx="5" fill="#424242" stroke="#212121" strokeWidth="3" />
+      {/* Screen */}
+      <rect x="20" y="25" width="50" height="50" rx="2" fill="#b3e5fc" />
+      {/* Face on Screen */}
+      <circle cx="35" cy="45" r="3" fill="#0277bd" />
+      <circle cx="55" cy="45" r="3" fill="#0277bd" />
+      <path d="M35,60 Q45,65 55,60" fill="none" stroke="#0277bd" strokeWidth="2" />
+      {/* Knobs */}
+      <circle cx="78" cy="35" r="3" fill="#e0e0e0" />
+      <circle cx="78" cy="45" r="3" fill="#e0e0e0" />
+      {/* Vents */}
+      <line x1="75" y1="60" x2="81" y2="60" stroke="#757575" strokeWidth="1" />
+      <line x1="75" y1="65" x2="81" y2="65" stroke="#757575" strokeWidth="1" />
+    </g>
+  ),
+  'head-cookie': (
+    <g>
+      <circle cx="50" cy="50" r="40" fill="#d7ccc8" stroke="#8d6e63" strokeWidth="3" />
+      {/* Chips */}
+      <circle cx="30" cy="30" r="4" fill="#3e2723" />
+      <circle cx="70" cy="35" r="5" fill="#3e2723" />
+      <circle cx="50" cy="20" r="3" fill="#3e2723" />
+      <circle cx="25" cy="60" r="4" fill="#3e2723" />
+      <circle cx="75" cy="65" r="3" fill="#3e2723" />
+      <circle cx="50" cy="80" r="4" fill="#3e2723" />
+      {/* Bite */}
+      <path d="M85,30 Q75,40 85,50" fill="#f3e5ab" stroke="none" />
+      {/* Face */}
+      <circle cx="40" cy="45" r="3" fill="#3e2723" />
+      <circle cx="60" cy="45" r="3" fill="#3e2723" />
+      <path d="M45,55 Q50,60 55,55" fill="none" stroke="#3e2723" strokeWidth="2" />
+    </g>
+  ),
+  'head-slime': (
+    <g>
+      <path d="M20,80 Q10,80 15,60 Q20,10 50,15 Q80,10 85,60 Q90,80 80,80 Q70,80 65,75 Q60,70 55,75 Q50,80 45,75 Q40,70 35,75 Q30,80 20,80" fill="#76ff03" stroke="#33691e" strokeWidth="2" />
+      <path d="M25,25 Q30,35 35,30" fill="none" stroke="#ccff90" strokeWidth="2" opacity="0.6" />
+      {/* Face */}
+      <circle cx="35" cy="45" r="4" fill="#1b5e20" />
+      <circle cx="65" cy="45" r="4" fill="#1b5e20" />
+      <path d="M40,55 Q50,65 60,55" fill="none" stroke="#1b5e20" strokeWidth="2" />
+      {/* Drips */}
+      <path d="M30,75 L30,85 Q30,90 35,85 L35,75" fill="#76ff03" stroke="#33691e" strokeWidth="1" />
+      <path d="M60,75 L60,90 Q60,95 65,90 L65,75" fill="#76ff03" stroke="#33691e" strokeWidth="1" />
+    </g>
+  ),
+  'head-pumpkin': (
+    <g>
+       <path d="M50,15 L50,5 M50,5 Q60,0 65,5" fill="none" stroke="#388e3c" strokeWidth="4" />
+       <ellipse cx="50" cy="55" rx="40" ry="35" fill="#ff6f00" stroke="#e65100" strokeWidth="2" />
+       <path d="M50,20 Q70,20 70,90" fill="none" stroke="#e65100" strokeWidth="2" opacity="0.5" />
+       <path d="M50,20 Q30,20 30,90" fill="none" stroke="#e65100" strokeWidth="2" opacity="0.5" />
+       <path d="M35,45 L45,45 L40,35 Z" fill="#3e2723" />
+       <path d="M55,45 L65,45 L60,35 Z" fill="#3e2723" />
+       <path d="M35,65 L40,75 L50,65 L60,75 L65,65" fill="none" stroke="#3e2723" strokeWidth="3" />
+    </g>
+  ),
+  'head-earth': (
+    <g>
+       <circle cx="50" cy="50" r="40" fill="#2196f3" stroke="#0d47a1" strokeWidth="2" />
+       {/* Continents */}
+       <path d="M20,40 Q30,20 40,30 Q50,40 30,60" fill="#4caf50" opacity="0.8" />
+       <path d="M60,30 Q80,20 85,40 Q90,60 70,70 Q60,60 60,30" fill="#4caf50" opacity="0.8" />
+       {/* Face */}
+       <circle cx="40" cy="50" r="3" fill="#0d47a1" />
+       <circle cx="60" cy="50" r="3" fill="#0d47a1" />
+       <path d="M45,60 Q50,65 55,60" fill="none" stroke="#0d47a1" strokeWidth="2" />
+    </g>
+  ),
+  'head-moon': (
+    <g>
+       <circle cx="50" cy="50" r="40" fill="#bdbdbd" stroke="#616161" strokeWidth="2" />
+       <circle cx="30" cy="30" r="5" fill="#9e9e9e" opacity="0.5" />
+       <circle cx="70" cy="60" r="8" fill="#9e9e9e" opacity="0.5" />
+       <circle cx="60" cy="25" r="4" fill="#9e9e9e" opacity="0.5" />
+       {/* Face */}
+       <circle cx="40" cy="50" r="3" fill="#424242" />
+       <circle cx="60" cy="50" r="3" fill="#424242" />
+       <circle cx="50" cy="60" r="2" fill="#e57373" opacity="0.6" />
+    </g>
+  ),
+  'head-bomb': (
+    <g>
+       <circle cx="50" cy="55" r="35" fill="#212121" stroke="black" strokeWidth="2" />
+       <rect x="45" y="10" width="10" height="15" fill="#424242" />
+       <path d="M50,10 Q60,0 70,5" fill="none" stroke="#ffa000" strokeWidth="2" />
+       <path d="M70,5 L75,0 M70,5 L75,10 M70,5 L65,0" stroke="#ff5722" strokeWidth="2" className="animate-pulse" />
+       {/* Face */}
+       <path d="M35,45 L45,50" stroke="white" strokeWidth="2" />
+       <path d="M65,45 L55,50" stroke="white" strokeWidth="2" />
+       <circle cx="40" cy="60" r="3" fill="white" />
+    </g>
+  ),
+  'head-eye': (
+    <g>
+       <circle cx="50" cy="50" r="40" fill="white" stroke="#bdbdbd" strokeWidth="2" />
+       <circle cx="50" cy="50" r="20" fill="#2196f3" />
+       <circle cx="50" cy="50" r="10" fill="black" />
+       <circle cx="55" cy="45" r="4" fill="white" />
+       <path d="M20,30 Q50,10 80,30" fill="none" stroke="#e0e0e0" strokeWidth="2" opacity="0.5" />
+    </g>
+  ),
+  // --- ANIMALS ---
+  'head-bear-brown': (
+    <g>
+      <circle cx="25" cy="25" r="12" fill="#795548" stroke="#5d4037" strokeWidth="2" />
+      <circle cx="75" cy="25" r="12" fill="#795548" stroke="#5d4037" strokeWidth="2" />
+      <circle cx="50" cy="50" r="40" fill="#8d6e63" stroke="#5d4037" strokeWidth="2" />
+      <ellipse cx="50" cy="55" rx="15" ry="12" fill="#d7ccc8" />
+      <circle cx="50" cy="50" r="4" fill="#3e2723" />
+      <circle cx="35" cy="40" r="3" fill="#3e2723" />
+      <circle cx="65" cy="40" r="3" fill="#3e2723" />
+      <path d="M50,54 L50,60 M45,63 L55,63" stroke="#3e2723" strokeWidth="2" />
+    </g>
+  ),
+  'head-bear-polar': (
+    <g>
+      <circle cx="25" cy="25" r="12" fill="#f5f5f5" stroke="#e0e0e0" strokeWidth="2" />
+      <circle cx="75" cy="25" r="12" fill="#f5f5f5" stroke="#e0e0e0" strokeWidth="2" />
+      <circle cx="50" cy="50" r="40" fill="#fafafa" stroke="#e0e0e0" strokeWidth="2" />
+      <ellipse cx="50" cy="55" rx="15" ry="12" fill="#f5f5f5" />
+      <circle cx="50" cy="50" r="4" fill="#212121" />
+      <circle cx="35" cy="40" r="3" fill="#212121" />
+      <circle cx="65" cy="40" r="3" fill="#212121" />
+      <path d="M50,54 L50,60 M45,63 L55,63" stroke="#212121" strokeWidth="2" />
+    </g>
+  ),
+  'head-bear-aviator': (
+    <g>
+      <circle cx="25" cy="25" r="12" fill="#795548" stroke="#5d4037" strokeWidth="2" />
+      <circle cx="75" cy="25" r="12" fill="#795548" stroke="#5d4037" strokeWidth="2" />
+      <circle cx="50" cy="50" r="40" fill="#8d6e63" stroke="#5d4037" strokeWidth="2" />
+      {/* Cap */}
+      <path d="M10,40 Q50,10 90,40" fill="#5d4037" stroke="#3e2723" strokeWidth="2" />
+      {/* Goggles */}
+      <rect x="20" y="35" width="25" height="15" rx="5" fill="#81d4fa" stroke="#424242" strokeWidth="2" />
+      <rect x="55" y="35" width="25" height="15" rx="5" fill="#81d4fa" stroke="#424242" strokeWidth="2" />
+      <rect x="45" y="40" width="10" height="5" fill="#424242" />
+      <line x1="10" y1="42" x2="20" y2="42" stroke="#3e2723" strokeWidth="3" />
+      <line x1="80" y1="42" x2="90" y2="42" stroke="#3e2723" strokeWidth="3" />
+      {/* Snout */}
+      <ellipse cx="50" cy="65" rx="12" ry="10" fill="#d7ccc8" />
+      <circle cx="50" cy="60" r="3" fill="#3e2723" />
+      <path d="M50,63 L50,68 M46,70 L54,70" stroke="#3e2723" strokeWidth="2" />
+    </g>
+  ),
+  'head-dog-pug': (
+    <g>
+      <path d="M20,30 Q5,40 15,60 L20,40 Z" fill="#3e2723" />
+      <path d="M80,30 Q95,40 85,60 L80,40 Z" fill="#3e2723" />
+      <rect x="15" y="20" width="70" height="65" rx="25" fill="#d7ccc8" stroke="#a1887f" strokeWidth="2" />
+      <ellipse cx="50" cy="55" rx="20" ry="15" fill="#3e2723" opacity="0.8" />
+      <circle cx="35" cy="45" r="5" fill="#3e2723" />
+      <circle cx="65" cy="45" r="5" fill="#3e2723" />
+      <ellipse cx="50" cy="52" rx="8" ry="5" fill="#1a1a1a" />
+      <path d="M40,60 Q50,70 60,60" fill="none" stroke="#d7ccc8" strokeWidth="2" />
+      <path d="M30,60 L25,65" stroke="#3e2723" strokeWidth="2" opacity="0.5" />
+      <path d="M70,60 L75,65" stroke="#3e2723" strokeWidth="2" opacity="0.5" />
+    </g>
+  ),
+  'head-dog-dalmatian': (
+    <g>
+      <path d="M20,20 Q10,40 20,60" fill="#eeeeee" stroke="#e0e0e0" strokeWidth="2" />
+      <path d="M80,20 Q90,40 80,60" fill="#eeeeee" stroke="#e0e0e0" strokeWidth="2" />
+      <circle cx="50" cy="50" r="40" fill="#fafafa" stroke="#e0e0e0" strokeWidth="2" />
+      {/* Spots */}
+      <circle cx="30" cy="30" r="4" fill="#212121" opacity="0.8" />
+      <circle cx="70" cy="25" r="3" fill="#212121" opacity="0.8" />
+      <circle cx="60" cy="70" r="2" fill="#212121" opacity="0.8" />
+      <circle cx="25" cy="60" r="3" fill="#212121" opacity="0.8" />
+      <path d="M20,20 Q10,40 20,60" fill="#212121" /> {/* Left ear black */}
+      {/* Face */}
+      <circle cx="35" cy="45" r="3" fill="#212121" />
+      <circle cx="65" cy="45" r="3" fill="#212121" />
+      <ellipse cx="50" cy="55" rx="6" ry="4" fill="#212121" />
+      <path d="M50,59 L50,65 M45,68 L55,68" stroke="#212121" strokeWidth="2" />
+    </g>
+  ),
+  'head-cat-orange': (
+    <g>
+      <path d="M15,20 L25,50 L50,50 Z" fill="#ffcc80" stroke="#e65100" strokeWidth="2" />
+      <path d="M85,20 L75,50 L50,50 Z" fill="#ffcc80" stroke="#e65100" strokeWidth="2" />
+      <circle cx="50" cy="50" r="40" fill="#ffcc80" stroke="#e65100" strokeWidth="2" />
+      {/* Stripes */}
+      <path d="M50,15 L45,25 L55,25 Z" fill="#e65100" />
+      <path d="M15,50 L25,50" stroke="#e65100" strokeWidth="2" />
+      <path d="M85,50 L75,50" stroke="#e65100" strokeWidth="2" />
+      {/* Face */}
+      <ellipse cx="35" cy="45" rx="4" ry="6" fill="#fff" />
+      <circle cx="35" cy="45" r="2" fill="#212121" />
+      <ellipse cx="65" cy="45" rx="4" ry="6" fill="#fff" />
+      <circle cx="65" cy="45" r="2" fill="#212121" />
+      <circle cx="50" cy="55" r="3" fill="#e91e63" />
+      <path d="M50,58 L40,65 M50,58 L60,65" stroke="#212121" strokeWidth="2" />
+      <line x1="20" y1="55" x2="40" y2="58" stroke="#212121" opacity="0.5" />
+      <line x1="80" y1="55" x2="60" y2="58" stroke="#212121" opacity="0.5" />
+    </g>
+  ),
+  'head-cat-black': (
+    <g>
+      <path d="M15,20 L25,50 L50,50 Z" fill="#212121" stroke="#000" strokeWidth="2" />
+      <path d="M85,20 L75,50 L50,50 Z" fill="#212121" stroke="#000" strokeWidth="2" />
+      <circle cx="50" cy="50" r="40" fill="#212121" stroke="#000" strokeWidth="2" />
+      {/* Eyes */}
+      <ellipse cx="35" cy="45" rx="6" ry="4" fill="#ffeb3b" />
+      <rect x="34" y="41" width="2" height="8" fill="#000" rx="1" />
+      <ellipse cx="65" cy="45" rx="6" ry="4" fill="#ffeb3b" />
+      <rect x="64" y="41" width="2" height="8" fill="#000" rx="1" />
+      <circle cx="50" cy="55" r="2" fill="#f48fb1" />
+      <path d="M50,57 L45,62 M50,57 L55,62" stroke="#fff" strokeWidth="1" />
+    </g>
+  ),
+  'head-lizard': (
+    <g>
+      <ellipse cx="50" cy="50" rx="30" ry="40" fill="#66bb6a" stroke="#2e7d32" strokeWidth="2" />
+      {/* Eyes popping out */}
+      <circle cx="30" cy="30" r="8" fill="#66bb6a" stroke="#2e7d32" strokeWidth="2" />
+      <circle cx="70" cy="30" r="8" fill="#66bb6a" stroke="#2e7d32" strokeWidth="2" />
+      <circle cx="30" cy="30" r="3" fill="#ffeb3b" />
+      <circle cx="70" cy="30" r="3" fill="#ffeb3b" />
+      <rect x="29" y="27" width="2" height="6" fill="black" />
+      <rect x="69" y="27" width="2" height="6" fill="black" />
+      {/* Nostrils */}
+      <circle cx="45" cy="50" r="1" fill="#1b5e20" />
+      <circle cx="55" cy="50" r="1" fill="#1b5e20" />
+      <path d="M40,65 Q50,70 60,65" fill="none" stroke="#1b5e20" strokeWidth="2" />
+      {/* Scales */}
+      <circle cx="50" cy="40" r="2" fill="#4caf50" />
+      <circle cx="40" cy="55" r="2" fill="#4caf50" />
+      <circle cx="60" cy="55" r="2" fill="#4caf50" />
+    </g>
+  ),
+
   // --- EXISTING HATS ---
   'hat-pirate': (
     <g>
@@ -119,7 +396,6 @@ export const AVATAR_ASSETS: Record<string, React.ReactNode> = {
        <path d="M85,40 Q100,30 100,60 L95,45 Z" fill="#d32f2f" />
     </g>
   ),
-  // --- NEW HATS ---
   'hat-cap-backwards': (
     <g>
       <path d="M20,50 Q50,20 80,50" fill="#1976d2" stroke="#0d47a1" strokeWidth="2" />
@@ -169,7 +445,7 @@ export const AVATAR_ASSETS: Record<string, React.ReactNode> = {
     </g>
   ),
 
-  // --- EXISTING BODIES ---
+  // --- BODIES ---
   'body-robot': (
     <g>
       <rect x="25" y="0" width="50" height="60" rx="5" fill="#b0bec5" stroke="#546e7a" strokeWidth="2" />
@@ -279,7 +555,6 @@ export const AVATAR_ASSETS: Record<string, React.ReactNode> = {
       <rect x="48" y="0" width="4" height="60" fill="#333" />
     </g>
   ),
-  // --- NEW BODIES ---
   'body-hoodie': (
     <g>
        <path d="M20,0 L80,0 L85,60 L15,60 Z" fill="#607d8b" stroke="#455a64" strokeWidth="2" />
@@ -333,7 +608,7 @@ export const AVATAR_ASSETS: Record<string, React.ReactNode> = {
     </g>
   ),
 
-  // --- ARMS (LEFT - Viewers Right) ---
+  // --- ARMS (LEFT) ---
   'arm-l-robot': (
     <g transform="rotate(20 25 0)">
        <rect x="0" y="0" width="20" height="50" rx="5" fill="#90a4ae" stroke="#546e7a" />
@@ -419,7 +694,6 @@ export const AVATAR_ASSETS: Record<string, React.ReactNode> = {
        <path d="M5,20 L15,25 M5,40 L15,45 M5,60 L15,65" stroke="#e65100" strokeWidth="2" />
     </g>
   ),
-  // --- NEW ARMS (LEFT) ---
   'arm-l-wing-angel': (
     <g transform="rotate(20 25 0)">
        <path d="M10,0 Q70,20 50,80 Q10,50 10,0" fill="#fff9c4" stroke="#fbc02d" strokeWidth="2" />
@@ -464,8 +738,7 @@ export const AVATAR_ASSETS: Record<string, React.ReactNode> = {
     </g>
   ),
 
-
-  // --- ARMS (RIGHT - Viewers Left) ---
+  // --- ARMS (RIGHT) ---
   'arm-r-robot': (
     <g transform="rotate(-20 25 0)">
        <rect x="5" y="0" width="20" height="50" rx="5" fill="#90a4ae" stroke="#546e7a" />
@@ -551,7 +824,6 @@ export const AVATAR_ASSETS: Record<string, React.ReactNode> = {
        <path d="M10,20 L20,25 M10,40 L20,45 M10,60 L20,65" stroke="#e65100" strokeWidth="2" />
     </g>
   ),
-  // --- NEW ARMS (RIGHT) ---
   'arm-r-wing-angel': (
     <g transform="rotate(-20 25 0)">
        <path d="M15,0 Q75,20 55,80 Q15,50 15,0" fill="#fff9c4" stroke="#fbc02d" strokeWidth="2" />
@@ -596,7 +868,7 @@ export const AVATAR_ASSETS: Record<string, React.ReactNode> = {
     </g>
   ),
 
-  // --- EXISTING LEGS ---
+  // --- LEGS ---
   'legs-wheels': (
     <g>
        <rect x="20" y="0" width="60" height="40" fill="#78909c" />
@@ -704,7 +976,6 @@ export const AVATAR_ASSETS: Record<string, React.ReactNode> = {
        <rect x="60" y="50" width="20" height="10" fill="#607d8b" />
     </g>
   ),
-  // --- NEW LEGS ---
   'legs-boots-rain': (
     <g>
        <rect x="30" y="0" width="15" height="30" fill="#1976d2" />

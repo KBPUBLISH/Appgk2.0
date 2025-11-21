@@ -92,39 +92,48 @@ const transformBooks = (apiBooks: any[]): Book[] => {
 };
 
 // Simple helper to handle potential API calls with authentication
-async function fetchWithTimeout(resource: string, options: RequestInit = {}) {
-  const { timeout = 8000 } = options as any;
+async function fetchWithTimeout(resource: string, options: RequestInit & { timeout?: number } = {}) {
+  const { timeout = 8000, ...fetchOptions } = options;
   
   const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
+  const id = setTimeout(() => {
+    console.warn(`⏱️ Request timeout after ${timeout}ms: ${resource}`);
+    controller.abort();
+  }, timeout);
   
   // Get auth token if available
   const token = authService.getToken();
-  const headers = new Headers(options.headers);
+  const headers = new Headers(fetchOptions.headers);
   
   // Set default headers
   if (!headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
   
-      // Add authorization header if token exists
-      // Format: "Bearer <token>"
-      if (token) {
-        const authHeader = `Bearer ${token}`;
-        headers.set('Authorization', authHeader);
-        console.log('🔑 Adding Authorization header: Bearer', token.substring(0, 20) + '...');
-        console.log('🔑 Full Authorization header length:', authHeader.length, 'characters');
-      } else {
-        console.log('⚠️ No token available, request will be unauthenticated');
-      }
+  // Add authorization header if token exists
+  // Format: "Bearer <token>"
+  if (token) {
+    const authHeader = `Bearer ${token}`;
+    headers.set('Authorization', authHeader);
+    console.log('🔑 Adding Authorization header: Bearer', token.substring(0, 20) + '...');
+    console.log('🔑 Full Authorization header length:', authHeader.length, 'characters');
+  } else {
+    console.log('⚠️ No token available, request will be unauthenticated');
+  }
   
-  const response = await fetch(resource, {
-    ...options,
-    headers,
-    signal: controller.signal  
-  });
-  clearTimeout(id);
-  return response;
+  try {
+    const response = await fetch(resource, {
+      ...fetchOptions,
+      headers,
+      signal: controller.signal  
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    // Re-throw the error so it can be handled by the caller
+    throw error;
+  }
 }
 
 export const ApiService = {
@@ -543,6 +552,20 @@ export const ApiService = {
           } else if (errorData.error) {
             errorMessage = errorData.error;
           }
+          
+          // Check if error is about email confirmation
+          const errorStr = JSON.stringify(errorData).toLowerCase();
+          if (errorStr.includes('confirm') || errorStr.includes('verified') || errorStr.includes('verification')) {
+            // Allow user to proceed anyway - they can confirm email later
+            console.warn('⚠️ Email confirmation required, but allowing access to onboarding');
+            // Return success with a flag that email needs confirmation
+            return {
+              success: true,
+              token: null, // No token yet, but allow navigation
+              error: 'Email confirmation required. You can confirm your email later.',
+              needsConfirmation: true
+            };
+          }
         } catch (parseError) {
           console.error('❌ Could not parse error response:', parseError);
           // Try to get error text
@@ -550,6 +573,16 @@ export const ApiService = {
             const text = await response.text();
             console.error('❌ Error response text:', text);
             errorMessage = text || errorMessage;
+            
+            // Check if text mentions confirmation
+            if (text.toLowerCase().includes('confirm') || text.toLowerCase().includes('verified')) {
+              return {
+                success: true,
+                token: null,
+                error: 'Email confirmation required. You can confirm your email later.',
+                needsConfirmation: true
+              };
+            }
           } catch {
             // Couldn't get error text either
           }
@@ -608,6 +641,7 @@ export const ApiService = {
       const response = await fetchWithTimeout(endpoint, {
         method: 'POST',
         body: JSON.stringify(body),
+        timeout: 10000, // 10 seconds for sign-up (reasonable timeout)
       });
 
       if (response.ok) {
@@ -629,7 +663,18 @@ export const ApiService = {
           user: data.user 
         };
       } else {
-        const errorData = await response.json().catch(() => ({ message: 'Sign-up failed' }));
+        let errorData: any = { message: 'Sign-up failed' };
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          // If response is not JSON, try to get text
+          try {
+            const text = await response.text();
+            errorData = { message: text || `Sign-up failed: ${response.status} ${response.statusText}` };
+          } catch {
+            errorData = { message: `Sign-up failed: ${response.status} ${response.statusText}` };
+          }
+        }
         return { 
           success: false, 
           error: errorData.message || `Sign-up failed: ${response.statusText}` 
@@ -637,9 +682,28 @@ export const ApiService = {
       }
     } catch (error) {
       console.error("Sign-up error:", error);
+      
+      // Handle AbortError specifically
+      if (error instanceof Error && error.name === 'AbortError') {
+        return { 
+          success: false, 
+          error: 'Request timed out. Please check your internet connection and try again.' 
+        };
+      }
+      
+      // Handle other errors
+      if (error instanceof Error) {
+        return { 
+          success: false, 
+          error: error.message.includes('aborted') 
+            ? 'Request was cancelled. Please try again.' 
+            : error.message 
+        };
+      }
+      
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Network error during sign-up' 
+        error: 'Network error during sign-up. Please check your connection and try again.' 
       };
     }
   },

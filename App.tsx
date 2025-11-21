@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import SignInPage from './pages/SignInPage';
+import OnboardingPage from './pages/OnboardingPage';
 import HomePage from './pages/HomePage';
 import ListenPage from './pages/ListenPage';
 import ReadPage from './pages/ReadPage';
@@ -80,6 +81,7 @@ const PanoramaBackground: React.FC = () => {
     const path = location.pathname;
     if (path === '/') return 0;
     if (path === '/signin') return 0;
+    if (path === '/onboarding') return 0;
     if (path === '/home') return 1;
     if (path === '/listen') return 2;
     if (path === '/read') return 3;
@@ -137,6 +139,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const isLanding = location.pathname === '/';
   const isSignIn = location.pathname === '/signin';
+  const isOnboarding = location.pathname === '/onboarding';
   const isBookDetail = location.pathname.startsWith('/book/');
   const isPlayer = location.pathname.startsWith('/player/');
   const isProfile = location.pathname === '/profile';
@@ -155,7 +158,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </div>
 
       {/* Only show BottomNavigation on main tab pages */}
-      {!isLanding && !isSignIn && !isBookDetail && !isPlayer && !isProfile && !isCreateProfile && !isPaywall && !isSettings && <BottomNavigation />}
+      {!isLanding && !isSignIn && !isOnboarding && !isBookDetail && !isPlayer && !isProfile && !isCreateProfile && !isPaywall && !isSettings && <BottomNavigation />}
     </div>
   );
 };
@@ -170,6 +173,7 @@ const App: React.FC = () => {
               <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/signin" element={<SignInPage />} />
+                <Route path="/onboarding" element={<OnboardingPage />} />
                 <Route path="/home" element={<HomePage />} />
                 <Route path="/listen" element={<ListenPage />} />
                 <Route path="/read" element={<ReadPage />} />

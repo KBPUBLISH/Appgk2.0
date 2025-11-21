@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Crown } from 'lucide-react';
+import { Crown, Music } from 'lucide-react';
 import ShopModal from '../features/ShopModal';
 import AvatarDetailModal from '../features/AvatarDetailModal';
 import { useUser } from '../../context/UserContext';
+import { useAudio } from '../../context/AudioContext';
 import AvatarCompositor from '../avatar/AvatarCompositor';
 
 interface HeaderProps {
@@ -15,6 +16,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
   const navigate = useNavigate();
   const { coins, equippedAvatar, equippedFrame, equippedHat, equippedBody, equippedLeftArm, equippedRightArm, equippedLegs, isSubscribed } = useUser();
+  const { musicEnabled, toggleMusic, playClick } = useAudio();
   const [isShopOpen, setIsShopOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
@@ -70,15 +72,33 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
                 </h1>
 
                 <div className="flex items-center gap-2">
+                    {/* Music Toggle Button */}
+                    <button 
+                      onClick={() => {
+                        playClick();
+                        toggleMusic();
+                      }}
+                      className={`bg-black/30 hover:bg-black/40 rounded-full p-2 border transition-colors active:scale-95 ${
+                        musicEnabled ? 'border-[#FFD700]/40' : 'border-white/20'
+                      }`}
+                      title={musicEnabled ? "Music On - Click to turn off" : "Music Off - Click to turn on"}
+                    >
+                        <Music 
+                          size={18} 
+                          className={musicEnabled ? "text-[#FFD700]" : "text-white/50"} 
+                          fill={musicEnabled ? "#FFD700" : "none"}
+                        />
+                    </button>
+
                     {/* Coins / Shop Trigger */}
                     <button 
                       onClick={() => setIsShopOpen(true)}
-                      className="hidden md:flex bg-black/30 hover:bg-black/40 rounded-full px-3 py-1 items-center gap-1.5 border border-[#FFD700]/40 transition-colors active:scale-95"
+                      className="hidden md:flex bg-black/30 hover:bg-black/40 rounded-full px-3.5 py-1.5 items-center gap-2 border border-[#FFD700]/40 transition-colors active:scale-95"
                     >
-                        <div className="w-5 h-5 rounded-full bg-[#FFD700] border border-[#B8860B] flex items-center justify-center shadow-sm">
-                           <span className="text-[#B8860B] font-bold text-[10px]">$</span>
+                        <div className="w-7 h-7 rounded-full bg-[#FFD700] border border-[#B8860B] flex items-center justify-center shadow-sm">
+                           <span className="text-[#B8860B] font-bold text-xs">$</span>
                         </div>
-                        <span className="text-[#FFD700] font-bold font-display text-sm shadow-black drop-shadow-md">{coins}</span>
+                        <span className="text-[#FFD700] font-bold font-display text-base shadow-black drop-shadow-md">{coins}</span>
                     </button>
 
                     {/* Mobile Coins (Smaller) */}
@@ -86,10 +106,10 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
                       onClick={() => setIsShopOpen(true)}
                       className="md:hidden flex flex-col items-center justify-center -space-y-1 active:scale-95"
                     >
-                        <div className="w-6 h-6 rounded-full bg-[#FFD700] border border-[#B8860B] flex items-center justify-center shadow-sm z-10">
-                           <span className="text-[#B8860B] font-bold text-[10px]">$</span>
+                        <div className="w-8 h-8 rounded-full bg-[#FFD700] border border-[#B8860B] flex items-center justify-center shadow-sm z-10">
+                           <span className="text-[#B8860B] font-bold text-xs">$</span>
                         </div>
-                        <span className="text-[#FFD700] font-bold font-display text-[10px] bg-black/40 px-1.5 rounded-full pt-1 pb-0.5 -mt-1">{coins}</span>
+                        <span className="text-[#FFD700] font-bold font-display text-xs bg-black/40 px-2 rounded-full pt-1 pb-0.5 -mt-1">{coins}</span>
                     </button>
                 </div>
             </div>

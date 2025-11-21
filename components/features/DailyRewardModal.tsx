@@ -1,56 +1,280 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import WoodButton from '../ui/WoodButton';
-import { X } from 'lucide-react';
+import { X, Star, Key, Clock } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
+import { useAudio } from '../../context/AudioContext';
 
 interface DailyRewardModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+// --- DATA ---
+const DAILY_VERSES = [
+  { text: "I am with you always", ref: "Matthew 28:20" },
+  { text: "Love one another", ref: "John 13:34" },
+  { text: "Do not be afraid", ref: "Joshua 1:9" },
+  { text: "Trust in the Lord", ref: "Proverbs 3:5" },
+  { text: "The Lord is my shepherd", ref: "Psalm 23:1" },
+  { text: "Let your light shine", ref: "Matthew 5:16" },
+  { text: "God is love", ref: "1 John 4:8" },
+  { text: "Rejoice always", ref: "1 Thess 5:16" }
+];
+
+type GameState = 'cooldown' | 'intro' | 'ready' | 'playing' | 'game-over' | 'success' | 'claimed';
+
+const GAME_DURATION = 30; // 30 seconds
+const COOLDOWN_HOURS = 12; // 12 hours cooldown
+const STORAGE_KEY = 'daily_verse_last_completion';
+
 const DailyRewardModal: React.FC<DailyRewardModalProps> = ({ isOpen, onClose }) => {
   const { addCoins } = useUser();
-  const [step, setStep] = useState<'closed' | 'opening' | 'opened'>('closed');
-  const [shake, setShake] = useState(false);
+  const { playClick, playSuccess, playTab, playBack } = useAudio();
+  
+  const [gameState, setGameState] = useState<GameState>('intro');
+  const [shakeItem, setShakeItem] = useState<number | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
+  
+  // Game Logic State
+  const [verseIndex, setVerseIndex] = useState(0);
+  const [wordChunks, setWordChunks] = useState<{id: number, text: string, isPlaced: boolean}[]>([]);
+  const [shuffledIndices, setShuffledIndices] = useState<number[]>([]);
+  const [nextTargetIndex, setNextTargetIndex] = useState(0);
+  
+  // Timer State
+  const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
+  const [countDown, setCountDown] = useState<string>(''); // For "Ready Set Go"
+  const [earnedStars, setEarnedStars] = useState(0);
+  const [timeUntilNext, setTimeUntilNext] = useState<string>(''); // Cooldown timer
 
+  // Keep track of interval to clear it properly
+  const timerRef = useRef<number | null>(null);
+  const cooldownTimerRef = useRef<number | null>(null);
+
+  // Helper function to check if cooldown is active
+  const getLastCompletionTime = (): number | null => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? parseInt(stored, 10) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const isOnCooldown = (): boolean => {
+    const lastTime = getLastCompletionTime();
+    if (!lastTime) return false;
+    const now = Date.now();
+    const hoursSinceCompletion = (now - lastTime) / (1000 * 60 * 60);
+    return hoursSinceCompletion < COOLDOWN_HOURS;
+  };
+
+  const getTimeUntilNext = (): string => {
+    const lastTime = getLastCompletionTime();
+    if (!lastTime) return '';
+    
+    const now = Date.now();
+    const nextAvailable = lastTime + (COOLDOWN_HOURS * 60 * 60 * 1000);
+    const msRemaining = nextAvailable - now;
+    
+    if (msRemaining <= 0) return '';
+    
+    const hours = Math.floor(msRemaining / (1000 * 60 * 60));
+    const minutes = Math.floor((msRemaining % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((msRemaining % (1000 * 60)) / 1000);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
+
+  // --- SETUP ---
   useEffect(() => {
     if (isOpen) {
-      setStep('closed');
-      setIsClaiming(false);
+      // Check if on cooldown
+      if (isOnCooldown()) {
+        setGameState('cooldown');
+        // Update cooldown timer every second
+        const updateCooldown = () => {
+          const timeRemaining = getTimeUntilNext();
+          setTimeUntilNext(timeRemaining);
+          
+          // If cooldown expired, allow play
+          if (!timeRemaining || !isOnCooldown()) {
+            setGameState('intro');
+            if (cooldownTimerRef.current) {
+              window.clearInterval(cooldownTimerRef.current);
+              cooldownTimerRef.current = null;
+            }
+          }
+        };
+        
+        updateCooldown();
+        cooldownTimerRef.current = window.setInterval(updateCooldown, 1000);
+      } else {
+        initializeGame();
+      }
+    } else {
+      setGameState('intro'); // Reset on close
+      if (timerRef.current) window.clearInterval(timerRef.current);
+      if (cooldownTimerRef.current) window.clearInterval(cooldownTimerRef.current);
     }
+    
+    return () => {
+       if (timerRef.current) window.clearInterval(timerRef.current);
+       if (cooldownTimerRef.current) window.clearInterval(cooldownTimerRef.current);
+    };
   }, [isOpen]);
 
-  const handleChestClick = () => {
-    if (step === 'closed') {
-      setShake(true);
-      setTimeout(() => {
-        setShake(false);
-        setStep('opening');
-        setTimeout(() => setStep('opened'), 600);
-      }, 500);
+  // --- TIMER LOGIC ---
+  useEffect(() => {
+    if (gameState === 'playing') {
+        timerRef.current = window.setInterval(() => {
+            setTimeLeft((prev) => {
+                if (prev <= 1) {
+                    if (timerRef.current) window.clearInterval(timerRef.current);
+                    setGameState('game-over');
+                    playBack(); // Sad sound
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    } else {
+        if (timerRef.current) window.clearInterval(timerRef.current);
     }
+
+    return () => {
+        if (timerRef.current) window.clearInterval(timerRef.current);
+    };
+  }, [gameState]);
+
+  const initializeGame = () => {
+      setGameState('intro');
+      setIsClaiming(false);
+      setNextTargetIndex(0);
+      setTimeLeft(GAME_DURATION);
+      setEarnedStars(0);
+      
+      // Pick random verse
+      const idx = Math.floor(Math.random() * DAILY_VERSES.length);
+      setVerseIndex(idx);
+      
+      // Split into words/chunks
+      const rawText = DAILY_VERSES[idx].text;
+      const chunks = rawText.split(' ').map((text, i) => ({
+        id: i,
+        text,
+        isPlaced: false
+      }));
+      
+      setWordChunks(chunks);
+      
+      // Create shuffled indices properly
+      const indices = chunks.map((_, i) => i);
+      // Fisher-Yates Shuffle
+      for (let i = indices.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [indices[i], indices[j]] = [indices[j], indices[i]];
+      }
+      setShuffledIndices(indices);
+  };
+
+  const currentVerse = DAILY_VERSES[verseIndex];
+
+  // --- GAME FLOW HANDLERS ---
+
+  const startCountdown = () => {
+    playClick();
+    setGameState('ready');
+    
+    // Sequence: Ready -> Set -> GO!
+    setCountDown('READY');
+    
+    setTimeout(() => setCountDown('SET'), 1000);
+    setTimeout(() => {
+        setCountDown('GO!');
+        // Start Actual Game after GO
+        setTimeout(() => {
+             setGameState('playing');
+        }, 1000);
+    }, 2000);
+  };
+
+  const handleRestart = () => {
+      playClick();
+      initializeGame(); // Reset everything to intro
+  };
+
+  const handleWordClick = (chunkId: number) => {
+     if (gameState !== 'playing') return;
+
+     // If clicking the correct next word
+     if (chunkId === nextTargetIndex) {
+        playTab();
+        
+        // Mark as placed using immutable update to ensure React re-renders
+        setWordChunks(prev => prev.map(chunk => 
+            chunk.id === chunkId ? { ...chunk, isPlaced: true } : chunk
+        ));
+        
+        const newNext = nextTargetIndex + 1;
+        setNextTargetIndex(newNext);
+
+        // Check Win (Use wordChunks.length from state reference in closure)
+        if (newNext >= wordChunks.length) {
+            handleWin();
+        }
+     } else {
+         // Wrong word
+         setShakeItem(chunkId);
+         setTimeout(() => setShakeItem(null), 500);
+     }
+  };
+
+  const handleWin = () => {
+      if (timerRef.current) window.clearInterval(timerRef.current);
+      
+      // Calculate Stars based on time left
+      let stars = 1;
+      if (timeLeft > 20) stars = 3;
+      else if (timeLeft > 10) stars = 2;
+      
+      setEarnedStars(stars);
+      
+      setTimeout(() => {
+        playSuccess();
+        setGameState('success');
+      }, 500);
   };
 
   const handleClaim = () => {
     setIsClaiming(true);
-    addCoins(50); // Add 50 real coins
-    // Wait for animation to finish before closing
+    // UPDATED COIN REWARDS: 50/25/10
+    const coinReward = earnedStars === 3 ? 50 : earnedStars === 2 ? 25 : 10;
+    addCoins(coinReward);
+    
+    // Store completion timestamp
+    localStorage.setItem(STORAGE_KEY, Date.now().toString());
+    
     setTimeout(() => {
         onClose();
-    }, 1000);
+    }, 1500);
   };
 
   if (!isOpen) return null;
 
-  const content = (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 pointer-events-auto">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
-        onClick={step === 'opened' && !isClaiming ? onClose : undefined}
+        onClick={gameState === 'success' && !isClaiming ? onClose : undefined}
       ></div>
 
       {/* FLYING COINS ANIMATION OVERLAY */}
@@ -61,10 +285,12 @@ const DailyRewardModal: React.FC<DailyRewardModalProps> = ({ isOpen, onClose }) 
                     key={i}
                     className="absolute w-8 h-8 bg-[#FFD700] border-2 border-[#B8860B] rounded-full shadow-xl flex items-center justify-center text-[#B8860B] font-bold text-xs z-[150]"
                     style={{
+                        top: '50%',
+                        left: '50%',
                         animation: `flyCoin 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards`,
                         animationDelay: `${i * 0.05}s`,
-                        '--scatter-x': `${(Math.random() - 0.5) * 150}px` as any,
-                        '--scatter-y': `${(Math.random() - 0.5) * 150}px` as any,
+                        '--scatter-x': `${(Math.random() - 0.5) * 300}px`,
+                        '--scatter-y': `${(Math.random() - 0.5) * 300}px`,
                     } as React.CSSProperties}
                  >
                     $
@@ -76,8 +302,7 @@ const DailyRewardModal: React.FC<DailyRewardModalProps> = ({ isOpen, onClose }) 
       {/* Main Card */}
       <div className={`
          relative w-full max-w-sm bg-[#3E1F07] rounded-3xl p-1 border-4 border-[#8B4513] shadow-2xl 
-         transition-all duration-500 transform
-         ${step === 'opening' ? 'scale-105' : 'scale-100'}
+         transition-all duration-500 transform overflow-hidden
          ${isClaiming ? 'scale-90 opacity-0 duration-700' : 'animate-in zoom-in-95 slide-in-from-bottom-10'}
       `}>
           
@@ -86,18 +311,13 @@ const DailyRewardModal: React.FC<DailyRewardModalProps> = ({ isOpen, onClose }) 
               <div className="absolute inset-0 opacity-20" 
                    style={{ backgroundImage: 'repeating-linear-gradient(45deg, #3E1F07 0px, #3E1F07 20px, #5c2e0b 20px, #5c2e0b 40px)' }}>
               </div>
+              
               {/* Light Burst Effect (Behind Chest) */}
               <div className={`
                   absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] 
                   bg-gradient-to-r from-transparent via-[#FFD700]/30 to-transparent
                   transition-opacity duration-1000
-                  ${step === 'opened' ? 'opacity-100 animate-[spin_10s_linear_infinite]' : 'opacity-0'}
-              `} style={{clipPath: 'polygon(50% 50%, 0 0, 100% 0, 50% 50%, 100% 100%, 0 100%)'}}></div>
-               <div className={`
-                  absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] 
-                  bg-gradient-to-b from-transparent via-[#FFD700]/30 to-transparent
-                  transition-opacity duration-1000 delay-100
-                  ${step === 'opened' ? 'opacity-100 animate-[spin_15s_linear_infinite_reverse]' : 'opacity-0'}
+                  ${gameState === 'success' ? 'opacity-100 animate-[spin_10s_linear_infinite]' : 'opacity-0'}
               `} style={{clipPath: 'polygon(50% 50%, 0 0, 100% 0, 50% 50%, 100% 100%, 0 100%)'}}></div>
           </div>
 
@@ -110,102 +330,195 @@ const DailyRewardModal: React.FC<DailyRewardModalProps> = ({ isOpen, onClose }) 
           </button>
 
           {/* Content Container */}
-          <div className="relative z-10 flex flex-col items-center pt-10 pb-8 px-6 text-center min-h-[400px]">
+          <div className="relative z-10 flex flex-col items-center pt-8 pb-8 px-6 text-center min-h-[420px]">
               
-              <h2 className="font-display font-extrabold text-2xl text-[#FFD700] drop-shadow-md tracking-wide mb-2 uppercase">
-                {step === 'opened' ? 'Daily Treasure!' : 'Daily Gift'}
+              <h2 className="font-display font-extrabold text-2xl text-[#FFD700] drop-shadow-md tracking-wide mb-4 uppercase">
+                Key of Truth
               </h2>
-              
-              <p className="text-[#eecaa0] font-bold text-sm mb-8 opacity-90">
-                 {step === 'opened' ? 'You found wisdom & gold!' : 'Tap the chest to open'}
-              </p>
 
-              {/* CHEST GRAPHIC */}
-              <div 
-                onClick={handleChestClick}
-                className={`
-                   relative w-48 h-48 cursor-pointer transition-transform duration-100
-                   ${shake ? 'animate-[shake_0.5s_ease-in-out]' : ''}
-                   ${step === 'opened' ? 'mt-4 mb-8' : 'mt-10'}
-                `}
-              >
-                  {step !== 'opened' ? (
-                    // CLOSED CHEST SVG
-                    <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-2xl filter">
-                         {/* Bottom Box */}
-                         <path d="M20,80 L180,80 L170,160 Q100,175 30,160 Z" fill="#8B4513" stroke="#3E1F07" strokeWidth="3" />
-                         <path d="M20,80 L180,80 L180,140 L20,140 Z" fill="url(#woodGrain)" opacity="0.5" />
-                         
-                         {/* Lid (Closed) */}
-                         <path d="M15,80 Q100,30 185,80" fill="#A0522D" stroke="#3E1F07" strokeWidth="3" />
-                         <path d="M15,80 Q100,30 185,80" fill="url(#woodGrain)" opacity="0.4" />
-                         
-                         {/* Gold Trim */}
-                         <path d="M90,75 L110,75 L110,95 Q100,100 90,95 Z" fill="#FFD700" stroke="#B8860B" strokeWidth="2" />
-                         <path d="M20,80 L180,80" fill="none" stroke="#FFD700" strokeWidth="4" />
-                         
-                         {/* Lock */}
-                         <circle cx="100" cy="90" r="8" fill="#FFD700" stroke="#B8860B" strokeWidth="1" />
-                         
-                         {/* Pulsing Glow */}
-                         <circle cx="100" cy="100" r="60" fill="none" stroke="#FFD700" strokeWidth="2" className="animate-ping opacity-20" />
-                    </svg>
-                  ) : (
-                    // OPENED CHEST SVG
-                    <div className="relative animate-[popChest_0.6s_cubic-bezier(0.175,0.885,0.32,1.275)]">
-                        <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-2xl">
-                            {/* Back Inside */}
-                            <path d="M30,80 L170,80 L165,130 L35,130 Z" fill="#2a1201" />
-                            
-                            {/* Lid (Open) */}
-                            <path d="M20,80 L180,80 L160,20 Q100,10 40,20 Z" fill="#8B4513" stroke="#3E1F07" strokeWidth="2" />
-                            <path d="M20,80 L180,80" stroke="#FFD700" strokeWidth="3" />
-                            
-                            {/* Bottom Box */}
-                            <path d="M20,80 L180,80 L175,150 Q100,165 25,150 Z" fill="#8B4513" stroke="#3E1F07" strokeWidth="3" />
-                            
-                            {/* Gold Coins Overflowing */}
-                            <circle cx="60" cy="75" r="10" fill="#FFD700" stroke="#B8860B" />
-                            <circle cx="80" cy="70" r="12" fill="#FFD700" stroke="#B8860B" />
-                            <circle cx="100" cy="75" r="11" fill="#FFD700" stroke="#B8860B" />
-                            <circle cx="120" cy="70" r="10" fill="#FFD700" stroke="#B8860B" />
-                            <circle cx="140" cy="78" r="9" fill="#FFD700" stroke="#B8860B" />
-                            <circle cx="90" cy="60" r="10" fill="#FFD700" stroke="#B8860B" />
-                            
-                            {/* Sparkles */}
-                            <g className="animate-pulse">
-                                <path d="M50,40 L55,30 L60,40 L70,45 L60,50 L55,60 L50,50 L40,45 Z" fill="white" />
-                                <path d="M150,50 L153,45 L156,50 L161,53 L156,56 L153,61 L150,56 L145,53 Z" fill="white" />
-                            </g>
-                        </svg>
-                    </div>
-                  )}
-              </div>
-
-              {/* REWARD CONTENT */}
-              {step === 'opened' && !isClaiming && (
-                  <div className="w-full animate-in slide-in-from-bottom-4 fade-in duration-700 delay-100 flex flex-col items-center">
+              {/* --- PHASE 0: COOLDOWN SCREEN --- */}
+              {gameState === 'cooldown' && (
+                  <div className="flex flex-col items-center animate-in fade-in w-full flex-1 justify-center">
                       
-                      {/* Verse Card */}
-                      <div className="bg-[#f3e5ab] text-[#5c2e0b] p-4 rounded-lg shadow-inner border-2 border-[#d4b483] w-full mb-4 relative">
-                          <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#8B4513] text-[#FFD700] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#FFD700]">VERSE OF THE DAY</div>
-                          <p className="font-display font-bold text-lg italic leading-snug">
-                            "Be strong and courageous. Do not be afraid; do not be discouraged."
+                      {/* Clock Icon */}
+                      <div className="relative w-32 h-32 mb-6">
+                          <Clock size={80} className="text-[#FFD700] animate-pulse" />
+                      </div>
+
+                      <div className="bg-black/20 rounded-xl p-4 mb-6 backdrop-blur-sm border border-[#eecaa0]/20">
+                          <p className="text-[#eecaa0] font-bold text-lg mb-2">
+                            Come Back Soon!
                           </p>
-                          <p className="text-xs font-bold text-right mt-2 opacity-70">— Joshua 1:9</p>
-                      </div>
-
-                      {/* Coin Reward */}
-                      <div className="flex items-center gap-2 mb-6 bg-black/30 px-4 py-2 rounded-full border border-[#FFD700]/50">
-                          <div className="w-6 h-6 rounded-full bg-[#FFD700] border border-[#B8860B] flex items-center justify-center shadow-sm">
-                              <span className="text-[#B8860B] font-bold text-xs">$</span>
+                          <p className="text-white/70 text-sm leading-relaxed mb-3">
+                             You've already completed today's verse. The next challenge will be available in:
+                          </p>
+                          <div className="text-[#FFD700] font-display font-black text-3xl mb-2">
+                            {timeUntilNext || '0s'}
                           </div>
-                          <span className="text-white font-bold font-display text-xl">+50 Coins</span>
+                          <p className="text-white/60 text-xs">
+                            (Resets every 12 hours)
+                          </p>
                       </div>
 
-                      <WoodButton onClick={handleClaim} fullWidth className="py-3 text-lg shadow-xl">
-                          CLAIM REWARD
+                      <WoodButton onClick={onClose} className="px-10 py-4 text-xl">
+                          CLOSE
                       </WoodButton>
+                  </div>
+              )}
+
+              {/* --- PHASE 1: INTRO SCREEN --- */}
+              {gameState === 'intro' && (
+                  <div className="flex flex-col items-center animate-in fade-in w-full flex-1 justify-center">
+                      
+                      {/* Locked Chest Icon */}
+                      <div className="relative w-32 h-32 mb-6 animate-bounce-slow">
+                          <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-2xl filter contrast-125">
+                            <path d="M30,80 L170,80 L165,130 L35,130 Z" fill="#2a1201" />
+                            <path d="M20,80 L180,80 L160,20 Q100,10 40,20 Z" fill="#8B4513" stroke="#3E1F07" strokeWidth="2" />
+                            <rect x="20" y="80" width="160" height="10" fill="#5c2e0b" />
+                            <path d="M20,80 L180,80 L175,150 Q100,165 25,150 Z" fill="#8B4513" stroke="#3E1F07" strokeWidth="3" />
+                            {/* Lock Shackle */}
+                            <path d="M85,70 L85,60 Q85,45 100,45 Q115,45 115,60 L115,70" fill="none" stroke="#FFD700" strokeWidth="6" />
+                            {/* Lock Body */}
+                            <rect x="80" y="70" width="40" height="30" rx="4" fill="#FFD700" stroke="#B8860B" strokeWidth="2" />
+                            <circle cx="100" cy="85" r="4" fill="#3E1F07" />
+                          </svg>
+                      </div>
+
+                      <div className="bg-black/20 rounded-xl p-4 mb-6 backdrop-blur-sm border border-[#eecaa0]/20">
+                          <p className="text-[#eecaa0] font-bold text-lg mb-1 flex items-center justify-center gap-2">
+                            <Key size={18} /> Verse Builder
+                          </p>
+                          <p className="text-white/70 text-sm leading-relaxed">
+                             Tap the floating words in order to build the Key of Truth and unlock the chest!
+                          </p>
+                      </div>
+
+                      <WoodButton onClick={startCountdown} className="px-10 py-4 text-xl shadow-[0_0_20px_rgba(255,215,0,0.3)]">
+                          START (30s)
+                      </WoodButton>
+                  </div>
+              )}
+
+              {/* --- PHASE 2: READY SET GO --- */}
+              {gameState === 'ready' && (
+                   <div className="flex items-center justify-center flex-1 w-full h-full absolute inset-0 bg-black/40 backdrop-blur-sm z-50 rounded-[20px]">
+                       <h1 className="font-display font-black text-6xl text-[#FFD700] animate-[ping_0.5s_ease-in-out] drop-shadow-[0_4px_0_#B8860B]">
+                           {countDown}
+                       </h1>
+                   </div>
+              )}
+
+              {/* --- PHASE 3: PLAYING --- */}
+              {gameState === 'playing' && (
+                  <div className="flex flex-col w-full h-full flex-1">
+                      {/* HUD */}
+                      <div className="flex justify-between items-center w-full mb-6 px-2">
+                          <div className="bg-black/30 px-3 py-1 rounded-full border border-white/10 text-white text-sm font-bold font-sans">
+                             {currentVerse.ref}
+                          </div>
+                          <div className={`font-display font-black text-2xl drop-shadow-sm ${timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-[#FFD700]'}`}>
+                             00:{timeLeft.toString().padStart(2, '0')}
+                          </div>
+                      </div>
+
+                      {/* Slots (Target) */}
+                      <div className="flex flex-wrap gap-2 justify-center mb-8 min-h-[60px]">
+                          {wordChunks.map((chunk, i) => (
+                              <div 
+                                key={`slot-${i}`}
+                                className={`
+                                    h-10 px-3 rounded-lg border-2 flex items-center justify-center font-bold text-sm font-sans transition-all duration-300
+                                    ${chunk.isPlaced 
+                                        ? 'bg-[#FFD700] border-[#B8860B] text-[#3E1F07] shadow-md scale-100' 
+                                        : 'bg-black/20 border-white/10 border-dashed text-transparent scale-95'}
+                                `}
+                              >
+                                  {chunk.text}
+                              </div>
+                          ))}
+                      </div>
+
+                      {/* Word Bank (Sources) */}
+                      <div className="flex flex-wrap gap-3 justify-center mt-auto mb-4 content-start min-h-[120px]">
+                          {shuffledIndices.map((idx) => {
+                              const chunk = wordChunks[idx];
+                              if (chunk.isPlaced) return <div key={`word-${idx}`} className="w-16 h-10"></div>; // Placeholder to keep layout stable-ish
+                              
+                              return (
+                                  <button
+                                      key={`word-${idx}`}
+                                      onClick={() => handleWordClick(idx)}
+                                      className={`
+                                          bg-[#f3e5ab] border-b-4 border-[#d4a373] text-[#5c2e0b] font-bold font-sans px-4 py-2 rounded-xl shadow-lg
+                                          active:border-b-0 active:translate-y-1 transition-all
+                                          ${shakeItem === idx ? 'animate-[shake_0.4s_ease-in-out] bg-red-100 border-red-300' : ''}
+                                      `}
+                                  >
+                                      {chunk.text}
+                                  </button>
+                              );
+                          })}
+                      </div>
+                  </div>
+              )}
+
+              {/* --- PHASE 4: GAME OVER --- */}
+              {gameState === 'game-over' && (
+                  <div className="flex flex-col items-center justify-center flex-1 w-full animate-in zoom-in">
+                      <div className="text-6xl mb-4">😢</div>
+                      <h3 className="font-display font-bold text-2xl text-white mb-2">Time's Up!</h3>
+                      <p className="text-[#eecaa0] mb-6">You were so close to unlocking the truth.</p>
+                      <WoodButton onClick={handleRestart}>TRY AGAIN</WoodButton>
+                  </div>
+              )}
+
+              {/* --- PHASE 5: SUCCESS / CLAIM --- */}
+              {gameState === 'success' && (
+                  <div className="flex flex-col items-center justify-center flex-1 w-full animate-in zoom-in duration-500">
+                      
+                      {/* Open Chest Animation */}
+                       <div className="relative w-32 h-32 mb-6">
+                          <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-2xl filter contrast-125">
+                             {/* Lid Open */}
+                             <g className="origin-bottom transition-transform duration-1000 -translate-y-4 -rotate-12">
+                                <path d="M20,80 L180,80 L160,20 Q100,10 40,20 Z" fill="#8B4513" stroke="#3E1F07" strokeWidth="2" />
+                                <path d="M85,60 L115,60 L115,70 L85,70 Z" fill="#FFD700" />
+                             </g>
+                             {/* Chest Body */}
+                             <path d="M30,80 L170,80 L165,130 L35,130 Z" fill="#2a1201" /> 
+                             <path d="M20,80 L180,80 L175,150 Q100,165 25,150 Z" fill="#8B4513" stroke="#3E1F07" strokeWidth="3" />
+                             {/* Coins overflowing */}
+                             <circle cx="60" cy="90" r="10" fill="#FFD700" stroke="#B8860B" />
+                             <circle cx="80" cy="85" r="12" fill="#FFD700" stroke="#B8860B" />
+                             <circle cx="100" cy="90" r="10" fill="#FFD700" stroke="#B8860B" />
+                             <circle cx="120" cy="85" r="11" fill="#FFD700" stroke="#B8860B" />
+                             <circle cx="140" cy="92" r="9" fill="#FFD700" stroke="#B8860B" />
+                          </svg>
+                      </div>
+
+                      <h3 className="font-display font-bold text-3xl text-[#FFD700] mb-1 drop-shadow-sm">CHEST UNLOCKED!</h3>
+                      <p className="text-white/80 font-sans font-bold mb-6">{currentVerse.ref}</p>
+                      
+                      {/* Star Rating */}
+                      <div className="flex gap-2 mb-8">
+                          {[1, 2, 3].map((star) => (
+                              <div key={star} className={`transform transition-all duration-500 ${star <= earnedStars ? 'scale-110' : 'scale-90 opacity-30'}`}>
+                                  <Star 
+                                    size={40} 
+                                    fill={star <= earnedStars ? "#FFD700" : "none"} 
+                                    className={star <= earnedStars ? "text-[#B8860B] drop-shadow-md" : "text-gray-400"} 
+                                    strokeWidth={3}
+                                  />
+                              </div>
+                          ))}
+                      </div>
+
+                      <div className="w-full px-8">
+                          <WoodButton variant="gold" fullWidth onClick={handleClaim} className="py-4 text-xl shadow-[0_0_20px_#FFD700]">
+                              CLAIM {earnedStars === 3 ? 50 : earnedStars === 2 ? 25 : 10} COINS
+                          </WoodButton>
+                      </div>
                   </div>
               )}
 
@@ -214,39 +527,19 @@ const DailyRewardModal: React.FC<DailyRewardModalProps> = ({ isOpen, onClose }) 
 
       <style>{`
         @keyframes shake {
-          0%, 100% { transform: rotate(0deg); }
-          25% { transform: rotate(-5deg); }
-          75% { transform: rotate(5deg); }
-        }
-        @keyframes popChest {
-          0% { transform: scale(0.8) translateY(10px); }
-          50% { transform: scale(1.1) translateY(-10px); }
-          100% { transform: scale(1) translateY(0); }
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
         }
         @keyframes flyCoin {
-          0% {
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) scale(1);
-            opacity: 1;
-          }
-          30% {
-            transform: translate(var(--scatter-x), var(--scatter-y)) scale(1.2);
-            opacity: 1;
-          }
-          100% {
-            top: 4%;
-            left: 85%; /* Approximate Header Coin Location */
-            transform: translate(-50%, -50%) scale(0.4);
-            opacity: 0;
-          }
+          0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+          20% { transform: translate(calc(-50% + var(--scatter-x)), calc(-50% + var(--scatter-y))) scale(1); opacity: 1; }
+          100% { transform: translate(calc(-50% + 200px), -600px) scale(0.5); opacity: 0; }
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
-
-  // Use Portal to render at document.body level to ensure it covers everything
-  return createPortal(content, document.body);
 };
 
 export default DailyRewardModal;

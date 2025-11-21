@@ -10,6 +10,7 @@ interface AudioContextType {
   playBack: () => void;
   playSuccess: () => void;
   playTab: () => void;
+  setGameMode: (active: boolean, type?: 'default' | 'workout') => void;
 }
 
 const AudioContext = createContext<AudioContextType>({
@@ -21,37 +22,53 @@ const AudioContext = createContext<AudioContextType>({
   playBack: () => {},
   playSuccess: () => {},
   playTab: () => {},
+  setGameMode: () => {},
 });
 
 export const useAudio = () => useContext(AudioContext);
 
-// A simple cheerful background loop URL (Creative Commons / Royalty Free placeholder)
-const BG_MUSIC_URL = "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3?filename=playful-15-sec-intro-music-loop-2-21350.mp3";
+// Ambient Ocean Sound (Main App)
+// IMPORTANT: This must be a direct MP3 file URL (ends in .mp3), not a webpage URL
+// For Suno tracks: Download the MP3 and host it, or use a direct audio CDN URL
+// Example: "https://your-cdn.com/path/to/background-music.mp3"
+const BG_MUSIC_URL = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
+
+// Upbeat Game Music (Daily Verse, Challenge) - "Happy Pop"
+const GAME_MUSIC_URL = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3";
+
+// Energetic Workout Music (Strength Game) - Upbeat Dance/Electronic
+// Using a reliable test music source - replace with your own workout music file
+const WORKOUT_MUSIC_URL = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3";
 
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [sfxEnabled, setSfxEnabled] = useState(true);
+  const [musicMode, setMusicMode] = useState<'bg' | 'game' | 'workout'>('bg');
   
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const bgAudioRef = useRef<HTMLAudioElement | null>(null);
+  const gameAudioRef = useRef<HTMLAudioElement | null>(null);
+  const workoutAudioRef = useRef<HTMLAudioElement | null>(null);
+  
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  // Initialize Audio Context lazily (browsers require interaction first)
+  // Initialize Audio Context lazily
   const getAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
     }
     return audioContextRef.current;
   }, []);
 
   // --- SOUND GENERATORS (Synthesizers) ---
-  // We use synthesized sounds to avoid loading external files for UI clicks.
 
   const playTone = useCallback((freq: number, type: OscillatorType, duration: number, vol: number = 0.1) => {
     if (!sfxEnabled) return;
     const ctx = getAudioContext();
+    
+    if (ctx.state === 'suspended') {
+        ctx.resume();
+    }
+
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     
@@ -69,26 +86,23 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [sfxEnabled, getAudioContext]);
 
   const playClick = useCallback(() => {
-    // Wood-block style click
     playTone(300, 'sine', 0.1, 0.15);
     playTone(400, 'triangle', 0.05, 0.05);
   }, [playTone]);
 
   const playBack = useCallback(() => {
-    // Lower pitch "cancel" or "back" sound
     playTone(200, 'sine', 0.15, 0.1);
   }, [playTone]);
 
   const playTab = useCallback(() => {
-    // Light high pitch tick
     playTone(600, 'sine', 0.05, 0.05);
   }, [playTone]);
 
   const playSuccess = useCallback(() => {
     if (!sfxEnabled) return;
     const ctx = getAudioContext();
+    if (ctx.state === 'suspended') ctx.resume();
     
-    // Arpeggio
     const now = ctx.currentTime;
     [440, 554, 659, 880].forEach((freq, i) => {
         const osc = ctx.createOscillator();
@@ -104,39 +118,215 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   }, [sfxEnabled, getAudioContext]);
 
+  const setGameMode = useCallback((active: boolean, type: 'default' | 'workout' = 'default') => {
+      if (!active) {
+          setMusicMode('bg');
+      } else {
+          setMusicMode(type === 'workout' ? 'workout' : 'game');
+      }
+  }, []);
+
 
   // --- BACKGROUND MUSIC LOGIC ---
   useEffect(() => {
-    if (!audioRef.current) {
-        audioRef.current = new Audio(BG_MUSIC_URL);
-        audioRef.current.loop = true;
-        audioRef.current.volume = 0.3; 
+    // Initialize audio elements with error handling
+    if (!bgAudioRef.current) {
+        bgAudioRef.current = new Audio(BG_MUSIC_URL);
+        bgAudioRef.current.loop = true;
+        bgAudioRef.current.volume = 0;
+        bgAudioRef.current.preload = 'auto';
+        bgAudioRef.current.addEventListener('error', (e) => {
+            console.error('❌ BG Music load error:', e, BG_MUSIC_URL);
+        });
+        bgAudioRef.current.addEventListener('canplaythrough', () => {
+            console.log('✅ BG Music loaded');
+        });
     }
+
+    if (!gameAudioRef.current) {
+        gameAudioRef.current = new Audio(GAME_MUSIC_URL);
+        gameAudioRef.current.loop = true;
+        gameAudioRef.current.volume = 0;
+        gameAudioRef.current.preload = 'auto';
+        gameAudioRef.current.addEventListener('error', (e) => {
+            console.error('❌ Game Music load error:', e, GAME_MUSIC_URL);
+        });
+        gameAudioRef.current.addEventListener('canplaythrough', () => {
+            console.log('✅ Game Music loaded');
+        });
+    }
+
+    if (!workoutAudioRef.current) {
+        workoutAudioRef.current = new Audio(WORKOUT_MUSIC_URL);
+        workoutAudioRef.current.loop = true;
+        workoutAudioRef.current.volume = 0;
+        workoutAudioRef.current.preload = 'auto';
+        workoutAudioRef.current.addEventListener('error', (e) => {
+            console.error('❌ Workout Music load error:', e, WORKOUT_MUSIC_URL);
+        });
+        workoutAudioRef.current.addEventListener('canplaythrough', () => {
+            console.log('✅ Workout Music loaded');
+        });
+    }
+
+    const bg = bgAudioRef.current;
+    const game = gameAudioRef.current;
+    const workout = workoutAudioRef.current;
+
+    const fadeIntervals: number[] = [];
+
+    const fadeTo = (audio: HTMLAudioElement, targetVol: number) => {
+        if (!musicEnabled) {
+            audio.pause();
+            return;
+        }
+        
+        // Check if audio is ready to play
+        const isReady = audio.readyState >= 2; // HAVE_CURRENT_DATA or higher
+        
+        const tryPlay = async () => {
+            // Check if audio has a valid source before trying to play
+            if (audio.networkState === 3) { // NETWORK_NO_SOURCE
+                console.error('❌ Audio has no supported sources:', audio.src);
+                return;
+            }
+            
+            // Wait for audio to be ready if not already
+            if (!isReady) {
+                const waitForReady = () => {
+                    return new Promise<void>((resolve) => {
+                        if (audio.readyState >= 2) {
+                            resolve();
+                        } else {
+                            const onCanPlay = () => {
+                                audio.removeEventListener('canplay', onCanPlay);
+                                resolve();
+                            };
+                            const onError = () => {
+                                audio.removeEventListener('error', onError);
+                                console.error('❌ Audio load error for:', audio.src);
+                                resolve(); // Resolve anyway to not block
+                            };
+                            audio.addEventListener('canplay', onCanPlay);
+                            audio.addEventListener('error', onError);
+                            // Timeout after 5 seconds
+                            setTimeout(() => {
+                                audio.removeEventListener('canplay', onCanPlay);
+                                audio.removeEventListener('error', onError);
+                                resolve();
+                            }, 5000);
+                        }
+                    });
+                };
+                await waitForReady();
+            }
+            
+            // Final check before playing
+            if (audio.networkState === 3 || audio.readyState === 0) {
+                console.error('❌ Audio not ready to play:', {
+                    networkState: audio.networkState,
+                    readyState: audio.readyState,
+                    src: audio.src
+                });
+                return;
+            }
+            
+            try {
+                if (targetVol > 0 && audio.paused) {
+                    await audio.play();
+                    console.log('✅ Music started:', audio.src.substring(0, 50) + '...');
+                }
+            } catch (error) {
+                console.warn('⚠️ Music play failed, will retry on user interaction:', error);
+                // Store which audio needs to play
+                audio.dataset.needsPlay = 'true';
+            }
+        };
+
+        tryPlay();
+
+        const step = 0.05;
+        const i = window.setInterval(() => {
+            if (Math.abs(audio.volume - targetVol) < step) {
+                audio.volume = targetVol;
+                if (targetVol === 0) audio.pause();
+                clearInterval(i);
+                const index = fadeIntervals.indexOf(i);
+                if (index > -1) fadeIntervals.splice(index, 1);
+            } else if (audio.volume < targetVol) {
+                audio.volume = Math.min(1, audio.volume + step);
+            } else {
+                audio.volume = Math.max(0, audio.volume - step);
+            }
+        }, 100);
+        fadeIntervals.push(i);
+    };
 
     if (musicEnabled) {
-        // Browser autoplay policy might block this until first interaction
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(error => {
-                console.log("Auto-play prevented. Music will start after interaction.");
-                // We could add a "one-time global click listener" here to start music
-                const startAudio = () => {
-                    if (musicEnabled && audioRef.current) audioRef.current.play();
-                    document.removeEventListener('click', startAudio);
-                    document.removeEventListener('touchstart', startAudio);
-                };
-                document.addEventListener('click', startAudio);
-                document.addEventListener('touchstart', startAudio);
-            });
+        if (musicMode === 'bg') {
+            fadeTo(bg, 0.25);
+            fadeTo(game, 0);
+            fadeTo(workout, 0);
+        } else if (musicMode === 'game') {
+            fadeTo(bg, 0);
+            fadeTo(game, 0.3);
+            fadeTo(workout, 0);
+        } else if (musicMode === 'workout') {
+            fadeTo(bg, 0);
+            fadeTo(game, 0);
+            fadeTo(workout, 0.4); // Increased volume for workout
         }
     } else {
-        audioRef.current.pause();
+        bg.pause();
+        game.pause();
+        workout.pause();
     }
+    
+    // Interaction unlock - retry playing audio that failed
+    const unlockAudio = async () => {
+        if (musicEnabled) {
+            // Try to play the active music mode
+            if (musicMode === 'bg' && bg.paused) {
+                try {
+                    await bg.play();
+                    console.log('✅ BG Music started via user interaction');
+                } catch (e) {
+                    console.warn('Failed to play bg music:', e);
+                }
+            }
+            if (musicMode === 'game' && game.paused) {
+                try {
+                    await game.play();
+                    console.log('✅ Game Music started via user interaction');
+                } catch (e) {
+                    console.warn('Failed to play game music:', e);
+                }
+            }
+            if (musicMode === 'workout' && workout.paused) {
+                try {
+                    await workout.play();
+                    console.log('✅ Workout Music started via user interaction');
+                } catch (e) {
+                    console.warn('Failed to play workout music:', e);
+                }
+            }
+        }
+        if (audioContextRef.current?.state === 'suspended') {
+            audioContextRef.current.resume();
+        }
+    };
+
+    // Add listeners for user interaction to unlock audio (persistent, not once)
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
 
     return () => {
-        // Cleanup not typically needed for singleton global music, but good practice
+        // Cleanup intervals
+        fadeIntervals.forEach(interval => clearInterval(interval));
+        window.removeEventListener('click', unlockAudio);
+        window.removeEventListener('touchstart', unlockAudio);
     };
-  }, [musicEnabled]);
+  }, [musicEnabled, musicMode]);
 
   const toggleMusic = () => setMusicEnabled(prev => !prev);
   const toggleSfx = () => setSfxEnabled(prev => !prev);
@@ -146,11 +336,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         musicEnabled, 
         sfxEnabled, 
         toggleMusic, 
-        toggleSfx,
+        toggleSfx, 
         playClick,
         playBack,
         playSuccess,
-        playTab
+        playTab,
+        setGameMode
     }}>
       {children}
     </AudioContext.Provider>

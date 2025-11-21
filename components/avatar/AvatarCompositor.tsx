@@ -1,6 +1,8 @@
 
 import React from 'react';
 import { AVATAR_ASSETS } from './AvatarAssets';
+import DraggableArm from './DraggableArm';
+import { useUser, ArmPosition } from '../../context/UserContext';
 
 interface AvatarCompositorProps {
   headUrl: string;
@@ -10,6 +12,8 @@ interface AvatarCompositorProps {
   rightArm?: string | null;
   legs?: string | null;
   className?: string;
+  isEditable?: boolean; // Enable/disable arm positioning (default: false)
+  onEditRequest?: () => void; // Callback when arm is clicked in non-editable mode
 }
 
 const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
@@ -19,12 +23,47 @@ const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
   leftArm,
   rightArm,
   legs,
-  className = "w-full h-full"
+  className = "w-full h-full",
+  isEditable = false,
+  onEditRequest
 }) => {
+  const { getArmPosition, setArmPosition } = useUser();
+  
   // Card Styles - The "Badge/Button" look
-  // Note: overflow-hidden is applied to the card itself to mask the SVG asset properly
   const cardClass = "absolute bg-[#fdf6e3] border-[3px] border-[#8B4513] shadow-[0_3px_0_rgba(0,0,0,0.2)] flex items-center justify-center overflow-hidden";
   
+  // Robust check: treat any string starting with "head-" as internal ID.
+  // If AVATAR_ASSETS doesn't have it, we still treat it as internal to avoid 404ing on an image tag.
+  const isInternalHead = headUrl && headUrl.startsWith('head-');
+  const headAsset = isInternalHead ? AVATAR_ASSETS[headUrl] : null;
+
+  // Helper function to get default arm position
+  const getDefaultArmPosition = (armType: 'leftArm' | 'rightArm'): ArmPosition => {
+    if (armType === 'leftArm') {
+      return {
+        top: '50%',
+        horizontal: '-40%',
+        rotation: -15,
+        transformOrigin: 'left center',
+        width: '65%',
+        height: '80%'
+      };
+    } else {
+      return {
+        top: '50%',
+        horizontal: '-40%',
+        rotation: 15,
+        transformOrigin: 'right center',
+        width: '65%',
+        height: '80%'
+      };
+    }
+  };
+
+  // Get arm positions from context or use defaults
+  const leftArmPosition = getArmPosition('leftArm') || getDefaultArmPosition('leftArm');
+  const rightArmPosition = getArmPosition('rightArm') || getDefaultArmPosition('rightArm');
+
   return (
     <div className={`relative ${className}`}>
       {/* 
@@ -35,8 +74,25 @@ const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
       */}
 
       {/* 1. HEAD (Anchor) */}
-      <div className="absolute inset-0 z-30 rounded-full overflow-hidden border-[4px] border-[#eecaa0] bg-[#f3e5ab] shadow-inner">
-          <img src={headUrl} alt="Head" className="w-full h-full object-cover" />
+      <div className="absolute inset-0 z-30 rounded-full overflow-hidden border-[4px] border-[#eecaa0] bg-[#f3e5ab] shadow-inner flex items-center justify-center">
+          {headAsset ? (
+               <div className="w-[90%] h-[90%]">
+                  <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
+                      {headAsset}
+                  </svg>
+               </div>
+          ) : (
+               // Fallback Logic
+               isInternalHead ? (
+                 /* Missing internal asset fallback - shows a Question Mark instead of broken image */
+                 <div className="w-full h-full bg-[#f3e5ab] flex flex-col items-center justify-center text-[#8B4513]">
+                    <span className="text-xs font-bold">?</span>
+                 </div>
+               ) : (
+                 /* External Image URL */
+                 <img src={headUrl || ''} alt="Head" className="w-full h-full object-cover" />
+               )
+          )}
       </div>
 
       {/* 2. HAT (Connects to Head) */}
@@ -84,38 +140,48 @@ const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
 
                {/* 3b. RIGHT ARM (Viewer Left) */}
                {rightArm && AVATAR_ASSETS[rightArm] && (
-                  <div 
-                    className={`${cardClass} z-20 rounded-xl`}
-                    style={{ 
-                        top: '10%', left: '-45%', width: '60%', height: '80%',
-                        transform: 'rotate(15deg)'
-                    }}
+                  <DraggableArm
+                    armType="rightArm"
+                    initialPosition={rightArmPosition}
+                    onPositionChange={(position) => setArmPosition('rightArm', position)}
+                    isEditable={isEditable}
+                    onEditRequest={onEditRequest}
                   >
-                       <svg viewBox="0 0 50 100" className="w-full h-full p-1 overflow-visible">
+                    <div className={`${cardClass} w-full h-full rounded-xl`}>
+                      <svg viewBox="0 0 50 100" className="w-full h-full p-0 overflow-visible">
+                        <g transform="translate(5, 0)">
                           {AVATAR_ASSETS[rightArm]}
+                        </g>
                       </svg>
-                  </div>
+                    </div>
+                  </DraggableArm>
                )}
 
                {/* 3c. LEFT ARM (Viewer Right) */}
                {leftArm && AVATAR_ASSETS[leftArm] && (
-                  <div 
-                    className={`${cardClass} z-20 rounded-xl`}
-                    style={{ 
-                        top: '10%', right: '-45%', width: '60%', height: '80%',
-                        transform: 'rotate(-15deg)'
-                    }}
+                  <DraggableArm
+                    armType="leftArm"
+                    initialPosition={leftArmPosition}
+                    onPositionChange={(position) => setArmPosition('leftArm', position)}
+                    isEditable={isEditable}
+                    onEditRequest={onEditRequest}
                   >
-                       <svg viewBox="0 0 50 100" className="w-full h-full p-1 overflow-visible">
+                    <div className={`${cardClass} w-full h-full rounded-xl`}>
+                      <svg viewBox="0 0 50 100" className="w-full h-full p-0 overflow-visible">
+                        <g transform="translate(-5, 0)">
                           {AVATAR_ASSETS[leftArm]}
+                        </g>
                       </svg>
-                  </div>
+                    </div>
+                  </DraggableArm>
                )}
 
                {/* 3d. THE BODY CARD ITSELF */}
                <div className={`${cardClass} z-10 rounded-2xl w-full h-full`}>
-                   <svg viewBox="0 0 100 80" className="w-full h-full p-1 overflow-visible">
-                      {AVATAR_ASSETS[body]}
+                   <svg viewBox="0 0 100 80" className="w-full h-full overflow-visible">
+                      <g transform="scale(1.15) translate(-7.5, -5)">
+                         {AVATAR_ASSETS[body]}
+                      </g>
                    </svg>
                </div>
           </div>
