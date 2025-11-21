@@ -67,14 +67,6 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
                                         ) : (
                                             <img src={equippedAvatar || ''} alt="Head" className="w-full h-full object-cover" />
                                         )}
-                                        {/* Hat Overlay */}
-                                        {equippedHat && AVATAR_ASSETS[equippedHat] && (
-                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                <svg viewBox="0 0 100 80" className="w-full h-full p-1 overflow-visible">
-                                                    {AVATAR_ASSETS[equippedHat]}
-                                                </svg>
-                                            </div>
-                                        )}
                                     </>
                                 );
                             })()}

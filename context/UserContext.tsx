@@ -66,7 +66,8 @@ interface UserContextType {
   legsOffset: { x: number, y: number };
   headOffset: { x: number, y: number };
   bodyOffset: { x: number, y: number };
-  setPartOffset: (part: 'leftArm' | 'rightArm' | 'legs' | 'head' | 'body', axis: 'x' | 'y', val: number) => void;
+  hatOffset: { x: number, y: number };
+  setPartOffset: (part: 'leftArm' | 'rightArm' | 'legs' | 'head' | 'body' | 'hat', axis: 'x' | 'y', val: number) => void;
   
   swapArms: () => void;
 
@@ -82,7 +83,7 @@ interface UserContextType {
   saveCurrentCharacter: () => void;
   deleteSavedCharacter: (id: string) => void;
   equipSavedCharacter: (character: SavedCharacter) => void;
-
+  
   isSubscribed: boolean;
   subscribe: () => void;
 
@@ -115,6 +116,7 @@ const UserContext = createContext<UserContextType>({
   legsOffset: { x: 0, y: 0 },
   headOffset: { x: 0, y: 0 },
   bodyOffset: { x: 0, y: 0 },
+  hatOffset: { x: 0, y: 0 },
   setPartOffset: () => {},
   swapArms: () => {},
   setEquippedAvatar: () => {},
@@ -186,6 +188,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [legsOffset, setLegsOffset] = useState<{x: number, y: number}>(saved?.legsOffset ?? { x: 0, y: 0 });
   const [headOffset, setHeadOffset] = useState<{x: number, y: number}>(saved?.headOffset ?? { x: 0, y: 0 });
   const [bodyOffset, setBodyOffset] = useState<{x: number, y: number}>(saved?.bodyOffset ?? { x: 0, y: 0 });
+  const [hatOffset, setHatOffset] = useState<{x: number, y: number}>(saved?.hatOffset ?? { x: 0, y: 0 });
 
   const [savedCharacters, setSavedCharacters] = useState<SavedCharacter[]>(saved?.savedCharacters ?? []);
 
@@ -214,6 +217,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       legsOffset,
       headOffset,
       bodyOffset,
+      hatOffset,
       savedCharacters,
       isSubscribed
     };
@@ -223,7 +227,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     equippedAvatar, equippedFrame, equippedHat, equippedBody, 
     equippedLeftArm, equippedRightArm, equippedLegs, equippedAnimation,
     equippedLeftArmRotation, equippedRightArmRotation, equippedLegsRotation,
-    leftArmOffset, rightArmOffset, legsOffset, headOffset, bodyOffset,
+    leftArmOffset, rightArmOffset, legsOffset, headOffset, bodyOffset, hatOffset,
     savedCharacters,
     isSubscribed
   ]);
@@ -284,7 +288,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     else if (part === 'legs') setEquippedLegsRotation(rotation);
   };
 
-  const setPartOffset = (part: 'leftArm' | 'rightArm' | 'legs' | 'head' | 'body', axis: 'x' | 'y', val: number) => {
+  const setPartOffset = (part: 'leftArm' | 'rightArm' | 'legs' | 'head' | 'body' | 'hat', axis: 'x' | 'y', val: number) => {
     if (part === 'leftArm') {
        setLeftArmOffset(prev => ({ ...prev, [axis]: val }));
     } else if (part === 'rightArm') {
@@ -295,6 +299,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
        setHeadOffset(prev => ({ ...prev, [axis]: val }));
     } else if (part === 'body') {
        setBodyOffset(prev => ({ ...prev, [axis]: val }));
+    } else if (part === 'hat') {
+       setHatOffset(prev => ({ ...prev, [axis]: val }));
     }
   };
 
@@ -380,6 +386,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLeftArmOffset({ x: 0, y: 0 });
     setRightArmOffset({ x: 0, y: 0 });
     setLegsOffset({ x: 0, y: 0 });
+    setHeadOffset({ x: 0, y: 0 });
+    setBodyOffset({ x: 0, y: 0 });
+    setHatOffset({ x: 0, y: 0 });
     setSavedCharacters([]);
     setIsSubscribed(false);
     localStorage.removeItem(STORAGE_KEY);
@@ -412,6 +421,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       legsOffset,
       headOffset,
       bodyOffset,
+      hatOffset,
       setPartOffset,
       swapArms,
       setEquippedAvatar,

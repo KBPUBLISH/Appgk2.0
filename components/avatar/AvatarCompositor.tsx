@@ -18,7 +18,8 @@ interface AvatarCompositorProps {
   legsOffset?: { x: number, y: number };
   headOffset?: { x: number, y: number };
   bodyOffset?: { x: number, y: number };
-  onPartClick?: (part: 'leftArm' | 'rightArm' | 'legs' | 'head' | 'body') => void;
+  hatOffset?: { x: number, y: number };
+  onPartClick?: (part: 'leftArm' | 'rightArm' | 'legs' | 'head' | 'body' | 'hat') => void;
   isAnimating?: boolean;
   className?: string;
   frameClass?: string; // Pass the frame border class here
@@ -43,9 +44,10 @@ const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
   leftArmOffset = { x: 0, y: 0 },
   rightArmOffset = { x: 0, y: 0 },
   legsOffset = { x: 0, y: 0 },
-  headOffset = { x: 0, y: 0 },
-  bodyOffset = { x: 0, y: 0 },
-  onPartClick,
+      headOffset = { x: 0, y: 0 },
+      bodyOffset = { x: 0, y: 0 },
+      hatOffset = { x: 0, y: 0 },
+      onPartClick,
   isAnimating = false,
   className = "w-full h-full",
   frameClass = "border-[#8B4513]",
@@ -61,12 +63,12 @@ const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
   const isInternalHead = headUrl && headUrl.startsWith('head-');
   const headAsset = isInternalHead ? AVATAR_ASSETS[headUrl] : null;
 
-  const handlePartClick = (e: React.MouseEvent, part: 'leftArm' | 'rightArm' | 'legs' | 'head' | 'body') => {
-    if (onPartClick) {
-      e.stopPropagation();
-      onPartClick(part);
-    }
-  };
+      const handlePartClick = (e: React.MouseEvent, part: 'leftArm' | 'rightArm' | 'legs' | 'head' | 'body' | 'hat') => {
+        if (onPartClick) {
+          e.stopPropagation();
+          onPartClick(part);
+        }
+      };
 
   // Adjusted offsets for narrower arm containers
   const DEFAULT_ARM_TOP = 15; 
@@ -132,17 +134,23 @@ const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
 
       {/* 5. HAT (Topmost Z-60) */}
       {hat && AVATAR_ASSETS[hat] && (
-          <div className="absolute inset-0 z-[60] pointer-events-none">
+          <div 
+            className="absolute inset-0 z-[60] flex items-center justify-center"
+            style={{
+              transform: `translate(${hatOffset.x}%, ${hatOffset.y}%)`
+            }}
+          >
              <div 
                 className="absolute top-[-25%] left-1/2 w-[90%] h-[70%] origin-center"
                 style={{ transform: 'translateX(-50%) rotate(-3deg)' }}
              >
                  <div 
-                    className={`absolute inset-0 flex items-center justify-center ${headAnimationClass}`}
+                    className={`absolute inset-0 flex items-center justify-center ${headAnimationClass} ${onPartClick ? 'cursor-pointer hover:brightness-110 active:scale-95 pointer-events-auto' : 'pointer-events-none'}`}
                     style={{ animationDuration: animationStyle === 'anim-spin' ? '1s' : '2s', animationDelay: '0.1s' }}
+                    onClick={(e) => onPartClick && handlePartClick(e, 'hat')}
                  >
                       {/* Transparent Hat Container */}
-                      <svg viewBox="0 0 100 80" className="w-full h-full p-1 overflow-visible pointer-events-none filter drop-shadow-md">
+                      <svg viewBox="0 0 100 80" className="w-full h-full p-1 overflow-visible filter drop-shadow-md">
                           {AVATAR_ASSETS[hat]}
                       </svg>
                  </div>
@@ -157,17 +165,17 @@ const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
              style={{
                 top: `calc(85% + ${bodyOffset.y}%)`, 
                 left: `calc(50% + ${bodyOffset.x}%)`, 
-                width: '100%', 
-                height: '80%',
+                width: '95%', 
+                height: '90%',
                 transform: 'translate(-50%, 0)' 
              }}
              onClick={(e) => onPartClick && handlePartClick(e, 'body')}
           >
-               {/* 1. LEGS (Bottom Layer Z-10) */}
+               {/* 1. LEGS (Bottom Layer Z-10) - No Container */}
                {legs && AVATAR_ASSETS[legs] && (
                     <div 
                         onClick={(e) => handlePartClick(e, 'legs')}
-                        className={`absolute z-10 rounded-xl bg-[#fff8e1] transition-transform duration-300 ${cardClass} ${onPartClick ? 'cursor-pointer hover:brightness-110 active:scale-95 pointer-events-auto' : ''} ${getLimbAnimClass()}`}
+                        className={`absolute z-10 transition-transform duration-300 flex items-center justify-center ${onPartClick ? 'cursor-pointer hover:brightness-110 active:scale-95 pointer-events-auto' : ''} ${getLimbAnimClass()}`}
                         style={{ 
                             top: `${DEFAULT_LEGS_TOP + legsOffset.y}%`, 
                             left: `${DEFAULT_LEGS_LEFT + legsOffset.x}%`, 
@@ -177,23 +185,23 @@ const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
                             transform: `rotate(${legsRotation}deg)`
                         }}
                     >
-                        <svg viewBox="0 0 100 60" className="w-full h-full p-1 overflow-visible">
+                        <svg viewBox="0 0 100 60" className="w-full h-full overflow-visible">
                             {AVATAR_ASSETS[legs]}
                         </svg>
                     </div>
                 )}
 
-               {/* 2. MAIN BODY (Z-20) */}
+               {/* 2. MAIN BODY (Z-20) - No Container */}
                <div 
-                  className={`absolute z-20 rounded-2xl ${cardClass}`}
-                  style={{ width: '90%', height: '100%' }}
+                  className={`absolute z-20 flex items-center justify-center`}
+                  style={{ width: '100%', height: '100%' }}
                 >
-                   <svg viewBox="0 0 100 80" className="w-full h-full p-0.5 overflow-visible">
+                   <svg viewBox="0 0 100 80" className="w-full h-full overflow-visible" style={{ transform: 'scale(1.3)' }}>
                       {AVATAR_ASSETS[body]}
                    </svg>
                </div>
 
-               {/* 3. RIGHT ARM (Viewer Left) (Z-30) */}
+               {/* 3. RIGHT ARM (Viewer Left) (Z-30) - No Container, Full Solid */}
                {rightArm && AVATAR_ASSETS[rightArm] && (
                   <div 
                     className="absolute z-30"
@@ -208,17 +216,17 @@ const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
                   >
                       <div
                         onClick={(e) => handlePartClick(e, 'rightArm')}
-                        className={`w-full h-full rounded-xl transition-colors duration-300 ${cardClass} ${onPartClick ? 'cursor-pointer hover:brightness-110 active:scale-95 pointer-events-auto' : ''} ${isAnimating && animationStyle !== 'anim-spin' ? 'animate-arm-sway-right' : ''} ${getLimbAnimClass()}`}
+                        className={`w-full h-full transition-colors duration-300 flex items-center justify-center ${onPartClick ? 'cursor-pointer hover:brightness-110 active:scale-95 pointer-events-auto' : ''} ${isAnimating && animationStyle !== 'anim-spin' ? 'animate-arm-sway-right' : ''} ${getLimbAnimClass()}`}
                         style={{ transformOrigin: '50% 15%' }} 
                       >
-                           <svg viewBox="0 0 50 100" className="w-full h-full p-0.5 overflow-visible">
+                           <svg viewBox="0 0 50 100" className="w-full h-full overflow-visible">
                               {AVATAR_ASSETS[rightArm]}
                           </svg>
                       </div>
                   </div>
                )}
 
-               {/* 4. LEFT ARM (Viewer Right) (Z-30) */}
+               {/* 4. LEFT ARM (Viewer Right) (Z-30) - No Container, Full Solid */}
                {leftArm && AVATAR_ASSETS[leftArm] && (
                   <div 
                     className="absolute z-30"
@@ -233,10 +241,10 @@ const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
                   >
                       <div 
                         onClick={(e) => handlePartClick(e, 'leftArm')}
-                        className={`w-full h-full rounded-xl transition-colors duration-300 ${cardClass} ${onPartClick ? 'cursor-pointer hover:brightness-110 active:scale-95 pointer-events-auto' : ''} ${isAnimating && animationStyle !== 'anim-spin' ? 'animate-arm-sway-left' : ''} ${getLimbAnimClass()}`}
+                        className={`w-full h-full transition-colors duration-300 flex items-center justify-center ${onPartClick ? 'cursor-pointer hover:brightness-110 active:scale-95 pointer-events-auto' : ''} ${isAnimating && animationStyle !== 'anim-spin' ? 'animate-arm-sway-left' : ''} ${getLimbAnimClass()}`}
                         style={{ transformOrigin: '50% 15%' }} 
                       >
-                           <svg viewBox="0 0 50 100" className="w-full h-full p-0.5 overflow-visible">
+                           <svg viewBox="0 0 50 100" className="w-full h-full overflow-visible">
                               {AVATAR_ASSETS[leftArm]}
                           </svg>
                       </div>

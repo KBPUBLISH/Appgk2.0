@@ -171,7 +171,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose }) => {
   const [isMenuMinimized, setIsMenuMinimized] = useState(false);
   const [isBuilderMode, setIsBuilderMode] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [selectedPart, setSelectedPart] = useState<'leftArm' | 'rightArm' | 'legs' | 'head' | 'body' | null>(null);
+  const [selectedPart, setSelectedPart] = useState<'leftArm' | 'rightArm' | 'legs' | 'head' | 'body' | 'hat' | null>(null);
   const [isSavedFeedback, setIsSavedFeedback] = useState(false);
 
   const { 
@@ -193,7 +193,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose }) => {
       equippedRightArmRotation,
       equippedLegsRotation,
       setPartRotation,
-      leftArmOffset, rightArmOffset, legsOffset, headOffset, bodyOffset,
+      leftArmOffset, rightArmOffset, legsOffset, headOffset, bodyOffset, hatOffset,
       setPartOffset,
       swapArms,
       savedCharacters,
@@ -273,7 +273,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose }) => {
   };
 
   // --- BUILDER CONTROLS LOGIC ---
-  const handlePartClick = (part: 'leftArm' | 'rightArm' | 'legs' | 'head' | 'body') => {
+  const handlePartClick = (part: 'leftArm' | 'rightArm' | 'legs' | 'head' | 'body' | 'hat') => {
       if (isBuilderMode) {
           setSelectedPart(part);
       }
@@ -288,6 +288,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose }) => {
       else if (selectedPart === 'legs') currentVal = legsOffset[axis];
       else if (selectedPart === 'head') currentVal = headOffset[axis];
       else if (selectedPart === 'body') currentVal = bodyOffset[axis];
+      else if (selectedPart === 'hat') currentVal = hatOffset[axis];
 
       const minVal = -50;
       const maxVal = axis === 'y' ? 120 : 100;
@@ -586,6 +587,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose }) => {
                             legsOffset={legsOffset}
                             headOffset={headOffset}
                             bodyOffset={bodyOffset}
+                            hatOffset={hatOffset}
                             onPartClick={isBuilderMode ? handlePartClick : undefined}
                             isAnimating={isPlaying}
                             frameClass={equippedFrame} // Pass frame
@@ -673,7 +675,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose }) => {
                        <div className="flex items-center gap-2">
                            <div className="bg-[#FFD700] w-2 h-6 rounded-full"></div>
                            <span className="text-white font-display font-bold text-lg uppercase tracking-wider">
-                              Adjust {selectedPart === 'legs' ? 'Legs' : selectedPart === 'leftArm' ? 'Left Arm' : selectedPart === 'rightArm' ? 'Right Arm' : selectedPart === 'head' ? 'Head' : 'Body'}
+                              Adjust {selectedPart === 'legs' ? 'Legs' : selectedPart === 'leftArm' ? 'Left Arm' : selectedPart === 'rightArm' ? 'Right Arm' : selectedPart === 'head' ? 'Head' : selectedPart === 'hat' ? 'Hat' : 'Body'}
                            </span>
                        </div>
                        <button 
@@ -695,15 +697,20 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose }) => {
                           </div>
                       </div>
 
-                      <div className="w-px h-24 bg-white/10"></div>
+                      {/* Rotation Controls (Not for Head/Body/Hat) */}
+                      {selectedPart !== 'head' && selectedPart !== 'body' && selectedPart !== 'hat' && (
+                          <>
+                              <div className="w-px h-24 bg-white/10"></div>
 
-                      <div className="flex flex-col gap-2 items-center">
-                          <span className="text-[10px] text-[#eecaa0]/60 font-bold uppercase tracking-wider">Rotate</span>
-                          <div className="flex gap-2 h-full items-center">
-                              <button onClick={() => updateRotation(-15)} className="w-14 h-14 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><RotateCcw size={24} /></button>
-                              <button onClick={() => updateRotation(15)} className="w-14 h-14 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><RotateCw size={24} /></button>
-                          </div>
-                      </div>
+                              <div className="flex flex-col gap-2 items-center">
+                                  <span className="text-[10px] text-[#eecaa0]/60 font-bold uppercase tracking-wider">Rotate</span>
+                                  <div className="flex gap-2 h-full items-center">
+                                      <button onClick={() => updateRotation(-15)} className="w-14 h-14 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><RotateCcw size={24} /></button>
+                                      <button onClick={() => updateRotation(15)} className="w-14 h-14 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><RotateCw size={24} /></button>
+                                  </div>
+                              </div>
+                          </>
+                      )}
                   </div>
               </div>
           )}

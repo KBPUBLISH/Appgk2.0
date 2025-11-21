@@ -25,6 +25,10 @@ const BottomNavigation: React.FC = () => {
     else if (location.pathname === '/listen') setActiveTab('listen');
     else if (location.pathname === '/read') setActiveTab('read');
     else if (location.pathname === '/library') setActiveTab('library');
+    // Default to explore if pathname doesn't match any known tab
+    else if (!['/signin', '/onboarding', '/profile', '/create-profile', '/paywall', '/settings'].includes(location.pathname) && !location.pathname.startsWith('/book/') && !location.pathname.startsWith('/player/')) {
+      setActiveTab('explore');
+    }
   }, [location.pathname]);
 
   const handleNav = (id: string, path: string) => {
@@ -71,7 +75,8 @@ const BottomNavigation: React.FC = () => {
     if (delta < -180) delta += 360;
 
     totalMoveRef.current += Math.abs(delta);
-    setDragRotation(startRotationRef.current + delta);
+    // Invert delta so rotating left moves background left (and vice versa)
+    setDragRotation(startRotationRef.current - delta);
   };
 
   const onEnd = () => {
