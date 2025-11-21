@@ -14,6 +14,9 @@ interface AvatarCompositorProps {
   className?: string;
   isEditable?: boolean; // Enable/disable arm positioning (default: false)
   onEditRequest?: () => void; // Callback when arm is clicked in non-editable mode
+  selectedArm?: 'leftArm' | 'rightArm' | null; // Which arm is currently selected
+  onArmSelect?: (armType: 'leftArm' | 'rightArm' | null) => void; // Callback when arm is selected
+  onArmRotate?: (armType: 'leftArm' | 'rightArm', angle: number) => void; // Callback to rotate arm
 }
 
 const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
@@ -25,7 +28,10 @@ const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
   legs,
   className = "w-full h-full",
   isEditable = false,
-  onEditRequest
+  onEditRequest,
+  selectedArm = null,
+  onArmSelect,
+  onArmRotate
 }) => {
   const { getArmPosition, setArmPosition } = useUser();
   
@@ -146,6 +152,18 @@ const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
                     onPositionChange={(position) => setArmPosition('rightArm', position)}
                     isEditable={isEditable}
                     onEditRequest={onEditRequest}
+                    isSelected={selectedArm === 'rightArm'}
+                    onSelect={() => onArmSelect && onArmSelect(selectedArm === 'rightArm' ? null : 'rightArm')}
+                    onRotate={(angle) => {
+                      if (onArmRotate) {
+                        const newPosition: ArmPosition = {
+                          ...rightArmPosition,
+                          rotation: angle
+                        };
+                        setArmPosition('rightArm', newPosition);
+                        onArmRotate('rightArm', angle);
+                      }
+                    }}
                   >
                     <div className={`${cardClass} w-full h-full rounded-xl`}>
                       <svg viewBox="0 0 50 100" className="w-full h-full p-0 overflow-visible">
@@ -165,6 +183,18 @@ const AvatarCompositor: React.FC<AvatarCompositorProps> = ({
                     onPositionChange={(position) => setArmPosition('leftArm', position)}
                     isEditable={isEditable}
                     onEditRequest={onEditRequest}
+                    isSelected={selectedArm === 'leftArm'}
+                    onSelect={() => onArmSelect && onArmSelect(selectedArm === 'leftArm' ? null : 'leftArm')}
+                    onRotate={(angle) => {
+                      if (onArmRotate) {
+                        const newPosition: ArmPosition = {
+                          ...leftArmPosition,
+                          rotation: angle
+                        };
+                        setArmPosition('leftArm', newPosition);
+                        onArmRotate('leftArm', angle);
+                      }
+                    }}
                   >
                     <div className={`${cardClass} w-full h-full rounded-xl`}>
                       <svg viewBox="0 0 50 100" className="w-full h-full p-0 overflow-visible">

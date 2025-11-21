@@ -162,6 +162,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<ShopTab>('head');
   const [isMenuMinimized, setIsMenuMinimized] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedArm, setSelectedArm] = useState<'leftArm' | 'rightArm' | null>(null);
 
   const { 
       coins, 
@@ -374,6 +375,9 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose }) => {
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsEditMode(!isEditMode);
+                  if (!isEditMode) {
+                    setSelectedArm(null); // Clear selection when exiting edit mode
+                  }
                 }}
                 className={`ml-2 p-2 rounded-lg transition-all ${
                   isEditMode 
@@ -415,6 +419,12 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose }) => {
                             legs={equippedLegs}
                             isEditable={isEditMode}
                             onEditRequest={() => setIsEditMode(true)}
+                            selectedArm={selectedArm}
+                            onArmSelect={setSelectedArm}
+                            onArmRotate={(armType, angle) => {
+                              // Rotation is handled by DraggableArm's onRotate callback
+                              // This is just for tracking if needed
+                            }}
                         />
                    </div>
               </div>
@@ -422,7 +432,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose }) => {
               {/* Edit Mode Tooltip */}
               {isEditMode && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/80 text-white text-xs px-3 py-2 rounded-lg shadow-lg z-20 pointer-events-none animate-pulse">
-                  Drag arms to adjust position
+                  {selectedArm ? 'Tap rotation buttons to adjust angle' : 'Tap an arm to select, then use rotation buttons'}
                 </div>
               )}
           </div>
