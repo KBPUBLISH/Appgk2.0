@@ -120,16 +120,24 @@ export const BooksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
   
-  // Also reload when route changes (e.g., after login navigation) - but only once
+  // Also reload when route changes (e.g., after login navigation or guest navigation) - but only once
   useEffect(() => {
     const handleHashChange = () => {
       const isLandingPage = window.location.hash === '#/' || window.location.hash === '';
       if (!isLandingPage && !hasLoadedRef.current) {
         const isAuthenticated = authService.isAuthenticated();
         console.log('📚 BooksContext: Route changed, authenticated:', isAuthenticated);
-        if (isAuthenticated && !isLoadingRef.current) {
-          console.log('📚 BooksContext: Reloading books after route change');
-          loadData();
+        if (!isLoadingRef.current) {
+          if (isAuthenticated) {
+            console.log('📚 BooksContext: Reloading books after route change (authenticated)');
+            loadData();
+          } else {
+            // Guest user - load mock books
+            console.log('📚 BooksContext: Loading mock books for guest user after route change');
+            setBooks(MOCK_BOOKS);
+            setLoading(false);
+            hasLoadedRef.current = true;
+          }
         }
       }
     };

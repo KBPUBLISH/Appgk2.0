@@ -116,34 +116,36 @@ const ProfileSelectionPage: React.FC = () => {
                 className="flex flex-col items-center gap-3 cursor-pointer group"
               >
                 <div className="relative mb-1">
-                    {/* Full Avatar with Animation - No Circle Container, Properly Sized */}
-                    <div className="w-32 h-32 overflow-visible flex items-center justify-center relative z-10 transition-transform duration-200 group-active:scale-95 group-hover:scale-105">
-                        <AvatarCompositor
-                            headUrl={equippedAvatar}
-                            hat={equippedHat}
-                            body={equippedBody}
-                            leftArm={equippedLeftArm}
-                            rightArm={equippedRightArm}
-                            legs={equippedLegs}
-                            animationStyle={equippedAnimation}
-                            leftArmRotation={equippedLeftArmRotation}
-                            rightArmRotation={equippedRightArmRotation}
-                            legsRotation={equippedLegsRotation}
-                            leftArmOffset={leftArmOffset}
-                            rightArmOffset={rightArmOffset}
-                            legsOffset={legsOffset}
-                            headOffset={headOffset}
-                            bodyOffset={bodyOffset}
-                            hatOffset={hatOffset}
-                            leftArmScale={leftArmScale}
-                            rightArmScale={rightArmScale}
-                            legsScale={legsScale}
-                            headScale={headScale}
-                            bodyScale={bodyScale}
-                            hatScale={hatScale}
-                            isAnimating={true}
-                            className="w-full h-full"
-                        />
+                    {/* Full Avatar with Animation - Contained in Circle */}
+                    <div className="w-32 h-32 rounded-full bg-[#f3e5ab] border-4 border-white shadow-[0_8px_15px_rgba(0,0,0,0.3)] overflow-hidden flex items-center justify-center relative z-10 transition-transform duration-200 group-active:scale-95 group-hover:scale-105">
+                        <div className="w-full h-full flex items-center justify-center relative">
+                            <AvatarCompositor
+                                headUrl={equippedAvatar}
+                                hat={equippedHat}
+                                body={equippedBody}
+                                leftArm={equippedLeftArm}
+                                rightArm={equippedRightArm}
+                                legs={equippedLegs}
+                                animationStyle={equippedAnimation}
+                                leftArmRotation={equippedLeftArmRotation}
+                                rightArmRotation={equippedRightArmRotation}
+                                legsRotation={equippedLegsRotation}
+                                leftArmOffset={leftArmOffset}
+                                rightArmOffset={rightArmOffset}
+                                legsOffset={legsOffset}
+                                headOffset={headOffset}
+                                bodyOffset={bodyOffset}
+                                hatOffset={hatOffset}
+                                leftArmScale={leftArmScale}
+                                rightArmScale={rightArmScale}
+                                legsScale={legsScale}
+                                headScale={headScale}
+                                bodyScale={bodyScale}
+                                hatScale={hatScale}
+                                isAnimating={true}
+                                className="w-full h-full"
+                            />
+                        </div>
                     </div>
                     {/* Crown Badge */}
                     <div className={`absolute top-0 right-0 bg-white rounded-full p-1.5 shadow-md border-2 z-20 ${isSubscribed ? 'border-[#FFD700]' : 'border-gray-200'}`}>
