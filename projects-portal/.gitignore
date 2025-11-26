@@ -22,13 +22,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# Build outputs
-build
-*.tsbuildinfo
-backend/service-account-key.json
