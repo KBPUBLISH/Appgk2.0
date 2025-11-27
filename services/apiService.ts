@@ -143,7 +143,7 @@ export const ApiService = {
       const token = authService.getToken();
 
       // Use the correct endpoint for local backend
-      const endpoint = `${baseUrl}api/books`;
+      const endpoint = `${baseUrl}books`;
       console.log('🔍 Fetching books from API:', endpoint);
       console.log('🔑 Has auth token:', !!token);
 
@@ -208,7 +208,7 @@ export const ApiService = {
           const alternativeEndpoints = [
             `${baseUrl}v3/books/by-categories`, // User endpoint from API docs
             `${baseUrl}v3/books/by-dynamic-categories`, // Alternative user endpoint
-            `${baseUrl}api/books`,
+            `${baseUrl}books`,
             `${baseUrl}v1/books`,
             `${baseUrl}user/books`,
             `${baseUrl}my-books`,
@@ -829,7 +829,7 @@ export const ApiService = {
 
       // Try different endpoint variations for categories
       const categoryEndpoints = [
-        `${baseUrl}api/categories`, // New categories endpoint
+        `${baseUrl}categories`, // New categories endpoint
         `${baseUrl}categories`,
         `${baseUrl}books/categories`,
         `${baseUrl}genres`,
