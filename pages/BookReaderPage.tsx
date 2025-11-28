@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Play, Pause, Volume2 } from 'lucide-react';
 import { ApiService } from '../services/apiService';
 
 interface TextBox {
@@ -24,6 +24,35 @@ interface Page {
     textBoxes?: TextBox[];
 }
 
+
+// Wood Button Component
+const WoodButton: React.FC<{ onClick: (e: React.MouseEvent) => void; icon: React.ReactNode; className?: string }> = ({ onClick, icon, className = '' }) => (
+    <button
+        onClick={onClick}
+        className={`
+            relative w-14 h-14 flex items-center justify-center
+            bg-gradient-to-b from-[#C17F44] to-[#8B4513]
+            border-2 border-[#5D2E0E] rounded-2xl
+            shadow-[inset_2px_2px_4px_rgba(255,255,255,0.3),inset_-2px_-2px_4px_rgba(0,0,0,0.4),0_4px_8px_rgba(0,0,0,0.5)]
+            active:translate-y-0.5 active:shadow-[inset_2px_2px_8px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.5)]
+            transition-all duration-100 group
+            ${className}
+        `}
+    >
+        {/* Inner engraved look for icon */}
+        <div className="text-[#3e2723] drop-shadow-[1px_1px_0px_rgba(255,255,255,0.3)]">
+            {icon}
+        </div>
+
+        {/* Wood grain texture overlay (optional, using simple CSS pattern) */}
+        <div className="absolute inset-0 rounded-2xl opacity-10 pointer-events-none"
+            style={{
+                backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 5px, #000 5px, #000 6px)'
+            }}
+        />
+    </button>
+);
+
 const BookReaderPage: React.FC = () => {
     const { bookId } = useParams<{ bookId: string }>();
     const navigate = useNavigate();
@@ -31,6 +60,14 @@ const BookReaderPage: React.FC = () => {
     const [currentPageIndex, setCurrentPageIndex] = useState(0);
     const [loading, setLoading] = useState(true);
     const [showScroll, setShowScroll] = useState(true);
+
+    // TTS State
+    const [playing, setPlaying] = useState(false);
+    const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+    const [activeTextBoxIndex, setActiveTextBoxIndex] = useState<number | null>(null);
+    const [loadingAudio, setLoadingAudio] = useState(false);
+    const [voices, setVoices] = useState<any[]>([]);
+    const [selectedVoiceId, setSelectedVoiceId] = useState<string>('21m00Tcm4TlvDq8ikWAM'); // Default Rachel
 
     useEffect(() => {
         const fetchPages = async () => {
@@ -45,12 +82,51 @@ const BookReaderPage: React.FC = () => {
             }
         };
         fetchPages();
+
+        // Fetch voices
+        const fetchVoices = async () => {
+            const voiceList = await ApiService.getVoices();
+            if (voiceList.length > 0) {
+                setVoices(voiceList);
+                // Try to find a kid-friendly voice or stick to default
+                const kidVoice = voiceList.find((v: any) => v.name === 'Domi' || v.name === 'Bella');
+                if (kidVoice) setSelectedVoiceId(kidVoice.voice_id);
+            } else {
+                // Fallback to hardcoded common voices if API fails
+                const fallbackVoices = [
+                    { voice_id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', category: 'premade' },
+                    { voice_id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi', category: 'premade' },
+                    { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella', category: 'premade' },
+                    { voice_id: 'ErXwobaYiN019PkySvjV', name: 'Antoni', category: 'premade' },
+                    { voice_id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli', category: 'premade' },
+                    { voice_id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh', category: 'premade' },
+                    { voice_id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold', category: 'premade' },
+                    { voice_id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam', category: 'premade' },
+                    { voice_id: 'yoZ06aMxZJJ28mfd3POQ', name: 'Sam', category: 'premade' }
+                ];
+                setVoices(fallbackVoices);
+                // Default to Domi (kid-friendly)
+                setSelectedVoiceId('AZnzlk1XvdvUeBnXmlld');
+            }
+        };
+        fetchVoices();
     }, [bookId]);
+
+    // Cleanup audio on unmount
+    useEffect(() => {
+        return () => {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.src = '';
+            }
+        };
+    }, [currentAudio]);
 
     const currentPage = pages[currentPageIndex];
 
     const handleNext = (e: React.MouseEvent) => {
         e.stopPropagation();
+        stopAudio();
         if (currentPageIndex < pages.length - 1) {
             setCurrentPageIndex(prev => prev + 1);
             setShowScroll(true); // Reset scroll visibility on page turn
@@ -59,6 +135,7 @@ const BookReaderPage: React.FC = () => {
 
     const handlePrev = (e: React.MouseEvent) => {
         e.stopPropagation();
+        stopAudio();
         if (currentPageIndex > 0) {
             setCurrentPageIndex(prev => prev - 1);
             setShowScroll(true);
@@ -67,6 +144,87 @@ const BookReaderPage: React.FC = () => {
 
     const toggleScroll = () => {
         setShowScroll(prev => !prev);
+    };
+
+    const stopAudio = () => {
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+        }
+        setPlaying(false);
+        setActiveTextBoxIndex(null);
+    };
+
+    const handlePlayPage = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        // If already playing, pause/stop
+        if (playing) {
+            stopAudio();
+            return;
+        }
+
+        // Play the first text box on the page
+        if (currentPage.textBoxes && currentPage.textBoxes.length > 0) {
+            const firstBox = currentPage.textBoxes[0];
+            handlePlayText(firstBox.text, 0, e);
+        }
+    };
+
+    const handlePlayText = async (text: string, index: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        // If already playing this text, pause it
+        if (playing && activeTextBoxIndex === index) {
+            currentAudio?.pause();
+            setPlaying(false);
+            return;
+        }
+
+        // If playing another text, stop it
+        if (playing && activeTextBoxIndex !== index) {
+            stopAudio();
+        }
+
+        // If we have audio for this text already loaded and paused, resume it
+        if (activeTextBoxIndex === index && currentAudio) {
+            currentAudio.play();
+            setPlaying(true);
+            return;
+        }
+
+        // Otherwise, generate/fetch new audio
+        setActiveTextBoxIndex(index);
+        setLoadingAudio(true);
+
+        try {
+            const result = await ApiService.generateTTS(text, selectedVoiceId);
+
+            if (result && result.audioUrl) {
+                const audio = new Audio(result.audioUrl);
+
+                audio.onended = () => {
+                    setPlaying(false);
+                    setActiveTextBoxIndex(null);
+                };
+
+                audio.onplay = () => setPlaying(true);
+                audio.onpause = () => setPlaying(false);
+
+                setCurrentAudio(audio);
+                audio.play();
+            } else {
+                console.error('No audio URL returned');
+                alert('Failed to generate audio. Please check the API key.');
+                setActiveTextBoxIndex(null);
+            }
+        } catch (error) {
+            console.error('Failed to play audio:', error);
+            alert('Failed to play audio. The TTS service might be unavailable.');
+            setActiveTextBoxIndex(null);
+        } finally {
+            setLoadingAudio(false);
+        }
     };
 
     if (loading) {
@@ -102,8 +260,28 @@ const BookReaderPage: React.FC = () => {
                     <ChevronLeft className="w-6 h-6" />
                 </button>
 
-                <div className="bg-black/30 backdrop-blur-md text-white px-3 py-1 rounded-full text-sm">
-                    Page {currentPageIndex + 1} / {pages.length}
+                <div className="flex items-center gap-4">
+                    {/* Voice Selector */}
+                    <div className="pointer-events-auto bg-black/30 backdrop-blur-md rounded-full px-3 py-1 flex items-center gap-2">
+                        <Volume2 className="w-4 h-4 text-white" />
+                        <select
+                            value={selectedVoiceId}
+                            onChange={(e) => setSelectedVoiceId(e.target.value)}
+                            className="bg-transparent text-white text-sm outline-none border-none cursor-pointer max-w-[100px]"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {voices.map(v => (
+                                <option key={v.voice_id} value={v.voice_id} className="text-black">
+                                    {v.name}
+                                </option>
+                            ))}
+                            {voices.length === 0 && <option value="21m00Tcm4TlvDq8ikWAM" className="text-black">Rachel</option>}
+                        </select>
+                    </div>
+
+                    <div className="bg-black/30 backdrop-blur-md text-white px-3 py-1 rounded-full text-sm">
+                        Page {currentPageIndex + 1} / {pages.length}
+                    </div>
                 </div>
 
                 <div className="w-10" /> {/* Spacer for balance */}
@@ -116,7 +294,7 @@ const BookReaderPage: React.FC = () => {
                     {currentPage.backgroundType === 'video' ? (
                         <video
                             src={currentPage.backgroundUrl}
-                            className="w-full h-full object-fill"
+                            className="w-full h-full object-contain"
                             autoPlay
                             loop
                             muted
@@ -126,7 +304,7 @@ const BookReaderPage: React.FC = () => {
                         <img
                             src={currentPage.backgroundUrl}
                             alt={`Page ${currentPage.pageNumber}`}
-                            className="w-full h-full object-fill"
+                            className="w-full h-full object-contain"
                         />
                     )}
                 </div>
@@ -144,11 +322,12 @@ const BookReaderPage: React.FC = () => {
                         // Calculate scroll top position
                         const scrollHeightVal = currentPage.scrollHeight ? `${currentPage.scrollHeight}px` : '30%';
                         const scrollTopVal = `calc(100% - ${scrollHeightVal})`;
+                        const isActive = activeTextBoxIndex === idx;
 
                         return (
                             <div
                                 key={idx}
-                                className="absolute pointer-events-auto overflow-y-auto p-2"
+                                className="absolute pointer-events-auto overflow-y-auto p-2 group"
                                 style={{
                                     left: `${box.x}%`,
                                     // If scroll exists, ensure top is at least the scroll start position
@@ -167,6 +346,25 @@ const BookReaderPage: React.FC = () => {
                                     WebkitOverflowScrolling: 'touch',
                                 }}
                             >
+                                {/* Individual Play Button Overlay - Hidden for now as we have the main wood button */}
+                                {/* 
+                                <div className={`absolute -top-3 -right-3 z-30 transition-opacity ${isActive || loadingAudio ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                    <button
+                                        onClick={(e) => handlePlayText(box.text, idx, e)}
+                                        className="bg-white/90 hover:bg-white text-indigo-600 rounded-full p-1.5 shadow-lg transform hover:scale-110 transition-all"
+                                        disabled={loadingAudio && isActive}
+                                    >
+                                        {loadingAudio && isActive ? (
+                                            <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                        ) : isActive && playing ? (
+                                            <Pause className="w-4 h-4 fill-current" />
+                                        ) : (
+                                            <Play className="w-4 h-4 fill-current ml-0.5" />
+                                        )}
+                                    </button>
+                                </div>
+                                */}
+
                                 {box.text}
                             </div>
                         );
@@ -189,6 +387,20 @@ const BookReaderPage: React.FC = () => {
                         />
                     </div>
                 )}
+
+                {/* Wood Play Button - Positioned over the scroll */}
+                <div className={`absolute bottom-4 left-4 z-40 transition-transform duration-500 ${showScroll ? 'translate-y-0' : 'translate-y-24'}`}>
+                    <WoodButton
+                        onClick={handlePlayPage}
+                        icon={loadingAudio ? (
+                            <div className="w-6 h-6 border-4 border-[#3e2723] border-t-transparent rounded-full animate-spin" />
+                        ) : playing ? (
+                            <Pause className="w-8 h-8 fill-current" />
+                        ) : (
+                            <Play className="w-8 h-8 fill-current ml-1" />
+                        )}
+                    />
+                </div>
 
                 {/* Navigation Controls (Side Taps) */}
                 <div className="absolute inset-y-0 left-0 w-1/4 z-30" onClick={handlePrev} />

@@ -821,6 +821,46 @@ export const ApiService = {
     }
   },
 
+
+
+  // TTS: Generate Audio
+  generateTTS: async (text: string, voiceId: string): Promise<{ audioUrl: string; alignment: any } | null> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetchWithTimeout(`${baseUrl}tts/generate`, {
+        method: 'POST',
+        body: JSON.stringify({ text, voiceId })
+      });
+
+      if (response.ok) {
+        return await response.json();
+      }
+      console.error('TTS Generation failed:', await response.text());
+      return null;
+    } catch (error) {
+      console.error('TTS Error:', error);
+      return null;
+    }
+  },
+
+  // TTS: Get Voices
+  getVoices: async (): Promise<any[]> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetchWithTimeout(`${baseUrl}tts/voices`, {
+        method: 'GET'
+      });
+
+      if (response.ok) {
+        return await response.json();
+      }
+      return [];
+    } catch (error) {
+      console.error('Get Voices Error:', error);
+      return [];
+    }
+  },
+
   // Get all categories (returns full category objects with name, color, icon, etc.)
   getCategories: async (): Promise<Array<{ _id: string; name: string; description?: string; color: string; icon?: string }>> => {
     try {
