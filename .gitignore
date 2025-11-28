@@ -32,3 +32,4 @@ dist-ssr
 build
 *.tsbuildinfo
 backend/service-account-key.json
+backend/uploads/
