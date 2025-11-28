@@ -147,6 +147,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isCreateProfile = location.pathname === '/create-profile';
   const isPaywall = location.pathname === '/paywall';
   const isSettings = location.pathname === '/settings';
+  const isBookReader = location.pathname.startsWith('/read/');
 
   return (
     <div className="relative h-screen w-full overflow-hidden text-white flex flex-col">
@@ -159,7 +160,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </div>
 
       {/* Only show BottomNavigation on main tab pages */}
-      {!isLanding && !isSignIn && !isOnboarding && !isBookDetail && !isPlayer && !isProfile && !isCreateProfile && !isPaywall && !isSettings && <BottomNavigation />}
+      {!isLanding && !isSignIn && !isOnboarding && !isBookDetail && !isPlayer && !isProfile && !isCreateProfile && !isPaywall && !isSettings && !isBookReader && <BottomNavigation />}
     </div>
   );
 };

@@ -116,7 +116,7 @@ const BookReaderPage: React.FC = () => {
                     {currentPage.backgroundType === 'video' ? (
                         <video
                             src={currentPage.backgroundUrl}
-                            className="w-full h-full object-contain"
+                            className="w-full h-full object-fill"
                             autoPlay
                             loop
                             muted
@@ -126,7 +126,7 @@ const BookReaderPage: React.FC = () => {
                         <img
                             src={currentPage.backgroundUrl}
                             alt={`Page ${currentPage.pageNumber}`}
-                            className="w-full h-full object-contain"
+                            className="w-full h-full object-fill"
                         />
                     )}
                 </div>
