@@ -6,6 +6,7 @@ import { voiceCloningService, ClonedVoice } from '../services/voiceCloningServic
 import VoiceCloningModal from '../components/features/VoiceCloningModal';
 import { useAudio } from '../context/AudioContext';
 import { readingProgressService } from '../services/readingProgressService';
+import { BookPageRenderer } from '../components/features/BookPageRenderer';
 
 interface TextBox {
     text: string;
@@ -85,28 +86,49 @@ const BookReaderPage: React.FC = () => {
     const [autoPlayMode, setAutoPlayMode] = useState(false);
     const autoPlayModeRef = useRef(false);
     const [isPageTurning, setIsPageTurning] = useState(false);
+    const [flipState, setFlipState] = useState<{ direction: 'next' | 'prev', isFlipping: boolean } | null>(null);
     const touchStartX = useRef<number>(0);
     const touchEndX = useRef<number>(0);
 
     // Pause background music when entering book reader
     useEffect(() => {
+        console.log('📖 BookReaderPage MOUNTED');
+
+        // NUCLEAR OPTION: Force a page reload on first mount to kill all audio
+        // Use URL parameter to track if we've already reloaded
+        const urlParams = new URLSearchParams(window.location.search);
+        const hasReloaded = urlParams.get('reloaded');
+
+        if (!hasReloaded) {
+            console.log('🔄 First time entering book reader - forcing reload to kill audio');
+            // Add reloaded parameter to URL
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.set('reloaded', '1');
+            window.location.href = newUrl.toString();
+            return;
+        }
+
+        console.log('📖 BookReaderPage - Already reloaded, proceeding normally');
+
         // Pause app background music and prevent it from resuming on interaction
         setGameMode(false);
         setMusicPaused(true);
-        
-        // Aggressively stop any music that might be playing
-        // This is a safety measure to ensure music is stopped immediately
-        const stopAllMusic = () => {
-            const audioElements = document.querySelectorAll('audio');
-            audioElements.forEach(audio => {
+
+        // NUCLEAR OPTION: Immediately pause ALL audio elements in the DOM
+        const killAllAudio = () => {
+            const allAudio = document.querySelectorAll('audio');
+            allAudio.forEach(audio => {
                 if (audio !== bookBackgroundMusicRef.current) {
                     audio.pause();
-                    audio.currentTime = 0;
+                    audio.volume = 0;
                 }
             });
         };
-        stopAllMusic();
-        
+        killAllAudio();
+
+        // Keep killing audio every 100ms as a safety measure
+        const killInterval = setInterval(killAllAudio, 100);
+
         // Fetch book data to check for book-specific background music
         const fetchBookData = async () => {
             if (!bookId) return;
@@ -122,14 +144,14 @@ const BookReaderPage: React.FC = () => {
                             bookBackgroundMusicRef.current.src = '';
                             bookBackgroundMusicRef.current = null;
                         }
-                        
+
                         const audio = new Audio(musicUrl);
                         audio.loop = true;
                         audio.volume = 0.3; // Lower volume for background music
                         audio.preload = 'auto';
                         bookBackgroundMusicRef.current = audio;
-                        
-                        // Try to play after user interaction
+
+                        // Try to play immediately
                         const playMusic = async () => {
                             try {
                                 await audio.play();
@@ -138,7 +160,7 @@ const BookReaderPage: React.FC = () => {
                                 console.warn('⚠️ Could not auto-play book music, will play on user interaction:', err);
                             }
                         };
-                        
+
                         // Wait for audio to be ready
                         audio.addEventListener('canplaythrough', playMusic);
                     }
@@ -147,30 +169,20 @@ const BookReaderPage: React.FC = () => {
                 console.error('Failed to fetch book data:', err);
             }
         };
-        
+
         fetchBookData();
-        
-        // Aggressive music stopping - check periodically to ensure music stays stopped
-        const musicStopInterval = setInterval(() => {
-            // Force stop all app background music
-            const audioElements = document.querySelectorAll('audio');
-            audioElements.forEach(audio => {
-                // Only stop app music, not book-specific music
-                if (audio !== bookBackgroundMusicRef.current) {
-                    audio.pause();
-                    audio.currentTime = 0;
-                }
-            });
-        }, 500); // Check every 500ms
-        
+
         // Cleanup: stop book background music and resume app music when leaving
         return () => {
-            clearInterval(musicStopInterval);
+            console.log('📖 BookReaderPage UNMOUNTING - Clearing kill interval');
+            clearInterval(killInterval);
+
             if (bookBackgroundMusicRef.current) {
                 bookBackgroundMusicRef.current.pause();
                 bookBackgroundMusicRef.current.src = '';
                 bookBackgroundMusicRef.current = null;
             }
+
             // Allow app music to resume when leaving book reader
             setMusicPaused(false);
         };
@@ -182,7 +194,7 @@ const BookReaderPage: React.FC = () => {
             try {
                 const data = await ApiService.getBookPages(bookId);
                 setPages(data);
-                
+
                 // Check if page is specified in URL (from Continue button)
                 const pageParam = searchParams.get('page');
                 if (pageParam) {
@@ -214,7 +226,7 @@ const BookReaderPage: React.FC = () => {
             if (voiceList.length > 0) {
                 setVoices(voiceList);
                 // Try to find a kid-friendly voice or use first available
-                const kidVoice = voiceList.find((v: any) => 
+                const kidVoice = voiceList.find((v: any) =>
                     v.name === 'Domi' || v.name === 'Bella' || v.name === 'Elli' || v.name === 'Rachel'
                 );
                 if (kidVoice) {
@@ -272,65 +284,73 @@ const BookReaderPage: React.FC = () => {
 
     const handleNext = (e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isPageTurning) return;
         stopAudio();
         if (currentPageIndex < pages.length - 1) {
             setIsPageTurning(true);
+            setFlipState({ direction: 'next', isFlipping: true });
+
             setTimeout(() => {
                 const nextIndex = currentPageIndex + 1;
                 setCurrentPageIndex(nextIndex);
                 setShowScroll(true);
                 setIsPageTurning(false);
+                setFlipState(null);
                 // Save progress
                 if (bookId) {
                     readingProgressService.saveProgress(bookId, nextIndex);
                 }
-            }, 300);
+            }, 600);
         }
     };
 
     const handlePrev = (e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isPageTurning) return;
         stopAudio();
         if (currentPageIndex > 0) {
             setIsPageTurning(true);
+            setFlipState({ direction: 'prev', isFlipping: true });
+
             setTimeout(() => {
                 const prevIndex = currentPageIndex - 1;
                 setCurrentPageIndex(prevIndex);
                 setShowScroll(true);
                 setIsPageTurning(false);
+                setFlipState(null);
                 // Save progress
                 if (bookId) {
                     readingProgressService.saveProgress(bookId, prevIndex);
                 }
-            }, 300);
+            }, 600);
         }
     };
-    
+
     // Swipe gesture handlers
     const handleTouchStart = (e: React.TouchEvent) => {
         touchStartX.current = e.touches[0].clientX;
     };
-    
+
     const handleTouchMove = (e: React.TouchEvent) => {
         touchEndX.current = e.touches[0].clientX;
     };
-    
+
     const handleTouchEnd = () => {
         const swipeThreshold = 50;
         const diff = touchStartX.current - touchEndX.current;
-        
+
         if (Math.abs(diff) > swipeThreshold) {
             if (diff > 0) {
                 // Swipe left - next page
                 if (currentPageIndex < pages.length - 1) {
                     stopAudio();
-                    handleNext({ stopPropagation: () => {} } as React.MouseEvent);
+                    handleNext({ stopPropagation: () => { } } as React.MouseEvent);
                 }
             } else {
                 // Swipe right - previous page
                 if (currentPageIndex > 0) {
                     stopAudio();
-                    handlePrev({ stopPropagation: () => {} } as React.MouseEvent);
+                    handlePrev({ stopPropagation: () => { } } as React.MouseEvent);
                 }
             }
         }
@@ -368,7 +388,7 @@ const BookReaderPage: React.FC = () => {
         // Enable auto-play mode and start playing
         setAutoPlayMode(true);
         autoPlayModeRef.current = true;
-        
+
         // Play the first text box on the page
         if (currentPage.textBoxes && currentPage.textBoxes.length > 0) {
             const firstBox = currentPage.textBoxes[0];
@@ -422,14 +442,14 @@ const BookReaderPage: React.FC = () => {
             // Use final audio URL from WebSocket
             if (result && result.audioUrl) {
                 const audio = new Audio(result.audioUrl);
-                
+
                 // Wait for audio metadata to load so we can get the actual duration
                 audio.addEventListener('loadedmetadata', () => {
                     const alignment = result.alignment || null;
                     if (alignment && alignment.words) {
                         const actualDuration = audio.duration;
                         const estimatedDuration = alignment.words.length * 0.4; // Our estimated duration
-                        
+
                         // Scale word timings to match actual audio duration
                         if (actualDuration > 0 && estimatedDuration > 0) {
                             const scaleFactor = actualDuration / estimatedDuration;
@@ -456,7 +476,7 @@ const BookReaderPage: React.FC = () => {
                         console.warn('⚠️ No alignment data in result:', result);
                     }
                 });
-                
+
                 // Track audio time for word highlighting
                 // Use ref to access latest alignment data (avoids closure issues)
                 audio.ontimeupdate = () => {
@@ -496,11 +516,11 @@ const BookReaderPage: React.FC = () => {
                         // Clear after a brief moment to show completion
                         setTimeout(() => {
                             setCurrentWordIndex(-1);
-                    setPlaying(false);
-                    setActiveTextBoxIndex(null);
+                            setPlaying(false);
+                            setActiveTextBoxIndex(null);
                             setWordAlignment(null);
                             wordAlignmentRef.current = null;
-                            
+
                             // Auto-play: Move to next page if enabled
                             // Use ref to get latest autoPlayMode value (closure-safe)
                             if (autoPlayModeRef.current && currentPageIndex < pages.length - 1) {
@@ -515,7 +535,7 @@ const BookReaderPage: React.FC = () => {
                                     if (bookId) {
                                         readingProgressService.saveProgress(bookId, nextPageIndex);
                                     }
-                                    
+
                                     // Wait for page to render, then auto-play next page
                                     setTimeout(() => {
                                         // Check again if auto-play is still enabled
@@ -524,7 +544,7 @@ const BookReaderPage: React.FC = () => {
                                             if (nextPage && nextPage.textBoxes && nextPage.textBoxes.length > 0) {
                                                 const firstBox = nextPage.textBoxes[0];
                                                 console.log('▶️ Auto-play: Starting next page audio');
-                                                const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                                                const syntheticEvent = { stopPropagation: () => { } } as React.MouseEvent;
                                                 handlePlayText(firstBox.text, 0, syntheticEvent, true);
                                             } else {
                                                 console.log('⏹️ Auto-play: No text boxes on next page, stopping');
@@ -542,12 +562,12 @@ const BookReaderPage: React.FC = () => {
                             }
                         }, 500);
                     } else {
-                    setPlaying(false);
+                        setPlaying(false);
                         setActiveTextBoxIndex(null);
                         setCurrentWordIndex(-1);
                         setWordAlignment(null);
                         wordAlignmentRef.current = null;
-                        
+
                         // Auto-play: Move to next page if enabled
                         // Use ref to get latest autoPlayMode value (closure-safe)
                         if (autoPlayModeRef.current && currentPageIndex < pages.length - 1) {
@@ -562,7 +582,7 @@ const BookReaderPage: React.FC = () => {
                                 if (bookId) {
                                     readingProgressService.saveProgress(bookId, nextPageIndex);
                                 }
-                                
+
                                 setTimeout(() => {
                                     // Check again if auto-play is still enabled
                                     if (autoPlayModeRef.current) {
@@ -570,7 +590,7 @@ const BookReaderPage: React.FC = () => {
                                         if (nextPage && nextPage.textBoxes && nextPage.textBoxes.length > 0) {
                                             const firstBox = nextPage.textBoxes[0];
                                             console.log('▶️ Auto-play: Starting next page audio');
-                                            const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                                            const syntheticEvent = { stopPropagation: () => { } } as React.MouseEvent;
                                             handlePlayText(firstBox.text, 0, syntheticEvent, true);
                                         } else {
                                             console.log('⏹️ Auto-play: No text boxes on next page, stopping');
@@ -631,7 +651,7 @@ const BookReaderPage: React.FC = () => {
     }
 
     return (
-        <div 
+        <div
             className="relative w-full h-screen bg-gray-900 overflow-hidden flex flex-col"
             onTouchStart={(e) => {
                 // Block any music from playing on touch
@@ -656,7 +676,7 @@ const BookReaderPage: React.FC = () => {
                 </button>
 
                 {/* Right: Voice Selector - Compact */}
-                <div 
+                <div
                     ref={voiceDropdownRef}
                     className="pointer-events-auto relative"
                     onClick={(e) => e.stopPropagation()}
@@ -670,9 +690,9 @@ const BookReaderPage: React.FC = () => {
                     >
                         <Volume2 className="w-4 h-4 text-white" />
                         <span className="text-white text-xs max-w-[100px] truncate">
-                            {voices.find(v => v.voice_id === selectedVoiceId)?.name || 
-                             clonedVoices.find(v => v.voice_id === selectedVoiceId)?.name || 
-                             'Voice'}
+                            {voices.find(v => v.voice_id === selectedVoiceId)?.name ||
+                                clonedVoices.find(v => v.voice_id === selectedVoiceId)?.name ||
+                                'Voice'}
                         </span>
                     </button>
 
@@ -691,21 +711,20 @@ const BookReaderPage: React.FC = () => {
                                                     setSelectedVoiceId(v.voice_id);
                                                     setShowVoiceDropdown(false);
                                                 }}
-                                                className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${
-                                                    selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
-                                                }`}
+                                                className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
+                                                    }`}
                                             >
                                                 {selectedVoiceId === v.voice_id && (
                                                     <Check className="w-4 h-4 text-[#FFD700]" />
                                                 )}
                                                 <span className={selectedVoiceId === v.voice_id ? 'font-bold' : ''}>
-                                    {v.name}
+                                                    {v.name}
                                                 </span>
                                             </button>
                                         ))}
                                     </>
                                 )}
-                                
+
                                 {/* Cloned voices */}
                                 {clonedVoices.length > 0 && (
                                     <>
@@ -717,9 +736,8 @@ const BookReaderPage: React.FC = () => {
                                                     setSelectedVoiceId(v.voice_id);
                                                     setShowVoiceDropdown(false);
                                                 }}
-                                                className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${
-                                                    selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
-                                                }`}
+                                                className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
+                                                    }`}
                                             >
                                                 {selectedVoiceId === v.voice_id && (
                                                     <Check className="w-4 h-4 text-[#FFD700]" />
@@ -732,14 +750,14 @@ const BookReaderPage: React.FC = () => {
                                     </>
                                 )}
 
-                                    {/* Voice Cloning Feature Disabled - ElevenLabs Limit Reached */}
-                                    {/* Separator */}
-                                    {(voices.length > 0 || clonedVoices.length > 0) && (
-                                        <div className="border-t border-white/20 my-1"></div>
-                                    )}
+                                {/* Voice Cloning Feature Disabled - ElevenLabs Limit Reached */}
+                                {/* Separator */}
+                                {(voices.length > 0 || clonedVoices.length > 0) && (
+                                    <div className="border-t border-white/20 my-1"></div>
+                                )}
 
-                                    {/* Create Voice Option - DISABLED */}
-                                    {/* 
+                                {/* Create Voice Option - DISABLED */}
+                                {/* 
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -759,179 +777,129 @@ const BookReaderPage: React.FC = () => {
                                         No voices available
                                     </div>
                                 )}
-                    </div>
-                    </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>
 
             {/* Main Reading Area */}
-            <div 
-                className="flex-1 w-full h-full relative" 
+            <div
+                className="flex-1 w-full h-full relative perspective-[2000px] overflow-hidden bg-gray-900"
                 onClick={(e) => toggleScroll(e)}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
             >
-                {/* Background Layer - Don't stop propagation here, let it bubble to parent for toggleScroll */}
-                <div className={`absolute inset-0 bg-black overflow-hidden transition-transform duration-300 ease-in-out ${isPageTurning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-                    {currentPage.backgroundType === 'video' ? (
-                        <video
-                            src={currentPage.backgroundUrl}
-                            className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full"
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
-                            style={{
-                                objectFit: 'cover',
-                                width: '100%',
-                                height: '100%',
-                            }}
-                        />
-                    ) : (
-                        <img
-                            src={currentPage.backgroundUrl}
-                            alt={`Page ${currentPage.pageNumber}`}
-                            className="w-full h-full object-contain"
-                        />
+                {/* Style for animations */}
+                <style>{`
+                    @keyframes flipNext {
+                        0% { transform: rotateY(0deg); }
+                        100% { transform: rotateY(-180deg); }
+                    }
+                    @keyframes flipPrev {
+                        0% { transform: rotateY(-180deg); }
+                        100% { transform: rotateY(0deg); }
+                    }
+                    .animate-flip-next {
+                        animation: flipNext 0.6s cubic-bezier(0.645, 0.045, 0.355, 1.000) forwards;
+                    }
+                    .animate-flip-prev {
+                        animation: flipPrev 0.6s cubic-bezier(0.645, 0.045, 0.355, 1.000) forwards;
+                    }
+                    .book-page {
+                        backface-visibility: hidden;
+                        transform-style: preserve-3d;
+                        transform-origin: left center;
+                    }
+                `}</style>
+
+                {/* 3D Scene Container */}
+                <div className="relative w-full h-full" style={{ transformStyle: 'preserve-3d' }}>
+
+                    {/* CASE 1: Normal View (No Flip) */}
+                    {!flipState && (
+                        <div className="absolute inset-0 z-10">
+                            <BookPageRenderer
+                                page={currentPage}
+                                activeTextBoxIndex={activeTextBoxIndex}
+                                showScroll={showScroll}
+                                onToggleScroll={toggleScroll}
+                                onPlayText={handlePlayText}
+                                highlightedWordIndex={currentWordIndex}
+                                wordAlignment={wordAlignment}
+                            />
+                        </div>
+                    )}
+
+                    {/* CASE 2: Flipping NEXT */}
+                    {flipState?.direction === 'next' && (
+                        <>
+                            {/* Bottom Layer: Next Page (Destination) */}
+                            <div className="absolute inset-0 z-0">
+                                <BookPageRenderer
+                                    page={pages[currentPageIndex + 1]}
+                                    activeTextBoxIndex={null}
+                                    showScroll={true}
+                                />
+                            </div>
+                            {/* Top Layer: Current Page (Animating) */}
+                            <div className="absolute inset-0 z-20 book-page animate-flip-next">
+                                <BookPageRenderer
+                                    page={currentPage}
+                                    activeTextBoxIndex={activeTextBoxIndex}
+                                    showScroll={showScroll}
+                                    highlightedWordIndex={currentWordIndex}
+                                    wordAlignment={wordAlignment}
+                                />
+                                {/* Back of the page */}
+                                <div className="absolute inset-0 bg-white" style={{ transform: 'rotateY(180deg)', backfaceVisibility: 'hidden' }}></div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* CASE 3: Flipping PREV */}
+                    {flipState?.direction === 'prev' && (
+                        <>
+                            {/* Bottom Layer: Current Page (Destination) */}
+                            <div className="absolute inset-0 z-0">
+                                <BookPageRenderer
+                                    page={currentPage}
+                                    activeTextBoxIndex={activeTextBoxIndex}
+                                    showScroll={showScroll}
+                                    highlightedWordIndex={currentWordIndex}
+                                    wordAlignment={wordAlignment}
+                                />
+                            </div>
+                            {/* Top Layer: Prev Page (Animating) */}
+                            <div className="absolute inset-0 z-20 book-page animate-flip-prev" style={{ transform: 'rotateY(-180deg)' }}>
+                                <BookPageRenderer
+                                    page={pages[currentPageIndex - 1]}
+                                    activeTextBoxIndex={null}
+                                    showScroll={true}
+                                />
+                            </div>
+                        </>
                     )}
                 </div>
 
-                {/* Text Boxes Layer - positioned relative to full page, moves with scroll */}
-                <div
-                    className="absolute inset-0 pointer-events-none transition-transform duration-500 ease-in-out z-20"
-                    style={{
-                        transform: currentPage.scrollUrl && !showScroll
-                            ? 'translateY(100%)'
-                            : 'translateY(0)'
-                    }}
-                >
-                    {currentPage.textBoxes?.map((box, idx) => {
-                        // Calculate scroll top position
-                        const scrollHeightVal = currentPage.scrollHeight ? `${currentPage.scrollHeight}px` : '30%';
-                        const scrollTopVal = `calc(100% - ${scrollHeightVal})`;
-                        const isActive = activeTextBoxIndex === idx;
-
-                        return (
-                            <div
-                                key={idx}
-                                className="absolute pointer-events-auto overflow-y-auto p-2 group"
-                                style={{
-                                    left: `${box.x}%`,
-                                    // If scroll exists, ensure top is at least the scroll start position
-                                    top: currentPage.scrollUrl ? `max(${box.y}%, ${scrollTopVal})` : `${box.y}%`,
-                                    width: `${box.width || 30}%`,
-                                    transform: 'translate(0, 0)',
-                                    textAlign: box.alignment,
-                                    color: box.color || '#4a3b2a',
-                                    fontFamily: box.fontFamily || 'Comic Sans MS',
-                                    fontSize: `${box.fontSize || 24}px`,
-                                    // Calculate max height based on the effective top position
-                                    maxHeight: currentPage.scrollUrl
-                                        ? `calc(100% - max(${box.y}%, ${scrollTopVal}) - 40px)`
-                                        : `calc(100% - ${box.y}% - 40px)`,
-                                    overflowY: 'auto',
-                                    WebkitOverflowScrolling: 'touch',
-                                }}
-                            >
-                                {/* Individual Play Button Overlay - Hidden for now as we have the main wood button */}
-                                {/* 
-                                <div className={`absolute -top-3 -right-3 z-30 transition-opacity ${isActive || loadingAudio ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                                    <button
-                                        onClick={(e) => handlePlayText(box.text, idx, e)}
-                                        className="bg-white/90 hover:bg-white text-indigo-600 rounded-full p-1.5 shadow-lg transform hover:scale-110 transition-all"
-                                        disabled={loadingAudio && isActive}
-                                    >
-                                        {loadingAudio && isActive ? (
-                                            <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                                        ) : isActive && playing ? (
-                                            <Pause className="w-4 h-4 fill-current" />
-                                        ) : (
-                                            <Play className="w-4 h-4 fill-current ml-0.5" />
-                                        )}
-                                    </button>
-                                </div>
-                                */}
-
-                                {(() => {
-                                    // Debug logging
-                                    if (isActive) {
-                                        console.log('🔍 Rendering check:', {
-                                            isActive,
-                                            hasWordAlignment: !!wordAlignment,
-                                            wordsCount: wordAlignment?.words?.length || 0,
-                                            currentWordIndex,
-                                            boxText: box.text?.substring(0, 20)
-                                        });
-                                    }
-
-                                    if (isActive && wordAlignment && wordAlignment.words && wordAlignment.words.length > 0) {
-                                        // Render text with word highlighting
-                                        return (
-                                            <span>
-                                                {wordAlignment.words.map((w: any, wordIdx: number) => {
-                                                    const isHighlighted = wordIdx === currentWordIndex;
-                                                    return (
-                                                        <span
-                                                            key={wordIdx}
-                                                            className={isHighlighted ? 'bg-yellow-300 bg-opacity-70 rounded px-1 transition-all duration-100' : ''}
-                                                            style={{
-                                                                backgroundColor: isHighlighted ? 'rgba(255, 235, 59, 0.6)' : 'transparent',
-                                                                transition: 'background-color 0.1s ease-in-out'
-                                                            }}
-                                                        >
-                                                            {w.word}
-                                                            {wordIdx < wordAlignment.words.length - 1 && ' '}
-                                                        </span>
-                                                    );
-                                                })}
-                                            </span>
-                                        );
-                                    } else {
-                                        // Regular text display when not playing or no alignment
-                                        return box.text;
-                                    }
-                                })()}
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {/* Scroll Overlay Layer */}
-                {currentPage.scrollUrl && (
-                    <div
-                        className={`absolute bottom-0 left-0 right-0 transition-all duration-500 ease-in-out z-10 ${isPageTurning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'} ${showScroll ? 'translate-y-0' : 'translate-y-full'
-                            }`}
-                        style={{ height: currentPage.scrollHeight ? `${currentPage.scrollHeight}px` : '30%' }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {/* The Scroll Image */}
-                        <img
-                            src={currentPage.scrollUrl}
-                            alt="Scroll background"
-                            className="w-full h-full object-fill"
-                        />
-                    </div>
-                )}
-
-                {/* Wood Play Button - Positioned over the scroll */}
-                <div className={`absolute bottom-4 left-4 z-40 transition-transform duration-500 ${showScroll ? 'translate-y-0' : 'translate-y-24'}`}>
-                    <WoodButton
-                        onClick={handlePlayPage}
-                        icon={loadingAudio ? (
-                            <div className="w-6 h-6 border-4 border-[#3e2723] border-t-transparent rounded-full animate-spin" />
-                        ) : playing ? (
-                            <Pause className="w-8 h-8 fill-current" />
-                        ) : (
-                            <Play className="w-8 h-8 fill-current ml-1" />
-                        )}
-                    />
-                </div>
-
-                {/* Navigation Controls (Side Taps) */}
+                {/* Navigation Controls (Side Taps) - Overlay on top of 3D scene */}
                 <div className="absolute inset-y-0 left-0 w-1/4 z-30" onClick={handlePrev} />
                 <div className="absolute inset-y-0 right-0 w-1/4 z-30" onClick={handleNext} />
+            </div>
+
+            {/* Wood Play Button - Positioned over the scroll */}
+            <div className={`absolute bottom-4 left-4 z-40 transition-transform duration-500 ${showScroll ? 'translate-y-0' : 'translate-y-24'}`}>
+                <WoodButton
+                    onClick={handlePlayPage}
+                    icon={loadingAudio ? (
+                        <div className="w-6 h-6 border-4 border-[#3e2723] border-t-transparent rounded-full animate-spin" />
+                    ) : playing ? (
+                        <Pause className="w-8 h-8 fill-current" />
+                    ) : (
+                        <Play className="w-8 h-8 fill-current ml-1" />
+                    )}
+                />
             </div>
 
             {/* Page Counter - Bottom Right */}
