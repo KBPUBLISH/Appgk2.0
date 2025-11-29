@@ -237,7 +237,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 if (!bg.paused) bg.pause();
                 if (!game.paused) game.pause();
             }
-        }, 500); // Check every 500ms
+        }, 100); // Check every 100ms for aggressive enforcement
 
         // One-time unlock listener for initial browser autoplay policy
         const unlockAudio = () => {

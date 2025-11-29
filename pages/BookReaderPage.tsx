@@ -92,9 +92,26 @@ const BookReaderPage: React.FC = () => {
 
     // Pause background music when entering book reader
     useEffect(() => {
+        console.log('📖 BookReaderPage MOUNTED - KILLING ALL APP MUSIC');
+
         // Pause app background music and prevent it from resuming on interaction
         setGameMode(false);
         setMusicPaused(true);
+
+        // NUCLEAR OPTION: Immediately pause ALL audio elements in the DOM
+        const killAllAudio = () => {
+            const allAudio = document.querySelectorAll('audio');
+            allAudio.forEach(audio => {
+                if (audio !== bookBackgroundMusicRef.current) {
+                    audio.pause();
+                    audio.volume = 0;
+                }
+            });
+        };
+        killAllAudio();
+
+        // Keep killing audio every 100ms as a safety measure
+        const killInterval = setInterval(killAllAudio, 100);
 
         // Fetch book data to check for book-specific background music
         const fetchBookData = async () => {
@@ -141,6 +158,9 @@ const BookReaderPage: React.FC = () => {
 
         // Cleanup: stop book background music and resume app music when leaving
         return () => {
+            console.log('📖 BookReaderPage UNMOUNTING - Clearing kill interval');
+            clearInterval(killInterval);
+
             if (bookBackgroundMusicRef.current) {
                 bookBackgroundMusicRef.current.pause();
                 bookBackgroundMusicRef.current.src = '';
