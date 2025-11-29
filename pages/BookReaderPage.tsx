@@ -221,23 +221,28 @@ const BookReaderPage: React.FC = () => {
                 const data = await ApiService.getBookPages(bookId);
 
                 // Add "The End" page as the last page
-                // Create a beautiful themed background matching the app's aesthetic
+                // Use the same vertical wood plank background as BookDetailPage
                 const theEndBackground = 'data:image/svg+xml;base64,' + btoa(`
                     <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
                         <defs>
-                            <linearGradient id="theEndGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" style="stop-color:#fdf6e3;stop-opacity:1" />
-                                <stop offset="50%" style="stop-color:#f3e5ab;stop-opacity:1" />
-                                <stop offset="100%" style="stop-color:#e8d5b7;stop-opacity:1" />
-                            </linearGradient>
-                            <pattern id="woodGrain" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
-                                <rect width="100" height="100" fill="#fdf6e3"/>
-                                <path d="M0,50 Q25,45 50,50 T100,50" stroke="#d4c5a0" stroke-width="1" fill="none" opacity="0.3"/>
-                                <path d="M0,75 Q25,70 50,75 T100,75" stroke="#d4c5a0" stroke-width="1" fill="none" opacity="0.2"/>
+                            <pattern id="woodPlanks" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+                                <rect width="100" height="100" fill="#8B4513"/>
+                                <rect x="0" y="0" width="14" height="100" fill="#a05f2c"/>
+                                <rect x="14" y="0" width="1" height="100" fill="#3e1f07"/>
+                                <rect x="15" y="0" width="14" height="100" fill="#c28246"/>
+                                <rect x="29" y="0" width="1" height="100" fill="#3e1f07"/>
+                                <rect x="30" y="0" width="19" height="100" fill="#945829"/>
+                                <rect x="49" y="0" width="1" height="100" fill="#3e1f07"/>
+                                <rect x="50" y="0" width="24" height="100" fill="#b06d36"/>
+                                <rect x="74" y="0" width="1" height="100" fill="#3e1f07"/>
+                                <rect x="75" y="0" width="25" height="100" fill="#a05f2c"/>
                             </pattern>
+                            <filter id="noise">
+                                <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="3" stitchTiles="stitch"/>
+                            </filter>
                         </defs>
-                        <rect width="100%" height="100%" fill="url(#theEndGradient)"/>
-                        <rect width="100%" height="100%" fill="url(#woodGrain)" opacity="0.4"/>
+                        <rect width="100%" height="100%" fill="url(#woodPlanks)"/>
+                        <rect width="100%" height="100%" filter="url(#noise)" opacity="0.1"/>
                     </svg>
                 `);
 
