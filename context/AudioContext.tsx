@@ -13,6 +13,7 @@ interface AudioContextType {
   playSuccess: () => void;
   playTab: () => void;
   setGameMode: (active: boolean, type?: 'default' | 'workout') => void;
+  setMusicPaused: (paused: boolean) => void;
 }
 
 const AudioContext = createContext<AudioContextType>({
@@ -27,6 +28,7 @@ const AudioContext = createContext<AudioContextType>({
   playSuccess: () => {},
   playTab: () => {},
   setGameMode: () => {},
+  setMusicPaused: () => {},
 });
 
 export const useAudio = () => useContext(AudioContext);
@@ -49,6 +51,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [sfxEnabled, setSfxEnabled] = useState(true);
   const [musicMode, setMusicMode] = useState<'bg' | 'game' | 'workout'>('bg');
+  const [musicForcePaused, setMusicForcePaused] = useState(false);
   
   const bgAudioRef = useRef<HTMLAudioElement | null>(null);
   const gameAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -292,7 +295,23 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     
     // Interaction unlock - retry playing audio that failed
-    const unlockAudio = async () => {
+    // BUT: If musicForcePaused is true, we NEVER add these listeners AND we block all music
+    const unlockAudio = async (e?: Event) => {
+        // TRIPLE CHECK: If musicForcePaused is true, immediately stop and return
+        // This should never be called when musicForcePaused is true, but just in case:
+        if (musicForcePaused) {
+            bg.pause();
+            game.pause();
+            workout.pause();
+            bg.currentTime = 0;
+            game.currentTime = 0;
+            workout.currentTime = 0;
+            // Prevent any further attempts
+            e?.stopPropagation();
+            e?.preventDefault();
+            return;
+        }
+        
         if (musicEnabled) {
             // Try to play the active music mode
             if (musicMode === 'bg' && bg.paused) {
@@ -325,17 +344,62 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
     };
 
-    // Add listeners for user interaction to unlock audio (persistent, not once)
-    window.addEventListener('click', unlockAudio);
-    window.addEventListener('touchstart', unlockAudio);
+    // CRITICAL: When musicForcePaused is true, we:
+    // 1. Force stop all music immediately
+    // 2. DO NOT add any event listeners
+    // 3. Add a blocking listener that prevents music from playing
+    if (musicForcePaused) {
+        // Force stop all music immediately
+        bg.pause();
+        game.pause();
+        workout.pause();
+        bg.currentTime = 0;
+        game.currentTime = 0;
+        workout.currentTime = 0;
+        
+        // Add a BLOCKING listener that prevents music from playing on ANY interaction
+        const blockMusic = (e: Event) => {
+            bg.pause();
+            game.pause();
+            workout.pause();
+            bg.currentTime = 0;
+            game.currentTime = 0;
+            workout.currentTime = 0;
+        };
+        
+        // Use capture phase to intercept events BEFORE anything else
+        window.addEventListener('click', blockMusic, { capture: true });
+        window.addEventListener('touchstart', blockMusic, { capture: true });
+        
+        return () => {
+            // Cleanup intervals
+            fadeIntervals.forEach(interval => clearInterval(interval));
+            // Remove blocking listeners
+            window.removeEventListener('click', blockMusic, { capture: true });
+            window.removeEventListener('touchstart', blockMusic, { capture: true });
+        };
+    }
+
+    // Only add unlock listeners if music is NOT force paused
+    let cleanup: (() => void) | null = null;
+    if (!musicForcePaused) {
+        window.addEventListener('click', unlockAudio, { capture: false });
+        window.addEventListener('touchstart', unlockAudio, { capture: false });
+        cleanup = () => {
+            window.removeEventListener('click', unlockAudio);
+            window.removeEventListener('touchstart', unlockAudio);
+        };
+    }
 
     return () => {
         // Cleanup intervals
         fadeIntervals.forEach(interval => clearInterval(interval));
-        window.removeEventListener('click', unlockAudio);
-        window.removeEventListener('touchstart', unlockAudio);
+        // Remove listeners if they were added
+        if (cleanup) {
+            cleanup();
+        }
     };
-  }, [musicEnabled, musicMode, musicVolume]);
+  }, [musicEnabled, musicMode, musicVolume, musicForcePaused]);
 
   const toggleMusic = () => setMusicEnabled(prev => !prev);
   const toggleSfx = () => setSfxEnabled(prev => !prev);
@@ -344,6 +408,31 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const clampedVolume = Math.max(0, Math.min(1, volume));
     setMusicVolumeState(clampedVolume);
     localStorage.setItem('godly_kids_music_volume', clampedVolume.toString());
+  }, []);
+
+  const setMusicPaused = useCallback((paused: boolean) => {
+    console.log('🎵 setMusicPaused called:', paused);
+    setMusicForcePaused(paused);
+    if (paused) {
+      // Immediately pause all music and ensure it stays paused
+      if (bgAudioRef.current) {
+        bgAudioRef.current.pause();
+        bgAudioRef.current.currentTime = 0; // Reset to beginning
+        // Remove any event listeners that might try to resume
+        bgAudioRef.current.onplay = null;
+      }
+      if (gameAudioRef.current) {
+        gameAudioRef.current.pause();
+        gameAudioRef.current.currentTime = 0;
+        gameAudioRef.current.onplay = null;
+      }
+      if (workoutAudioRef.current) {
+        workoutAudioRef.current.pause();
+        workoutAudioRef.current.currentTime = 0;
+        workoutAudioRef.current.onplay = null;
+      }
+      console.log('🎵 All music paused and reset - listeners removed');
+    }
   }, []);
 
   return (
@@ -358,7 +447,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         playBack,
         playSuccess,
         playTab,
-        setGameMode
+        setGameMode,
+        setMusicPaused
     }}>
       {children}
     </AudioContext.Provider>

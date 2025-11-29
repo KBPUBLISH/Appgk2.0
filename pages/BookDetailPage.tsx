@@ -4,6 +4,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Heart, BookOpen, Crown, PlayCircle, Headphones, Disc } from 'lucide-react';
 import { useBooks } from '../context/BooksContext';
 import { Book } from '../types';
+import { readingProgressService } from '../services/readingProgressService';
 
 // Default placeholder image
 const DEFAULT_COVER = 'https://via.placeholder.com/400x400/8B4513/FFFFFF?text=Book+Cover';
@@ -37,13 +38,34 @@ const BookDetailPage: React.FC = () => {
   const { books, loading } = useBooks();
   const [book, setBook] = useState<Book | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [savedPageIndex, setSavedPageIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (books.length > 0) {
       const found = books.find(b => b.id === id);
       setBook(found || null);
+      
+      // Load reading progress for this book
+      if (id) {
+        const progress = readingProgressService.getProgress(id);
+        if (progress) {
+          setSavedPageIndex(progress.currentPageIndex);
+        } else {
+          setSavedPageIndex(null);
+        }
+      }
     }
   }, [id, books]);
+  
+  const handleContinue = () => {
+    if (id && savedPageIndex !== null && savedPageIndex >= 0) {
+      // Navigate to book reader with the saved page
+      navigate(`/read/${id}?page=${savedPageIndex + 1}`); // +1 because URL uses 1-based, but we store 0-based
+    } else {
+      // No saved progress, just start from beginning
+      navigate(`/read/${id}`);
+    }
+  };
 
   if (loading && !book) return <div className="h-full flex items-center justify-center text-white font-display">Loading...</div>;
 
@@ -151,10 +173,15 @@ const BookDetailPage: React.FC = () => {
                 >
                   Read
                 </button>
-                <button className="flex-1 bg-[#FCEBB6] hover:bg-[#fff5cc] text-[#5c2e0b] font-display font-bold text-xl py-3 rounded-2xl shadow-[0_4px_0_#D4B483] border-2 border-[#D4B483] active:translate-y-[4px] active:shadow-none transition-all text-center leading-none flex flex-col items-center justify-center gap-0.5">
-                  <span>Continue</span>
-                  <span className="text-[10px] font-sans font-normal opacity-80">(Pag 22)</span>
-                </button>
+                {savedPageIndex !== null && savedPageIndex >= 0 ? (
+                  <button 
+                    onClick={handleContinue}
+                    className="flex-1 bg-[#FCEBB6] hover:bg-[#fff5cc] text-[#5c2e0b] font-display font-bold text-xl py-3 rounded-2xl shadow-[0_4px_0_#D4B483] border-2 border-[#D4B483] active:translate-y-[4px] active:shadow-none transition-all text-center leading-none flex flex-col items-center justify-center gap-0.5"
+                  >
+                    <span>Continue</span>
+                    <span className="text-[10px] font-sans font-normal opacity-80">(Page {savedPageIndex + 1})</span>
+                  </button>
+                ) : null}
               </div>
 
               {/* Game Card */}

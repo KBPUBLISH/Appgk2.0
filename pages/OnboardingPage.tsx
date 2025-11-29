@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Check, Plus, Trash2, UserCircle } from 'lucide-react';
+import { ChevronLeft, Check, Plus, Trash2, UserCircle, Mic, X } from 'lucide-react';
 import WoodButton from '../components/ui/WoodButton';
 import { useUser } from '../context/UserContext';
 import { useAudio } from '../context/AudioContext';
 import { AVATAR_ASSETS } from '../components/avatar/AvatarAssets';
 import ParentGateModal from '../components/features/ParentGateModal';
+import VoiceCloningModal from '../components/features/VoiceCloningModal';
+import { voiceCloningService, ClonedVoice } from '../services/voiceCloningService';
 
 // Use Funny Heads instead of generic human seeds
 const FUNNY_HEADS = [
@@ -34,7 +36,7 @@ const OnboardingPage: React.FC = () => {
   const { setParentName, setEquippedAvatar, addKid, kids, removeKid, subscribe, resetUser } = useUser();
   const { playClick, playSuccess } = useAudio();
   
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1); // Removed step 3 (voice cloning) - ElevenLabs limit reached
 
   // Step 1 State (Parent)
   const [pName, setPName] = useState('');
@@ -48,6 +50,10 @@ const OnboardingPage: React.FC = () => {
   // Step 3 State (Paywall)
   const [selectedPlan, setSelectedPlan] = useState<'annual' | 'monthly'>('annual');
   const [showParentGate, setShowParentGate] = useState(false);
+  
+  // Step 4 State (Voice Cloning - Optional)
+  const [showVoiceCloningModal, setShowVoiceCloningModal] = useState(false);
+  const [voiceCloned, setVoiceCloned] = useState(false);
 
   // Reset user data when entering onboarding to ensure a fresh start
   useEffect(() => {
@@ -84,11 +90,21 @@ const OnboardingPage: React.FC = () => {
 
   const handleStep2Continue = () => {
     playClick();
-    setStep(3);
+    setStep(3); // Go directly to unlock/paywall step (was step 4, now step 3)
   };
 
   const handleSubscribeClick = () => {
     setShowParentGate(true);
+  };
+
+  const handleSkipVoiceCloning = () => {
+    playClick();
+    setStep(3); // Move to unlock/paywall step (was step 4, now step 3)
+  };
+
+  const handleVoiceCloningContinue = () => {
+    playClick();
+    setStep(3); // Move to unlock/paywall step (was step 4, now step 3)
   };
 
   const handleGateSuccess = () => {
@@ -97,9 +113,16 @@ const OnboardingPage: React.FC = () => {
     navigate('/home');
   };
 
+  const handleVoiceCloned = (voice: ClonedVoice) => {
+    setVoiceCloned(true);
+    playSuccess();
+  };
+
   // --- RENDERERS ---
 
-  const renderProgress = () => (
+  const renderProgress = () => {
+    const totalSteps = 3; // Parent, Family, Unlock (Voice cloning removed - ElevenLabs limit)
+    return (
     <div className="w-full max-w-md px-8 mb-8">
        <div className="flex justify-between mb-2 text-[#eecaa0] font-display font-bold text-xs uppercase tracking-widest">
           <span className={step >= 1 ? "text-[#FFD700]" : "opacity-50"}>Parent</span>
@@ -109,11 +132,12 @@ const OnboardingPage: React.FC = () => {
        <div className="h-3 bg-[#3E1F07] rounded-full overflow-hidden border border-[#5c2e0b] shadow-inner">
           <div 
             className="h-full bg-gradient-to-r from-[#FFD700] to-[#ffb300] transition-all duration-500 ease-out"
-            style={{ width: `${(step / 3) * 100}%` }}
+            style={{ width: `${(step / totalSteps) * 100}%` }}
           ></div>
        </div>
     </div>
-  );
+    );
+  };
 
   // Helper for rendering internal avatar asset
   const renderAvatarAsset = (headKey: string) => {
@@ -311,6 +335,84 @@ const OnboardingPage: React.FC = () => {
            </div>
         )}
 
+        {/* --- STEP 3: VOICE CLONING (DISABLED - ElevenLabs Limit Reached) --- */}
+        {/* Voice cloning feature removed due to ElevenLabs 180 clone limit */}
+        {false && step === 3 && (
+          <div className="w-full max-w-md px-6 animate-in slide-in-from-right-10 duration-500">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-2xl border-4 border-[#8B4513]">
+                <Mic className="text-[#8B4513]" size={48} />
+              </div>
+              <h2 className="text-3xl font-bold text-white mb-3">
+                Create Your Own Voice!
+              </h2>
+              <p className="text-[#eecaa0] text-lg leading-relaxed">
+                Record your voice (or a loved one's like Grandpa) to read books in a familiar voice
+              </p>
+            </div>
+
+            {/* Feature Benefits */}
+            <div className="bg-[#3E1F07]/50 rounded-xl p-6 mb-8 border-2 border-[#5D2E0E]">
+              <h3 className="text-white font-bold mb-4 text-lg">Why create a voice?</h3>
+              <ul className="space-y-3 text-white/90">
+                <li className="flex items-start gap-3">
+                  <Check className="text-[#FFD700] flex-shrink-0 mt-1" size={20} />
+                  <span>Listen to books in <span className="font-bold text-white">Grandpa's voice</span> or any family member</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Check className="text-[#FFD700] flex-shrink-0 mt-1" size={20} />
+                  <span>Create up to <span className="font-bold text-white">5 custom voices</span> stored on your device</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Check className="text-[#FFD700] flex-shrink-0 mt-1" size={20} />
+                  <span>Make storytime more <span className="font-bold text-white">personal and engaging</span></span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col gap-3">
+              <WoodButton
+                onClick={() => {
+                  playClick();
+                  setShowVoiceCloningModal(true);
+                }}
+                className="w-full"
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Mic size={20} />
+                  <span className="text-lg font-bold">Create Voice Now</span>
+                </div>
+              </WoodButton>
+
+              {voiceCloned && (
+                <div className="bg-green-600/20 border-2 border-green-500 rounded-xl p-4 text-center">
+                  <Check className="text-green-400 mx-auto mb-2" size={24} />
+                  <p className="text-green-200 font-bold">Voice created successfully!</p>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSkipVoiceCloning}
+                  className="flex-1 text-[#eecaa0] text-sm font-bold underline decoration-dotted opacity-70 hover:opacity-100 transition-opacity"
+                >
+                  Skip for now
+                </button>
+                {voiceCloned && (
+                  <button
+                    onClick={handleVoiceCloningContinue}
+                    className="flex-1 px-6 py-3 bg-[#FFD700] hover:bg-[#ffed4e] border-2 border-[#B8860B] rounded-xl text-[#8B4513] font-bold transition-colors"
+                  >
+                    Continue
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* --- STEP 3: PAYWALL / DEAL --- */}
         {step === 3 && (
             <div className="w-full max-w-md px-4 animate-in slide-in-from-right-10 duration-500 pb-10">
@@ -413,6 +515,12 @@ const OnboardingPage: React.FC = () => {
             isOpen={showParentGate} 
             onClose={() => setShowParentGate(false)} 
             onSuccess={handleGateSuccess} 
+        />
+
+        <VoiceCloningModal
+          isOpen={showVoiceCloningModal}
+          onClose={() => setShowVoiceCloningModal(false)}
+          onVoiceCloned={handleVoiceCloned}
         />
 
       </div>

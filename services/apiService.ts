@@ -875,136 +875,71 @@ export const ApiService = {
   generateTTS: async (
     text: string, 
     voiceId: string, 
-    bookId?: string,
-    onAudioChunk?: (audioData: string) => void,
-    onAlignment?: (alignment: { words: Array<{ word: string; start: number; end: number }> }) => void
+    bookId?: string
   ): Promise<{ audioUrl: string; alignment: any } | null> => {
-    return new Promise((resolve, reject) => {
-      try {
-        const baseUrl = getApiBaseUrl();
-        // Convert http:// to ws:// or https:// to wss://
-        const wsUrl = baseUrl.replace(/^http/, 'ws') + 'tts/ws';
-        
-        const ws = new WebSocket(wsUrl);
-        const audioChunks: string[] = [];
-        let finalAlignment: any = null;
-        let finalAudioUrl: string | null = null;
-        
-        ws.onopen = () => {
-          console.log('WebSocket connected for TTS');
-          ws.send(JSON.stringify({ text, voiceId, bookId }));
-        };
-        
-        ws.onmessage = (event) => {
-          try {
-            // Try to parse as JSON first
-            const data = JSON.parse(event.data);
-            
-            if (data.type === 'audio') {
-              // Base64 audio chunk
-              audioChunks.push(data.data);
-              if (onAudioChunk) {
-                onAudioChunk(data.data);
-              }
-            } else if (data.type === 'alignment') {
-              // Word alignment data
-              if (onAlignment) {
-                onAlignment({ words: data.words });
-              }
-              finalAlignment = { words: data.words };
-            } else if (data.type === 'complete') {
-              // Stream complete
-              console.log('✅ Received complete message from backend:', data.audioUrl);
-              finalAudioUrl = data.audioUrl;
-              finalAlignment = data.alignment;
-              resolve({
-                audioUrl: data.audioUrl,
-                alignment: data.alignment
-              });
-              // Close after a short delay to ensure message is processed
-              setTimeout(() => {
-                if (ws.readyState === WebSocket.OPEN) {
-                  ws.close();
-                }
-              }, 100);
-            } else if (data.error) {
-              console.error('❌ Error from backend:', data.error);
-              reject(new Error(data.error));
-              ws.close();
-            }
-          } catch (err) {
-            // Binary audio data - convert to base64
-            const reader = new FileReader();
-            reader.onload = () => {
-              const base64 = (reader.result as string).split(',')[1];
-              audioChunks.push(base64);
-              if (onAudioChunk) {
-                onAudioChunk(base64);
-              }
-            };
-            reader.readAsDataURL(event.data);
-          }
-        };
-        
-        ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          // Don't reject immediately - let the backend handle the error and send a response
-          // The backend will fallback to HTTP and send a 'complete' message
-        };
-        
-        ws.onclose = (event) => {
-          console.log('WebSocket closed', event.code, event.reason);
-          // If we didn't get a complete message, the backend might still be processing
-          // Don't reject immediately - the backend might send the complete message before closing
-          if (!finalAudioUrl && !finalAlignment) {
-            // Wait a bit longer for the backend to process HTTP fallback
-            setTimeout(() => {
-              if (!finalAudioUrl) {
-                console.warn('⚠️ No audio received after WebSocket closed, rejecting');
-                reject(new Error('No audio received - backend may have failed'));
-              }
-            }, 5000); // Give backend 5 seconds to process HTTP fallback
-          }
-        };
-        
-        // Fallback to HTTP if WebSocket fails after 5 seconds
-        setTimeout(() => {
-          if (ws.readyState === WebSocket.CONNECTING) {
-            ws.close();
-            // Fallback to HTTP
-            const httpUrl = baseUrl + 'tts/generate';
-            fetchWithTimeout(httpUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text, voiceId, bookId })
-            })
-              .then(response => response.ok ? response.json() : null)
-              .then(result => resolve(result))
-              .catch(err => reject(err));
-          }
-        }, 5000);
-        
-      } catch (error) {
-        console.error('TTS WebSocket Error:', error);
-        reject(error);
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetchWithTimeout(`${baseUrl}tts/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voiceId, bookId })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        return result;
       }
-    });
+      console.error('TTS Generation failed:', await response.text());
+      return null;
+    } catch (error) {
+      console.error('TTS Error:', error);
+      return null;
+    }
   },
 
-  // TTS: Get Voices
+  // TTS: Get Voices (from enabled voices only - synced with portal)
   getVoices: async (): Promise<any[]> => {
     try {
       const baseUrl = getApiBaseUrl();
-      const response = await fetchWithTimeout(`${baseUrl}tts/voices`, {
+      // Use the enabled voices endpoint to get only voices enabled in the portal
+      console.log('🔊 Fetching enabled voices from portal...');
+      const response = await fetchWithTimeout(`${baseUrl}voices/enabled`, {
         method: 'GET'
       });
 
       if (response.ok) {
-        return await response.json();
+        const voices = await response.json();
+        console.log(`✅ Loaded ${voices.length} enabled voice(s) from portal`);
+        // Map to expected format for backward compatibility
+        const mappedVoices = voices.map((v: any) => ({
+          voice_id: v.voiceId,
+          name: v.name,
+          preview_url: v.previewUrl,
+          category: v.category
+        }));
+        
+        if (mappedVoices.length === 0) {
+          console.warn('⚠️ No voices enabled in portal. Users should enable voices in the portal first.');
+        }
+        
+        return mappedVoices;
       }
+      
+      // Fallback to TTS endpoint if voices endpoint doesn't exist (for backward compatibility)
+      console.warn('⚠️ Enabled voices endpoint not available, falling back to TTS endpoint');
+      const fallbackResponse = await fetchWithTimeout(`${baseUrl}tts/voices`, {
+        method: 'GET'
+      });
+      if (fallbackResponse.ok) {
+        const fallbackVoices = await fallbackResponse.json();
+        console.log(`✅ Loaded ${fallbackVoices.length} voice(s) from TTS endpoint (fallback)`);
+        return fallbackVoices;
+      }
+      
+      console.warn('⚠️ No voices available from any endpoint');
       return [];
     } catch (error) {
-      console.error('Get Voices Error:', error);
+      console.error('❌ Get Voices Error:', error);
       return [];
     }
   },
@@ -1072,6 +1007,100 @@ export const ApiService = {
   getCategoryNames: async (): Promise<string[]> => {
     const categories = await ApiService.getCategories();
     return categories.map(cat => cat.name);
+  },
+
+  // Voice Cloning: Clone a voice from audio samples
+  cloneVoice: async (
+    name: string,
+    audioFiles: File[],
+    description?: string
+  ): Promise<{ success: boolean; voice?: any; error?: string }> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const formData = new FormData();
+      formData.append('name', name);
+      if (description) {
+        formData.append('description', description);
+      }
+      
+      audioFiles.forEach((file) => {
+        formData.append('samples', file);
+      });
+
+      const token = authService.getToken();
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      // Use longer timeout for voice cloning (120 seconds - 2 minutes)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+      try {
+        const response = await fetch(`${baseUrl}voice-cloning/clone`, {
+          method: 'POST',
+          body: formData,
+          headers,
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const data = await response.json();
+          return { success: true, voice: data.voice };
+        } else {
+          const errorData = await response.json();
+          return { success: false, error: errorData.message || 'Failed to clone voice' };
+        }
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          return { success: false, error: 'Request timeout - voice cloning takes time' };
+        }
+        throw error;
+      }
+    } catch (error: any) {
+      console.error('❌ Voice Cloning Error:', error);
+      
+      // Try to extract error message from response
+      let errorMessage = 'Failed to clone voice';
+      if (error.response) {
+        try {
+          const errorData = await error.response.json();
+          errorMessage = errorData.message || error.message || 'Failed to clone voice';
+        } catch {
+          errorMessage = error.response.statusText || error.message || 'Failed to clone voice';
+        }
+      } else {
+        errorMessage = error.message || 'Failed to clone voice';
+      }
+      
+      return { success: false, error: errorMessage };
+    }
+  },
+
+  // Voice Cloning: Delete a cloned voice
+  deleteClonedVoice: async (voiceId: string): Promise<boolean> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const token = authService.getToken();
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetchWithTimeout(`${baseUrl}voice-cloning/clone/${voiceId}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Delete Cloned Voice Error:', error);
+      return false;
+    }
   },
 };
 

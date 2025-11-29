@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, X, Play, Pause, Volume2 } from 'lucide-react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, X, Play, Pause, Volume2, Mic, Check } from 'lucide-react';
 import { ApiService } from '../services/apiService';
+import { voiceCloningService, ClonedVoice } from '../services/voiceCloningService';
+import VoiceCloningModal from '../components/features/VoiceCloningModal';
+import { useAudio } from '../context/AudioContext';
+import { readingProgressService } from '../services/readingProgressService';
 
 interface TextBox {
     text: string;
@@ -56,6 +60,8 @@ const WoodButton: React.FC<{ onClick: (e: React.MouseEvent) => void; icon: React
 const BookReaderPage: React.FC = () => {
     const { bookId } = useParams<{ bookId: string }>();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const { setGameMode, setMusicPaused } = useAudio();
     const [pages, setPages] = useState<Page[]>([]);
     const [currentPageIndex, setCurrentPageIndex] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -67,10 +73,108 @@ const BookReaderPage: React.FC = () => {
     const [activeTextBoxIndex, setActiveTextBoxIndex] = useState<number | null>(null);
     const [loadingAudio, setLoadingAudio] = useState(false);
     const [voices, setVoices] = useState<any[]>([]);
+    const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
     const [selectedVoiceId, setSelectedVoiceId] = useState<string>('21m00Tcm4TlvDq8ikWAM'); // Default Rachel
     const [wordAlignment, setWordAlignment] = useState<{ words: Array<{ word: string; start: number; end: number }> } | null>(null);
     const [currentWordIndex, setCurrentWordIndex] = useState<number>(-1);
+    const [showVoiceCloningModal, setShowVoiceCloningModal] = useState(false);
+    const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
     const wordAlignmentRef = useRef<{ words: Array<{ word: string; start: number; end: number }> } | null>(null);
+    const bookBackgroundMusicRef = useRef<HTMLAudioElement | null>(null);
+    const voiceDropdownRef = useRef<HTMLDivElement>(null);
+    const [autoPlayMode, setAutoPlayMode] = useState(false);
+    const autoPlayModeRef = useRef(false);
+    const [isPageTurning, setIsPageTurning] = useState(false);
+    const touchStartX = useRef<number>(0);
+    const touchEndX = useRef<number>(0);
+
+    // Pause background music when entering book reader
+    useEffect(() => {
+        // Pause app background music and prevent it from resuming on interaction
+        setGameMode(false);
+        setMusicPaused(true);
+        
+        // Aggressively stop any music that might be playing
+        // This is a safety measure to ensure music is stopped immediately
+        const stopAllMusic = () => {
+            const audioElements = document.querySelectorAll('audio');
+            audioElements.forEach(audio => {
+                if (audio !== bookBackgroundMusicRef.current) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
+            });
+        };
+        stopAllMusic();
+        
+        // Fetch book data to check for book-specific background music
+        const fetchBookData = async () => {
+            if (!bookId) return;
+            try {
+                const book = await ApiService.getBookById(bookId);
+                if (book && (book as any).files?.audio && Array.isArray((book as any).files.audio) && (book as any).files.audio.length > 0) {
+                    // Use the first audio file as background music
+                    const musicUrl = (book as any).files.audio[0].url;
+                    if (musicUrl) {
+                        // Clean up any existing book music
+                        if (bookBackgroundMusicRef.current) {
+                            bookBackgroundMusicRef.current.pause();
+                            bookBackgroundMusicRef.current.src = '';
+                            bookBackgroundMusicRef.current = null;
+                        }
+                        
+                        const audio = new Audio(musicUrl);
+                        audio.loop = true;
+                        audio.volume = 0.3; // Lower volume for background music
+                        audio.preload = 'auto';
+                        bookBackgroundMusicRef.current = audio;
+                        
+                        // Try to play after user interaction
+                        const playMusic = async () => {
+                            try {
+                                await audio.play();
+                                console.log('✅ Book background music started');
+                            } catch (err) {
+                                console.warn('⚠️ Could not auto-play book music, will play on user interaction:', err);
+                            }
+                        };
+                        
+                        // Wait for audio to be ready
+                        audio.addEventListener('canplaythrough', playMusic);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch book data:', err);
+            }
+        };
+        
+        fetchBookData();
+        
+        // Aggressive music stopping - check periodically to ensure music stays stopped
+        const musicStopInterval = setInterval(() => {
+            // Force stop all app background music
+            const audioElements = document.querySelectorAll('audio');
+            audioElements.forEach(audio => {
+                // Only stop app music, not book-specific music
+                if (audio !== bookBackgroundMusicRef.current) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
+            });
+        }, 500); // Check every 500ms
+        
+        // Cleanup: stop book background music and resume app music when leaving
+        return () => {
+            clearInterval(musicStopInterval);
+            if (bookBackgroundMusicRef.current) {
+                bookBackgroundMusicRef.current.pause();
+                bookBackgroundMusicRef.current.src = '';
+                bookBackgroundMusicRef.current = null;
+            }
+            // Allow app music to resume when leaving book reader
+            setMusicPaused(false);
+        };
+    }, [bookId, setGameMode, setMusicPaused]);
 
     useEffect(() => {
         const fetchPages = async () => {
@@ -78,6 +182,24 @@ const BookReaderPage: React.FC = () => {
             try {
                 const data = await ApiService.getBookPages(bookId);
                 setPages(data);
+                
+                // Check if page is specified in URL (from Continue button)
+                const pageParam = searchParams.get('page');
+                if (pageParam) {
+                    const pageNum = parseInt(pageParam, 10);
+                    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= data.length) {
+                        const pageIndex = pageNum - 1; // Convert to 0-based
+                        setCurrentPageIndex(pageIndex);
+                        console.log(`📖 Navigated to page ${pageNum} from URL`);
+                    }
+                } else {
+                    // Load saved reading progress if no URL param
+                    const progress = readingProgressService.getProgress(bookId);
+                    if (progress && progress.currentPageIndex >= 0 && progress.currentPageIndex < data.length) {
+                        setCurrentPageIndex(progress.currentPageIndex);
+                        console.log(`📖 Restored reading progress: Page ${progress.currentPageIndex + 1} of ${data.length}`);
+                    }
+                }
             } catch (err) {
                 console.error('Failed to fetch pages:', err);
             } finally {
@@ -86,34 +208,55 @@ const BookReaderPage: React.FC = () => {
         };
         fetchPages();
 
-        // Fetch voices
+        // Fetch voices (only enabled voices from portal)
         const fetchVoices = async () => {
             const voiceList = await ApiService.getVoices();
             if (voiceList.length > 0) {
                 setVoices(voiceList);
-                // Try to find a kid-friendly voice or stick to default
-                const kidVoice = voiceList.find((v: any) => v.name === 'Domi' || v.name === 'Bella');
-                if (kidVoice) setSelectedVoiceId(kidVoice.voice_id);
+                // Try to find a kid-friendly voice or use first available
+                const kidVoice = voiceList.find((v: any) => 
+                    v.name === 'Domi' || v.name === 'Bella' || v.name === 'Elli' || v.name === 'Rachel'
+                );
+                if (kidVoice) {
+                    setSelectedVoiceId(kidVoice.voice_id);
+                } else if (voiceList.length > 0) {
+                    // Use first available voice if no kid-friendly voice found
+                    setSelectedVoiceId(voiceList[0].voice_id);
+                }
+                console.log(`✅ Loaded ${voiceList.length} enabled voice(s) from portal`);
             } else {
-                // Fallback to hardcoded common voices if API fails
-                const fallbackVoices = [
-                    { voice_id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', category: 'premade' },
-                    { voice_id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi', category: 'premade' },
-                    { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella', category: 'premade' },
-                    { voice_id: 'ErXwobaYiN019PkySvjV', name: 'Antoni', category: 'premade' },
-                    { voice_id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli', category: 'premade' },
-                    { voice_id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh', category: 'premade' },
-                    { voice_id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold', category: 'premade' },
-                    { voice_id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam', category: 'premade' },
-                    { voice_id: 'yoZ06aMxZJJ28mfd3POQ', name: 'Sam', category: 'premade' }
-                ];
-                setVoices(fallbackVoices);
-                // Default to Domi (kid-friendly)
-                setSelectedVoiceId('AZnzlk1XvdvUeBnXmlld');
+                console.warn('⚠️ No voices enabled in portal. Please enable voices in the portal first.');
+                // Don't use fallback - show empty state so users know to enable voices in portal
+                setVoices([]);
             }
         };
         fetchVoices();
+
+        // Load cloned voices from local storage
+        const loadClonedVoices = () => {
+            const cloned = voiceCloningService.getClonedVoices();
+            setClonedVoices(cloned);
+            console.log(`✅ Loaded ${cloned.length} cloned voice(s) from local storage`);
+        };
+        loadClonedVoices();
     }, [bookId]);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (voiceDropdownRef.current && !voiceDropdownRef.current.contains(event.target as Node)) {
+                setShowVoiceDropdown(false);
+            }
+        };
+
+        if (showVoiceDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showVoiceDropdown]);
 
     // Cleanup audio on unmount
     useEffect(() => {
@@ -131,8 +274,17 @@ const BookReaderPage: React.FC = () => {
         e.stopPropagation();
         stopAudio();
         if (currentPageIndex < pages.length - 1) {
-            setCurrentPageIndex(prev => prev + 1);
-            setShowScroll(true); // Reset scroll visibility on page turn
+            setIsPageTurning(true);
+            setTimeout(() => {
+                const nextIndex = currentPageIndex + 1;
+                setCurrentPageIndex(nextIndex);
+                setShowScroll(true);
+                setIsPageTurning(false);
+                // Save progress
+                if (bookId) {
+                    readingProgressService.saveProgress(bookId, nextIndex);
+                }
+            }, 300);
         }
     };
 
@@ -140,12 +292,55 @@ const BookReaderPage: React.FC = () => {
         e.stopPropagation();
         stopAudio();
         if (currentPageIndex > 0) {
-            setCurrentPageIndex(prev => prev - 1);
-            setShowScroll(true);
+            setIsPageTurning(true);
+            setTimeout(() => {
+                const prevIndex = currentPageIndex - 1;
+                setCurrentPageIndex(prevIndex);
+                setShowScroll(true);
+                setIsPageTurning(false);
+                // Save progress
+                if (bookId) {
+                    readingProgressService.saveProgress(bookId, prevIndex);
+                }
+            }, 300);
+        }
+    };
+    
+    // Swipe gesture handlers
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStartX.current = e.touches[0].clientX;
+    };
+    
+    const handleTouchMove = (e: React.TouchEvent) => {
+        touchEndX.current = e.touches[0].clientX;
+    };
+    
+    const handleTouchEnd = () => {
+        const swipeThreshold = 50;
+        const diff = touchStartX.current - touchEndX.current;
+        
+        if (Math.abs(diff) > swipeThreshold) {
+            if (diff > 0) {
+                // Swipe left - next page
+                if (currentPageIndex < pages.length - 1) {
+                    stopAudio();
+                    handleNext({ stopPropagation: () => {} } as React.MouseEvent);
+                }
+            } else {
+                // Swipe right - previous page
+                if (currentPageIndex > 0) {
+                    stopAudio();
+                    handlePrev({ stopPropagation: () => {} } as React.MouseEvent);
+                }
+            }
         }
     };
 
-    const toggleScroll = () => {
+    const toggleScroll = (e?: React.MouseEvent) => {
+        // Stop propagation to prevent music unlock
+        if (e) {
+            e.stopPropagation();
+        }
         setShowScroll(prev => !prev);
     };
 
@@ -156,31 +351,40 @@ const BookReaderPage: React.FC = () => {
         }
         setPlaying(false);
         setActiveTextBoxIndex(null);
+        setAutoPlayMode(false);
+        autoPlayModeRef.current = false;
     };
 
     const handlePlayPage = async (e: React.MouseEvent) => {
         e.stopPropagation();
 
-        // If already playing, pause/stop
+        // If already playing, pause/stop and disable auto-play
         if (playing) {
             stopAudio();
+            setAutoPlayMode(false);
             return;
         }
 
+        // Enable auto-play mode and start playing
+        setAutoPlayMode(true);
+        autoPlayModeRef.current = true;
+        
         // Play the first text box on the page
         if (currentPage.textBoxes && currentPage.textBoxes.length > 0) {
             const firstBox = currentPage.textBoxes[0];
-            handlePlayText(firstBox.text, 0, e);
+            handlePlayText(firstBox.text, 0, e, true); // Pass autoPlay flag
         }
     };
 
-    const handlePlayText = async (text: string, index: number, e: React.MouseEvent) => {
+    const handlePlayText = async (text: string, index: number, e: React.MouseEvent, isAutoPlay: boolean = false) => {
         e.stopPropagation();
 
         // If already playing this text, pause it
         if (playing && activeTextBoxIndex === index) {
             currentAudio?.pause();
             setPlaying(false);
+            setAutoPlayMode(false);
+            autoPlayModeRef.current = false;
             return;
         }
 
@@ -193,6 +397,10 @@ const BookReaderPage: React.FC = () => {
         if (activeTextBoxIndex === index && currentAudio) {
             currentAudio.play();
             setPlaying(true);
+            if (isAutoPlay) {
+                setAutoPlayMode(true);
+                autoPlayModeRef.current = true;
+            }
             return;
         }
 
@@ -204,33 +412,50 @@ const BookReaderPage: React.FC = () => {
         wordAlignmentRef.current = null;
 
         try {
-            // Use WebSocket for real-time streaming with word alignment
+            // Use HTTP API for TTS
             const result = await ApiService.generateTTS(
                 text, 
                 selectedVoiceId,
-                bookId || undefined,
-                // onAudioChunk callback - can be used for streaming in future
-                undefined,
-                // onAlignment callback - update word alignment in real-time
-                (alignment: { words: Array<{ word: string; start: number; end: number }> }) => {
-                    console.log('📝 Received word alignment:', alignment);
-                    setWordAlignment(alignment);
-                    wordAlignmentRef.current = alignment;
-                }
+                bookId || undefined
             );
 
             // Use final audio URL from WebSocket
             if (result && result.audioUrl) {
                 const audio = new Audio(result.audioUrl);
                 
-                const alignment = result.alignment || null;
-                if (alignment && alignment.words) {
-                    console.log('📝 Final alignment received:', alignment);
-                    setWordAlignment(alignment);
-                    wordAlignmentRef.current = alignment;
-                } else {
-                    console.warn('⚠️ No alignment data in result:', result);
-                }
+                // Wait for audio metadata to load so we can get the actual duration
+                audio.addEventListener('loadedmetadata', () => {
+                    const alignment = result.alignment || null;
+                    if (alignment && alignment.words) {
+                        const actualDuration = audio.duration;
+                        const estimatedDuration = alignment.words.length * 0.4; // Our estimated duration
+                        
+                        // Scale word timings to match actual audio duration
+                        if (actualDuration > 0 && estimatedDuration > 0) {
+                            const scaleFactor = actualDuration / estimatedDuration;
+                            const scaledAlignment = {
+                                words: alignment.words.map((w: any) => ({
+                                    word: w.word,
+                                    start: w.start * scaleFactor,
+                                    end: w.end * scaleFactor
+                                }))
+                            };
+                            console.log('📝 Scaled alignment:', {
+                                estimatedDuration: estimatedDuration.toFixed(2),
+                                actualDuration: actualDuration.toFixed(2),
+                                scaleFactor: scaleFactor.toFixed(2),
+                                words: scaledAlignment.words.length
+                            });
+                            setWordAlignment(scaledAlignment);
+                            wordAlignmentRef.current = scaledAlignment;
+                        } else {
+                            setWordAlignment(alignment);
+                            wordAlignmentRef.current = alignment;
+                        }
+                    } else {
+                        console.warn('⚠️ No alignment data in result:', result);
+                    }
+                });
                 
                 // Track audio time for word highlighting
                 // Use ref to access latest alignment data (avoids closure issues)
@@ -243,9 +468,9 @@ const BookReaderPage: React.FC = () => {
                         );
                         if (wordIndex !== -1 && wordIndex !== currentWordIndex) {
                             setCurrentWordIndex(wordIndex);
-                        } else if (currentTime >= (currentAlignment.words[currentAlignment.words.length - 1]?.end || 0)) {
-                            setCurrentWordIndex(-1);
                         }
+                        // Don't reset highlighting when past last word - keep it on the last word
+                        // This ensures all words get highlighted even if timing is slightly off
                     } else if (!currentAlignment) {
                         // Debug: log when alignment is missing
                         console.warn('⚠️ No alignment data available for highlighting');
@@ -253,11 +478,104 @@ const BookReaderPage: React.FC = () => {
                 };
 
                 audio.onended = () => {
+                    // Highlight the last word when audio ends
+                    const currentAlignment = wordAlignmentRef.current;
+                    if (currentAlignment && currentAlignment.words && currentAlignment.words.length > 0) {
+                        setCurrentWordIndex(currentAlignment.words.length - 1);
+                        // Clear after a brief moment to show completion
+                        setTimeout(() => {
+                            setCurrentWordIndex(-1);
                     setPlaying(false);
                     setActiveTextBoxIndex(null);
-                    setCurrentWordIndex(-1);
-                    setWordAlignment(null);
-                    wordAlignmentRef.current = null;
+                            setWordAlignment(null);
+                            wordAlignmentRef.current = null;
+                            
+                            // Auto-play: Move to next page if enabled
+                            // Use ref to get latest autoPlayMode value (closure-safe)
+                            if (autoPlayModeRef.current && currentPageIndex < pages.length - 1) {
+                                const nextPageIndex = currentPageIndex + 1;
+                                console.log('🔄 Auto-play: Moving to page', nextPageIndex + 1);
+                                setIsPageTurning(true);
+                                setTimeout(() => {
+                                    setCurrentPageIndex(nextPageIndex);
+                                    setShowScroll(true);
+                                    setIsPageTurning(false);
+                                    // Save progress
+                                    if (bookId) {
+                                        readingProgressService.saveProgress(bookId, nextPageIndex);
+                                    }
+                                    
+                                    // Wait for page to render, then auto-play next page
+                                    setTimeout(() => {
+                                        // Check again if auto-play is still enabled
+                                        if (autoPlayModeRef.current) {
+                                            const nextPage = pages[nextPageIndex];
+                                            if (nextPage && nextPage.textBoxes && nextPage.textBoxes.length > 0) {
+                                                const firstBox = nextPage.textBoxes[0];
+                                                console.log('▶️ Auto-play: Starting next page audio');
+                                                const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                                                handlePlayText(firstBox.text, 0, syntheticEvent, true);
+                                            } else {
+                                                console.log('⏹️ Auto-play: No text boxes on next page, stopping');
+                                                setAutoPlayMode(false);
+                                                autoPlayModeRef.current = false;
+                                            }
+                                        }
+                                    }, 300);
+                                }, 300);
+                            } else if (autoPlayModeRef.current && currentPageIndex >= pages.length - 1) {
+                                // Reached end of book, stop auto-play
+                                console.log('🏁 Auto-play: Reached end of book, stopping');
+                                setAutoPlayMode(false);
+                                autoPlayModeRef.current = false;
+                            }
+                        }, 500);
+                    } else {
+                    setPlaying(false);
+                        setActiveTextBoxIndex(null);
+                        setCurrentWordIndex(-1);
+                        setWordAlignment(null);
+                        wordAlignmentRef.current = null;
+                        
+                        // Auto-play: Move to next page if enabled
+                        // Use ref to get latest autoPlayMode value (closure-safe)
+                        if (autoPlayModeRef.current && currentPageIndex < pages.length - 1) {
+                            const nextPageIndex = currentPageIndex + 1;
+                            console.log('🔄 Auto-play: Moving to page', nextPageIndex + 1);
+                            setIsPageTurning(true);
+                            setTimeout(() => {
+                                setCurrentPageIndex(nextPageIndex);
+                                setShowScroll(true);
+                                setIsPageTurning(false);
+                                // Save progress
+                                if (bookId) {
+                                    readingProgressService.saveProgress(bookId, nextPageIndex);
+                                }
+                                
+                                setTimeout(() => {
+                                    // Check again if auto-play is still enabled
+                                    if (autoPlayModeRef.current) {
+                                        const nextPage = pages[nextPageIndex];
+                                        if (nextPage && nextPage.textBoxes && nextPage.textBoxes.length > 0) {
+                                            const firstBox = nextPage.textBoxes[0];
+                                            console.log('▶️ Auto-play: Starting next page audio');
+                                            const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                                            handlePlayText(firstBox.text, 0, syntheticEvent, true);
+                                        } else {
+                                            console.log('⏹️ Auto-play: No text boxes on next page, stopping');
+                                            setAutoPlayMode(false);
+                                            autoPlayModeRef.current = false;
+                                        }
+                                    }
+                                }, 300);
+                            }, 300);
+                        } else if (autoPlayModeRef.current && currentPageIndex >= pages.length - 1) {
+                            // Reached end of book, stop auto-play
+                            console.log('🏁 Auto-play: Reached end of book, stopping');
+                            setAutoPlayMode(false);
+                            autoPlayModeRef.current = false;
+                        }
+                    }
                 };
 
                 audio.onplay = () => setPlaying(true);
@@ -302,55 +620,163 @@ const BookReaderPage: React.FC = () => {
     }
 
     return (
-        <div className="relative w-full h-screen bg-gray-900 overflow-hidden flex flex-col">
-            {/* Top Toolbar - Simplified for App */}
-            <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-4 z-50 pointer-events-none">
+        <div 
+            className="relative w-full h-screen bg-gray-900 overflow-hidden flex flex-col"
+            onTouchStart={(e) => {
+                // Block any music from playing on touch
+                e.stopPropagation();
+            }}
+            onClick={(e) => {
+                // Block any music from playing on click
+                e.stopPropagation();
+            }}
+        >
+            {/* Top Toolbar - Clean and Compact */}
+            <div className="absolute top-0 left-0 right-0 h-14 flex items-center justify-between px-3 z-50 pointer-events-none">
+                {/* Back Button */}
                 <button
-                    onClick={() => navigate(-1)}
-                    className="pointer-events-auto bg-black/30 backdrop-blur-md text-white p-2 rounded-full hover:bg-black/50 transition flex items-center gap-2"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(-1);
+                    }}
+                    className="pointer-events-auto bg-black/40 backdrop-blur-md text-white p-2 rounded-full hover:bg-black/60 transition"
                 >
-                    <ChevronLeft className="w-6 h-6" />
+                    <ChevronLeft className="w-5 h-5" />
                 </button>
 
-                <div className="flex items-center gap-4">
-                    {/* Voice Selector */}
-                    <div className="pointer-events-auto bg-black/30 backdrop-blur-md rounded-full px-3 py-1 flex items-center gap-2">
+                {/* Right: Voice Selector - Compact */}
+                <div 
+                    ref={voiceDropdownRef}
+                    className="pointer-events-auto relative"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowVoiceDropdown(!showVoiceDropdown);
+                        }}
+                        className="bg-black/40 backdrop-blur-md rounded-full px-2.5 py-1.5 flex items-center gap-1.5 hover:bg-black/60 transition-colors"
+                    >
                         <Volume2 className="w-4 h-4 text-white" />
-                        <select
-                            value={selectedVoiceId}
-                            onChange={(e) => setSelectedVoiceId(e.target.value)}
-                            className="bg-transparent text-white text-sm outline-none border-none cursor-pointer max-w-[100px]"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            {voices.map(v => (
-                                <option key={v.voice_id} value={v.voice_id} className="text-black">
+                        <span className="text-white text-xs max-w-[100px] truncate">
+                            {voices.find(v => v.voice_id === selectedVoiceId)?.name || 
+                             clonedVoices.find(v => v.voice_id === selectedVoiceId)?.name || 
+                             'Voice'}
+                        </span>
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {showVoiceDropdown && (
+                        <div className="absolute top-full right-0 mt-2 bg-black/95 backdrop-blur-md rounded-xl border border-white/20 shadow-2xl z-50 min-w-[200px] max-w-[280px] max-h-[400px] overflow-y-auto">
+                            <div className="py-2">
+                                {/* Portal voices */}
+                                {voices.length > 0 && (
+                                    <>
+                                        {voices.map(v => (
+                                            <button
+                                                key={v.voice_id}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedVoiceId(v.voice_id);
+                                                    setShowVoiceDropdown(false);
+                                                }}
+                                                className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${
+                                                    selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
+                                                }`}
+                                            >
+                                                {selectedVoiceId === v.voice_id && (
+                                                    <Check className="w-4 h-4 text-[#FFD700]" />
+                                                )}
+                                                <span className={selectedVoiceId === v.voice_id ? 'font-bold' : ''}>
                                     {v.name}
-                                </option>
-                            ))}
-                            {voices.length === 0 && <option value="21m00Tcm4TlvDq8ikWAM" className="text-black">Rachel</option>}
-                        </select>
-                    </div>
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </>
+                                )}
+                                
+                                {/* Cloned voices */}
+                                {clonedVoices.length > 0 && (
+                                    <>
+                                        {clonedVoices.map(v => (
+                                            <button
+                                                key={v.voice_id}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedVoiceId(v.voice_id);
+                                                    setShowVoiceDropdown(false);
+                                                }}
+                                                className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${
+                                                    selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
+                                                }`}
+                                            >
+                                                {selectedVoiceId === v.voice_id && (
+                                                    <Check className="w-4 h-4 text-[#FFD700]" />
+                                                )}
+                                                <span className={selectedVoiceId === v.voice_id ? 'font-bold' : ''}>
+                                                    {v.name} (Cloned)
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </>
+                                )}
 
-                    <div className="bg-black/30 backdrop-blur-md text-white px-3 py-1 rounded-full text-sm">
-                        Page {currentPageIndex + 1} / {pages.length}
+                                    {/* Voice Cloning Feature Disabled - ElevenLabs Limit Reached */}
+                                    {/* Separator */}
+                                    {(voices.length > 0 || clonedVoices.length > 0) && (
+                                        <div className="border-t border-white/20 my-1"></div>
+                                    )}
+
+                                    {/* Create Voice Option - DISABLED */}
+                                    {/* 
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowVoiceDropdown(false);
+                                            setShowVoiceCloningModal(true);
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-sm text-[#FFD700] font-bold hover:bg-white/10 transition-colors flex items-center gap-2"
+                                    >
+                                        <Mic className="w-4 h-4" />
+                                        Create Your Voice
+                                    </button>
+                                    */}
+
+                                {/* No voices message */}
+                                {voices.length === 0 && clonedVoices.length === 0 && (
+                                    <div className="px-4 py-2 text-sm text-white/70 text-center">
+                                        No voices available
+                                    </div>
+                                )}
                     </div>
+                    </div>
+                    )}
                 </div>
-
-                <div className="w-10" /> {/* Spacer for balance */}
             </div>
 
             {/* Main Reading Area */}
-            <div className="flex-1 w-full h-full relative" onClick={toggleScroll}>
-                {/* Background Layer */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black">
+            <div 
+                className="flex-1 w-full h-full relative" 
+                onClick={(e) => toggleScroll(e)}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+            >
+                {/* Background Layer - Don't stop propagation here, let it bubble to parent for toggleScroll */}
+                <div className={`absolute inset-0 bg-black overflow-hidden transition-transform duration-300 ease-in-out ${isPageTurning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
                     {currentPage.backgroundType === 'video' ? (
                         <video
                             src={currentPage.backgroundUrl}
-                            className="w-full h-full object-contain"
+                            className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full"
                             autoPlay
                             loop
                             muted
                             playsInline
+                            style={{
+                                objectFit: 'cover',
+                                width: '100%',
+                                height: '100%',
+                            }}
                         />
                     ) : (
                         <img
@@ -464,7 +890,7 @@ const BookReaderPage: React.FC = () => {
                 {/* Scroll Overlay Layer */}
                 {currentPage.scrollUrl && (
                     <div
-                        className={`absolute bottom-0 left-0 right-0 transition-transform duration-500 ease-in-out z-10 ${showScroll ? 'translate-y-0' : 'translate-y-full'
+                        className={`absolute bottom-0 left-0 right-0 transition-all duration-500 ease-in-out z-10 ${isPageTurning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'} ${showScroll ? 'translate-y-0' : 'translate-y-full'
                             }`}
                         style={{ height: currentPage.scrollHeight ? `${currentPage.scrollHeight}px` : '30%' }}
                         onClick={(e) => e.stopPropagation()}
@@ -496,6 +922,26 @@ const BookReaderPage: React.FC = () => {
                 <div className="absolute inset-y-0 left-0 w-1/4 z-30" onClick={handlePrev} />
                 <div className="absolute inset-y-0 right-0 w-1/4 z-30" onClick={handleNext} />
             </div>
+
+            {/* Page Counter - Bottom Right */}
+            <div className="absolute bottom-4 right-4 z-50 pointer-events-none">
+                <div className="bg-black/40 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-medium pointer-events-auto">
+                    {currentPageIndex + 1} / {pages.length}
+                </div>
+            </div>
+
+            {/* Voice Cloning Modal */}
+            <VoiceCloningModal
+                isOpen={showVoiceCloningModal}
+                onClose={() => setShowVoiceCloningModal(false)}
+                onVoiceCloned={(voice) => {
+                    // Reload cloned voices
+                    const cloned = voiceCloningService.getClonedVoices();
+                    setClonedVoices(cloned);
+                    // Optionally select the newly cloned voice
+                    setSelectedVoiceId(voice.voice_id);
+                }}
+            />
         </div>
     );
 };
