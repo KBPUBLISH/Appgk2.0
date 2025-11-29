@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, X, Play, Pause, Volume2, Mic, Check, Music, Home, Heart, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Play, Pause, Volume2, Mic, Check, Music, Home, Heart, Star, RotateCcw, Gamepad2 } from 'lucide-react';
 import { ApiService } from '../services/apiService';
 import { voiceCloningService, ClonedVoice } from '../services/voiceCloningService';
 import VoiceCloningModal from '../components/features/VoiceCloningModal';
@@ -1159,6 +1159,14 @@ const BookReaderPage: React.FC = () => {
                         transform-style: preserve-3d;
                         transform-origin: left center;
                     }
+                    @keyframes fadeIn {
+                        from { opacity: 0; }
+                        to { opacity: 1; }
+                    }
+                    @keyframes scaleUp {
+                        from { transform: scale(0.8); opacity: 0; }
+                        to { transform: scale(1); opacity: 1; }
+                    }
                 `}</style>
 
                 {/* 3D Scene Container */}
@@ -1267,80 +1275,111 @@ const BookReaderPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* The End Page Buttons */}
+            {/* The End Page Overlay */}
             {isTheEndPage && (
-                <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center gap-3 pointer-events-auto">
-                    <div className="flex gap-3">
-                        {/* Go Home Button */}
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                // Restore music before navigating
-                                const wasEnabled = wasMusicEnabledRef.current || localStorage.getItem('godly_kids_music_was_enabled') === 'true';
-                                if (wasEnabled && !musicEnabled) {
-                                    toggleMusic();
-                                }
-                                setTimeout(() => {
-                                    const musicButton = document.querySelector('button[title*="Music"]') as HTMLButtonElement;
-                                    if (musicButton) {
-                                        musicButton.click();
-                                    }
-                                }, 150);
-                                navigate('/home');
-                            }}
-                            className="relative overflow-hidden font-display font-bold transition-transform active:scale-95 rounded-xl shadow-xl border-b-4 bg-[#8B4513] border-[#5c2e0b] hover:bg-[#A0522D] text-white px-6 py-3 flex items-center gap-2"
-                        >
-                            <Home className="w-5 h-5" />
-                            <span>Go Home</span>
-                            <div className="absolute inset-0 opacity-20 pointer-events-none"
-                                style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 12px)' }}>
-                            </div>
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-white opacity-20"></div>
-                        </button>
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-[fadeIn_0.3s_ease-out]">
+                    <div className="relative bg-[#F5DEB3] p-8 rounded-3xl shadow-2xl border-4 border-[#8B4513] max-w-md w-full mx-4 transform animate-[scaleUp_0.4s_cubic-bezier(0.175,0.885,0.32,1.275)]">
+                        {/* Decorative Wood Texture */}
+                        <div className="absolute inset-0 rounded-[20px] opacity-10 pointer-events-none"
+                            style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #8B4513 10px, #8B4513 12px)' }}
+                        />
 
-                        {/* Save to Favs Button */}
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (bookId) {
-                                    const newFavoriteState = favoritesService.toggleFavorite(bookId);
-                                    setIsFavorite(newFavoriteState);
-                                }
-                            }}
-                            className={`relative overflow-hidden font-display font-bold transition-transform active:scale-95 rounded-xl shadow-xl border-b-4 px-6 py-3 flex items-center gap-2 ${isFavorite
-                                ? 'bg-[#FFD700] border-[#B8860B] hover:bg-[#ffe066] text-[#5c2e0b]'
-                                : 'bg-[#CD853F] border-[#8B4513] hover:bg-[#DEB887] text-white'
-                                }`}
-                        >
-                            <Star className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
-                            <span>{isFavorite ? 'Favorited' : 'Save to Favs'}</span>
-                            <div className="absolute inset-0 opacity-20 pointer-events-none"
-                                style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 12px)' }}>
+                        {/* Content */}
+                        <div className="relative flex flex-col items-center gap-6 text-center">
+                            {/* Header */}
+                            <div className="space-y-2">
+                                <h2 className="text-4xl font-black text-[#8B4513] drop-shadow-md font-display tracking-wide animate-bounce">
+                                    The End!
+                                </h2>
+                                <p className="text-[#5D4037] font-medium text-lg">
+                                    Great reading! What's next?
+                                </p>
                             </div>
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-white opacity-20"></div>
-                        </button>
 
-                        {/* Like Button */}
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (bookId) {
-                                    const newLikeState = favoritesService.toggleLike(bookId);
-                                    setIsLiked(newLikeState);
-                                }
-                            }}
-                            className={`relative overflow-hidden font-display font-bold transition-transform active:scale-95 rounded-xl shadow-xl border-b-4 px-6 py-3 flex items-center gap-2 ${isLiked
-                                ? 'bg-[#FF5252] border-[#D32F2F] hover:bg-[#FF6B6B] text-white'
-                                : 'bg-[#CD853F] border-[#8B4513] hover:bg-[#DEB887] text-white'
-                                }`}
-                        >
-                            <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
-                            <span>{isLiked ? 'Liked' : 'Like'}</span>
-                            <div className="absolute inset-0 opacity-20 pointer-events-none"
-                                style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 12px)' }}>
+                            {/* Action Buttons Grid */}
+                            <div className="grid grid-cols-2 gap-4 w-full">
+                                {/* Read Again */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setCurrentPageIndex(0);
+                                    }}
+                                    className="col-span-2 bg-[#4CAF50] hover:bg-[#43A047] text-white p-4 rounded-xl font-bold shadow-lg border-b-4 border-[#2E7D32] active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 group"
+                                >
+                                    <RotateCcw className="w-5 h-5 group-hover:-rotate-180 transition-transform duration-500" />
+                                    Read Again
+                                </button>
+
+                                {/* Go Home */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        // Restore music before navigating
+                                        const wasEnabled = wasMusicEnabledRef.current || localStorage.getItem('godly_kids_music_was_enabled') === 'true';
+                                        if (wasEnabled && !musicEnabled) {
+                                            toggleMusic();
+                                        }
+                                        setTimeout(() => {
+                                            const musicButton = document.querySelector('button[title*="Music"]') as HTMLButtonElement;
+                                            if (musicButton) {
+                                                musicButton.click();
+                                            }
+                                        }, 150);
+                                        navigate('/home');
+                                    }}
+                                    className="bg-[#2196F3] hover:bg-[#1E88E5] text-white p-4 rounded-xl font-bold shadow-lg border-b-4 border-[#1565C0] active:border-b-0 active:translate-y-1 transition-all flex flex-col items-center gap-1 group"
+                                >
+                                    <Home className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                                    <span className="text-sm">Home</span>
+                                </button>
+
+                                {/* Play Game */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate('/games');
+                                    }}
+                                    className="bg-[#9C27B0] hover:bg-[#8E24AA] text-white p-4 rounded-xl font-bold shadow-lg border-b-4 border-[#7B1FA2] active:border-b-0 active:translate-y-1 transition-all flex flex-col items-center gap-1 group"
+                                >
+                                    <Gamepad2 className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+                                    <span className="text-sm">Play Games</span>
+                                </button>
                             </div>
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-white opacity-20"></div>
-                        </button>
+
+                            {/* Social Actions */}
+                            <div className="flex gap-4 w-full justify-center pt-4 border-t border-[#8B4513]/20">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (bookId) {
+                                            const newFavoriteState = favoritesService.toggleFavorite(bookId);
+                                            setIsFavorite(newFavoriteState);
+                                        }
+                                    }}
+                                    className={`p-3 rounded-full shadow-md transition-transform active:scale-90 border-2 ${isFavorite
+                                        ? 'bg-[#FFD700] border-[#B8860B] text-[#5c2e0b]'
+                                        : 'bg-white border-gray-200 text-gray-400 hover:border-[#FFD700] hover:text-[#FFD700]'}`}
+                                    title="Add to Favorites"
+                                >
+                                    <Star className={`w-6 h-6 ${isFavorite ? 'fill-current' : ''}`} />
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (bookId) {
+                                            const newLikeState = favoritesService.toggleLike(bookId);
+                                            setIsLiked(newLikeState);
+                                        }
+                                    }}
+                                    className={`p-3 rounded-full shadow-md transition-transform active:scale-90 border-2 ${isLiked
+                                        ? 'bg-[#FF5252] border-[#D32F2F] text-white'
+                                        : 'bg-white border-gray-200 text-gray-400 hover:border-[#FF5252] hover:text-[#FF5252]'}`}
+                                    title="Like Book"
+                                >
+                                    <Heart className={`w-6 h-6 ${isLiked ? 'fill-current' : ''}`} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
