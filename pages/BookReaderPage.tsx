@@ -87,13 +87,14 @@ const BookReaderPage: React.FC = () => {
     const [isPageTurning, setIsPageTurning] = useState(false);
     const touchStartX = useRef<number>(0);
     const touchEndX = useRef<number>(0);
+    const cleanupInteractionListeners = useRef<(() => void) | null>(null);
 
     // Pause background music when entering book reader
     useEffect(() => {
         // Pause app background music and prevent it from resuming on interaction
         setGameMode(false);
         setMusicPaused(true);
-        
+
         // Aggressively stop any music that might be playing
         // This is a safety measure to ensure music is stopped immediately
         const stopAllMusic = () => {
@@ -106,7 +107,7 @@ const BookReaderPage: React.FC = () => {
             });
         };
         stopAllMusic();
-        
+
         // Fetch book data to check for book-specific background music
         const fetchBookData = async () => {
             if (!bookId) return;
@@ -122,23 +123,51 @@ const BookReaderPage: React.FC = () => {
                             bookBackgroundMusicRef.current.src = '';
                             bookBackgroundMusicRef.current = null;
                         }
-                        
+
                         const audio = new Audio(musicUrl);
                         audio.loop = true;
                         audio.volume = 0.3; // Lower volume for background music
                         audio.preload = 'auto';
                         bookBackgroundMusicRef.current = audio;
-                        
-                        // Try to play after user interaction
+
+                        // Try to play immediately
                         const playMusic = async () => {
                             try {
                                 await audio.play();
                                 console.log('✅ Book background music started');
                             } catch (err) {
-                                console.warn('⚠️ Could not auto-play book music, will play on user interaction:', err);
+                                console.warn('⚠️ Could not auto-play book music, waiting for user interaction:', err);
+
+                                // Add one-time interaction listeners to start music
+                                const handleInteraction = async () => {
+                                    try {
+                                        if (bookBackgroundMusicRef.current) {
+                                            await bookBackgroundMusicRef.current.play();
+                                            console.log('✅ Book background music started after interaction');
+                                        }
+                                        // Remove listeners once successful
+                                        if (cleanupInteractionListeners.current) {
+                                            cleanupInteractionListeners.current();
+                                            cleanupInteractionListeners.current = null;
+                                        }
+                                    } catch (e) {
+                                        console.error('Still failed to play music:', e);
+                                    }
+                                };
+
+                                document.addEventListener('click', handleInteraction);
+                                document.addEventListener('touchstart', handleInteraction);
+                                document.addEventListener('keydown', handleInteraction);
+
+                                // Store cleanup function
+                                cleanupInteractionListeners.current = () => {
+                                    document.removeEventListener('click', handleInteraction);
+                                    document.removeEventListener('touchstart', handleInteraction);
+                                    document.removeEventListener('keydown', handleInteraction);
+                                };
                             }
                         };
-                        
+
                         // Wait for audio to be ready
                         audio.addEventListener('canplaythrough', playMusic);
                     }
@@ -147,9 +176,9 @@ const BookReaderPage: React.FC = () => {
                 console.error('Failed to fetch book data:', err);
             }
         };
-        
+
         fetchBookData();
-        
+
         // Aggressive music stopping - check periodically to ensure music stays stopped
         const musicStopInterval = setInterval(() => {
             // Force stop all app background music
@@ -162,7 +191,7 @@ const BookReaderPage: React.FC = () => {
                 }
             });
         }, 500); // Check every 500ms
-        
+
         // Cleanup: stop book background music and resume app music when leaving
         return () => {
             clearInterval(musicStopInterval);
@@ -171,6 +200,13 @@ const BookReaderPage: React.FC = () => {
                 bookBackgroundMusicRef.current.src = '';
                 bookBackgroundMusicRef.current = null;
             }
+
+            // Remove interaction listeners if they exist
+            if (cleanupInteractionListeners.current) {
+                cleanupInteractionListeners.current();
+                cleanupInteractionListeners.current = null;
+            }
+
             // Allow app music to resume when leaving book reader
             setMusicPaused(false);
         };
@@ -182,7 +218,7 @@ const BookReaderPage: React.FC = () => {
             try {
                 const data = await ApiService.getBookPages(bookId);
                 setPages(data);
-                
+
                 // Check if page is specified in URL (from Continue button)
                 const pageParam = searchParams.get('page');
                 if (pageParam) {
@@ -214,7 +250,7 @@ const BookReaderPage: React.FC = () => {
             if (voiceList.length > 0) {
                 setVoices(voiceList);
                 // Try to find a kid-friendly voice or use first available
-                const kidVoice = voiceList.find((v: any) => 
+                const kidVoice = voiceList.find((v: any) =>
                     v.name === 'Domi' || v.name === 'Bella' || v.name === 'Elli' || v.name === 'Rachel'
                 );
                 if (kidVoice) {
@@ -305,32 +341,32 @@ const BookReaderPage: React.FC = () => {
             }, 300);
         }
     };
-    
+
     // Swipe gesture handlers
     const handleTouchStart = (e: React.TouchEvent) => {
         touchStartX.current = e.touches[0].clientX;
     };
-    
+
     const handleTouchMove = (e: React.TouchEvent) => {
         touchEndX.current = e.touches[0].clientX;
     };
-    
+
     const handleTouchEnd = () => {
         const swipeThreshold = 50;
         const diff = touchStartX.current - touchEndX.current;
-        
+
         if (Math.abs(diff) > swipeThreshold) {
             if (diff > 0) {
                 // Swipe left - next page
                 if (currentPageIndex < pages.length - 1) {
                     stopAudio();
-                    handleNext({ stopPropagation: () => {} } as React.MouseEvent);
+                    handleNext({ stopPropagation: () => { } } as React.MouseEvent);
                 }
             } else {
                 // Swipe right - previous page
                 if (currentPageIndex > 0) {
                     stopAudio();
-                    handlePrev({ stopPropagation: () => {} } as React.MouseEvent);
+                    handlePrev({ stopPropagation: () => { } } as React.MouseEvent);
                 }
             }
         }
@@ -368,7 +404,7 @@ const BookReaderPage: React.FC = () => {
         // Enable auto-play mode and start playing
         setAutoPlayMode(true);
         autoPlayModeRef.current = true;
-        
+
         // Play the first text box on the page
         if (currentPage.textBoxes && currentPage.textBoxes.length > 0) {
             const firstBox = currentPage.textBoxes[0];
@@ -422,15 +458,14 @@ const BookReaderPage: React.FC = () => {
             // Use final audio URL from WebSocket
             if (result && result.audioUrl) {
                 const audio = new Audio(result.audioUrl);
-<<<<<<< HEAD
-                
+
                 // Wait for audio metadata to load so we can get the actual duration
                 audio.addEventListener('loadedmetadata', () => {
                     const alignment = result.alignment || null;
                     if (alignment && alignment.words) {
                         const actualDuration = audio.duration;
                         const estimatedDuration = alignment.words.length * 0.4; // Our estimated duration
-                        
+
                         // Scale word timings to match actual audio duration
                         if (actualDuration > 0 && estimatedDuration > 0) {
                             const scaleFactor = actualDuration / estimatedDuration;
@@ -457,7 +492,7 @@ const BookReaderPage: React.FC = () => {
                         console.warn('⚠️ No alignment data in result:', result);
                     }
                 });
-                
+
                 // Track audio time for word highlighting
                 // Use ref to access latest alignment data (avoids closure issues)
                 audio.ontimeupdate = () => {
@@ -497,11 +532,11 @@ const BookReaderPage: React.FC = () => {
                         // Clear after a brief moment to show completion
                         setTimeout(() => {
                             setCurrentWordIndex(-1);
-                    setPlaying(false);
-                    setActiveTextBoxIndex(null);
+                            setPlaying(false);
+                            setActiveTextBoxIndex(null);
                             setWordAlignment(null);
                             wordAlignmentRef.current = null;
-                            
+
                             // Auto-play: Move to next page if enabled
                             // Use ref to get latest autoPlayMode value (closure-safe)
                             if (autoPlayModeRef.current && currentPageIndex < pages.length - 1) {
@@ -516,7 +551,7 @@ const BookReaderPage: React.FC = () => {
                                     if (bookId) {
                                         readingProgressService.saveProgress(bookId, nextPageIndex);
                                     }
-                                    
+
                                     // Wait for page to render, then auto-play next page
                                     setTimeout(() => {
                                         // Check again if auto-play is still enabled
@@ -525,7 +560,7 @@ const BookReaderPage: React.FC = () => {
                                             if (nextPage && nextPage.textBoxes && nextPage.textBoxes.length > 0) {
                                                 const firstBox = nextPage.textBoxes[0];
                                                 console.log('▶️ Auto-play: Starting next page audio');
-                                                const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                                                const syntheticEvent = { stopPropagation: () => { } } as React.MouseEvent;
                                                 handlePlayText(firstBox.text, 0, syntheticEvent, true);
                                             } else {
                                                 console.log('⏹️ Auto-play: No text boxes on next page, stopping');
@@ -543,12 +578,12 @@ const BookReaderPage: React.FC = () => {
                             }
                         }, 500);
                     } else {
-                    setPlaying(false);
+                        setPlaying(false);
                         setActiveTextBoxIndex(null);
                         setCurrentWordIndex(-1);
                         setWordAlignment(null);
                         wordAlignmentRef.current = null;
-                        
+
                         // Auto-play: Move to next page if enabled
                         // Use ref to get latest autoPlayMode value (closure-safe)
                         if (autoPlayModeRef.current && currentPageIndex < pages.length - 1) {
@@ -563,7 +598,7 @@ const BookReaderPage: React.FC = () => {
                                 if (bookId) {
                                     readingProgressService.saveProgress(bookId, nextPageIndex);
                                 }
-                                
+
                                 setTimeout(() => {
                                     // Check again if auto-play is still enabled
                                     if (autoPlayModeRef.current) {
@@ -571,7 +606,7 @@ const BookReaderPage: React.FC = () => {
                                         if (nextPage && nextPage.textBoxes && nextPage.textBoxes.length > 0) {
                                             const firstBox = nextPage.textBoxes[0];
                                             console.log('▶️ Auto-play: Starting next page audio');
-                                            const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                                            const syntheticEvent = { stopPropagation: () => { } } as React.MouseEvent;
                                             handlePlayText(firstBox.text, 0, syntheticEvent, true);
                                         } else {
                                             console.log('⏹️ Auto-play: No text boxes on next page, stopping');
@@ -632,7 +667,7 @@ const BookReaderPage: React.FC = () => {
     }
 
     return (
-        <div 
+        <div
             className="relative w-full h-screen bg-gray-900 overflow-hidden flex flex-col"
             onTouchStart={(e) => {
                 // Block any music from playing on touch
@@ -657,7 +692,7 @@ const BookReaderPage: React.FC = () => {
                 </button>
 
                 {/* Right: Voice Selector - Compact */}
-                <div 
+                <div
                     ref={voiceDropdownRef}
                     className="pointer-events-auto relative"
                     onClick={(e) => e.stopPropagation()}
@@ -671,9 +706,9 @@ const BookReaderPage: React.FC = () => {
                     >
                         <Volume2 className="w-4 h-4 text-white" />
                         <span className="text-white text-xs max-w-[100px] truncate">
-                            {voices.find(v => v.voice_id === selectedVoiceId)?.name || 
-                             clonedVoices.find(v => v.voice_id === selectedVoiceId)?.name || 
-                             'Voice'}
+                            {voices.find(v => v.voice_id === selectedVoiceId)?.name ||
+                                clonedVoices.find(v => v.voice_id === selectedVoiceId)?.name ||
+                                'Voice'}
                         </span>
                     </button>
 
@@ -692,21 +727,20 @@ const BookReaderPage: React.FC = () => {
                                                     setSelectedVoiceId(v.voice_id);
                                                     setShowVoiceDropdown(false);
                                                 }}
-                                                className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${
-                                                    selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
-                                                }`}
+                                                className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
+                                                    }`}
                                             >
                                                 {selectedVoiceId === v.voice_id && (
                                                     <Check className="w-4 h-4 text-[#FFD700]" />
                                                 )}
                                                 <span className={selectedVoiceId === v.voice_id ? 'font-bold' : ''}>
-                                    {v.name}
+                                                    {v.name}
                                                 </span>
                                             </button>
                                         ))}
                                     </>
                                 )}
-                                
+
                                 {/* Cloned voices */}
                                 {clonedVoices.length > 0 && (
                                     <>
@@ -718,9 +752,8 @@ const BookReaderPage: React.FC = () => {
                                                     setSelectedVoiceId(v.voice_id);
                                                     setShowVoiceDropdown(false);
                                                 }}
-                                                className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${
-                                                    selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
-                                                }`}
+                                                className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
+                                                    }`}
                                             >
                                                 {selectedVoiceId === v.voice_id && (
                                                     <Check className="w-4 h-4 text-[#FFD700]" />
@@ -733,14 +766,14 @@ const BookReaderPage: React.FC = () => {
                                     </>
                                 )}
 
-                                    {/* Voice Cloning Feature Disabled - ElevenLabs Limit Reached */}
-                                    {/* Separator */}
-                                    {(voices.length > 0 || clonedVoices.length > 0) && (
-                                        <div className="border-t border-white/20 my-1"></div>
-                                    )}
+                                {/* Voice Cloning Feature Disabled - ElevenLabs Limit Reached */}
+                                {/* Separator */}
+                                {(voices.length > 0 || clonedVoices.length > 0) && (
+                                    <div className="border-t border-white/20 my-1"></div>
+                                )}
 
-                                    {/* Create Voice Option - DISABLED */}
-                                    {/* 
+                                {/* Create Voice Option - DISABLED */}
+                                {/* 
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -760,15 +793,15 @@ const BookReaderPage: React.FC = () => {
                                         No voices available
                                     </div>
                                 )}
-                    </div>
-                    </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>
 
             {/* Main Reading Area */}
-            <div 
-                className="flex-1 w-full h-full relative" 
+            <div
+                className="flex-1 w-full h-full relative"
                 onClick={(e) => toggleScroll(e)}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
