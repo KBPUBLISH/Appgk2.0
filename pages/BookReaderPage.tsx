@@ -87,26 +87,12 @@ const BookReaderPage: React.FC = () => {
     const [isPageTurning, setIsPageTurning] = useState(false);
     const touchStartX = useRef<number>(0);
     const touchEndX = useRef<number>(0);
-    const cleanupInteractionListeners = useRef<(() => void) | null>(null);
 
     // Pause background music when entering book reader
     useEffect(() => {
         // Pause app background music and prevent it from resuming on interaction
         setGameMode(false);
         setMusicPaused(true);
-
-        // Aggressively stop any music that might be playing
-        // This is a safety measure to ensure music is stopped immediately
-        const stopAllMusic = () => {
-            const audioElements = document.querySelectorAll('audio');
-            audioElements.forEach(audio => {
-                if (audio !== bookBackgroundMusicRef.current) {
-                    audio.pause();
-                    audio.currentTime = 0;
-                }
-            });
-        };
-        stopAllMusic();
 
         // Fetch book data to check for book-specific background music
         const fetchBookData = async () => {
@@ -136,35 +122,7 @@ const BookReaderPage: React.FC = () => {
                                 await audio.play();
                                 console.log('✅ Book background music started');
                             } catch (err) {
-                                console.warn('⚠️ Could not auto-play book music, waiting for user interaction:', err);
-
-                                // Add one-time interaction listeners to start music
-                                const handleInteraction = async () => {
-                                    try {
-                                        if (bookBackgroundMusicRef.current) {
-                                            await bookBackgroundMusicRef.current.play();
-                                            console.log('✅ Book background music started after interaction');
-                                        }
-                                        // Remove listeners once successful
-                                        if (cleanupInteractionListeners.current) {
-                                            cleanupInteractionListeners.current();
-                                            cleanupInteractionListeners.current = null;
-                                        }
-                                    } catch (e) {
-                                        console.error('Still failed to play music:', e);
-                                    }
-                                };
-
-                                document.addEventListener('click', handleInteraction);
-                                document.addEventListener('touchstart', handleInteraction);
-                                document.addEventListener('keydown', handleInteraction);
-
-                                // Store cleanup function
-                                cleanupInteractionListeners.current = () => {
-                                    document.removeEventListener('click', handleInteraction);
-                                    document.removeEventListener('touchstart', handleInteraction);
-                                    document.removeEventListener('keydown', handleInteraction);
-                                };
+                                console.warn('⚠️ Could not auto-play book music, will play on user interaction:', err);
                             }
                         };
 
@@ -179,32 +137,12 @@ const BookReaderPage: React.FC = () => {
 
         fetchBookData();
 
-        // Aggressive music stopping - check periodically to ensure music stays stopped
-        const musicStopInterval = setInterval(() => {
-            // Force stop all app background music
-            const audioElements = document.querySelectorAll('audio');
-            audioElements.forEach(audio => {
-                // Only stop app music, not book-specific music
-                if (audio !== bookBackgroundMusicRef.current) {
-                    audio.pause();
-                    audio.currentTime = 0;
-                }
-            });
-        }, 500); // Check every 500ms
-
         // Cleanup: stop book background music and resume app music when leaving
         return () => {
-            clearInterval(musicStopInterval);
             if (bookBackgroundMusicRef.current) {
                 bookBackgroundMusicRef.current.pause();
                 bookBackgroundMusicRef.current.src = '';
                 bookBackgroundMusicRef.current = null;
-            }
-
-            // Remove interaction listeners if they exist
-            if (cleanupInteractionListeners.current) {
-                cleanupInteractionListeners.current();
-                cleanupInteractionListeners.current = null;
             }
 
             // Allow app music to resume when leaving book reader
