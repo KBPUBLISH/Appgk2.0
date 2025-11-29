@@ -51,7 +51,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [musicEnabled, setMusicEnabled] = useState(true);
     const [sfxEnabled, setSfxEnabled] = useState(true);
     const [musicMode, setMusicMode] = useState<'bg' | 'game' | 'workout'>('bg');
-    const [musicForcePaused, setMusicForcePaused] = useState(false);
+    const [musicForcePaused, setMusicForcePaused] = useState(() => {
+        // Check if we are starting on the book reader page
+        return window.location.pathname.includes('/book-reader') || window.location.pathname.includes('/read/');
+    });
 
     const bgAudioRef = useRef<HTMLAudioElement | null>(null);
     const gameAudioRef = useRef<HTMLAudioElement | null>(null);

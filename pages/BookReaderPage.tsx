@@ -77,7 +77,7 @@ const BookReaderPage: React.FC = () => {
     const [currentPageIndex, setCurrentPageIndex] = useState(0);
     const [loading, setLoading] = useState(true);
     const [showScroll, setShowScroll] = useState(true);
-    
+
     // Keep ref in sync with state
     useEffect(() => {
         showScrollRef.current = showScroll;
@@ -117,35 +117,26 @@ const BookReaderPage: React.FC = () => {
 
     // Pause background music when entering book reader
     useEffect(() => {
-        console.log('📖 BookReaderPage MOUNTED - Auto-toggling music off');
+        console.log('📖 BookReaderPage MOUNTED - KILLING ALL APP MUSIC');
 
-        // Store original music state in both ref and localStorage
-        wasMusicEnabledRef.current = musicEnabled;
-        localStorage.setItem('godly_kids_music_was_enabled', musicEnabled ? 'true' : 'false');
-
-        // If music is enabled, toggle it off (this pauses music)
-        if (musicEnabled) {
-            console.log('🎵 Music was enabled, toggling off');
-            toggleMusic();
-        }
-
+        // Pause app background music and prevent it from resuming on interaction
         setGameMode(false);
+        setMusicPaused(true);
 
-        // Safety measure: Pause any stray audio elements (but toggleMusic should handle it)
+        // NUCLEAR OPTION: Immediately pause ALL audio elements in the DOM
         const killAllAudio = () => {
             const allAudio = document.querySelectorAll('audio');
             allAudio.forEach(audio => {
                 if (audio !== bookBackgroundMusicRef.current) {
-                    // Only pause if music is disabled (should be after toggle)
-                    if (!musicEnabled) {
-                        audio.pause();
-                    }
+                    audio.pause();
+                    audio.volume = 0;
                 }
             });
         };
-        
-        // Run once after a short delay to ensure toggle has taken effect
-        const killTimeout = setTimeout(killAllAudio, 100);
+        killAllAudio();
+
+        // Keep killing audio every 100ms as a safety measure
+        const killInterval = setInterval(killAllAudio, 100);
 
         // Fetch book data to check for book-specific background music
         const fetchBookData = async () => {
@@ -153,28 +144,22 @@ const BookReaderPage: React.FC = () => {
             try {
                 const book = await ApiService.getBookById(bookId);
                 console.log('📖 Fetched book data:', book);
-                
+
                 // Check both the rawData (from API) and the transformed book
                 const rawData = (book as any)?.rawData;
                 const files = rawData?.files || (book as any)?.files;
                 console.log('📖 Book rawData:', rawData);
-                console.log('📖 Book files:', files);
-                console.log('📖 Book audio files:', files?.audio);
-                
-                if (book && files?.audio && Array.isArray(files.audio) && files.audio.length > 0) {
+
+                if (files?.audio && Array.isArray(files.audio) && files.audio.length > 0) {
                     // Use the first audio file as background music
-                    // Handle both {url: "..."} and direct URL string formats
-                    const audioFile = files.audio[0];
-                    const musicUrl = typeof audioFile === 'string' ? audioFile : (audioFile?.url || audioFile);
-                    console.log('🎵 Found book background music URL:', musicUrl);
+                    const musicUrl = files.audio[0].url;
                     if (musicUrl) {
-                        console.log('✅ Setting hasBookMusic to true');
+                        console.log('🎵 Found book music:', musicUrl);
                         setHasBookMusic(true);
-                        
+
                         // Clean up any existing book music
                         if (bookBackgroundMusicRef.current) {
                             bookBackgroundMusicRef.current.pause();
-                            bookBackgroundMusicRef.current.src = '';
                             bookBackgroundMusicRef.current = null;
                         }
 
@@ -216,7 +201,7 @@ const BookReaderPage: React.FC = () => {
         // Cleanup: stop book background music and restore app music when leaving
         return () => {
             console.log('📖 BookReaderPage UNMOUNTING - Restoring music state');
-            clearTimeout(killTimeout);
+            clearInterval(killInterval);
 
             if (bookBackgroundMusicRef.current) {
                 bookBackgroundMusicRef.current.pause();
@@ -224,31 +209,17 @@ const BookReaderPage: React.FC = () => {
                 bookBackgroundMusicRef.current = null;
             }
 
-            // Restore music to original state (toggle back on if it was originally enabled)
-            // Use a timeout to ensure state has updated
-            setTimeout(() => {
-                const wasEnabled = wasMusicEnabledRef.current || localStorage.getItem('godly_kids_music_was_enabled') === 'true';
-                // Get current state from AudioContext (check if music is actually playing)
-                const bgAudio = document.querySelector('audio[src*="Seaside_Adventure"]') as HTMLAudioElement;
-                const isCurrentlyPlaying = bgAudio && !bgAudio.paused;
-                
-                // If music was originally enabled but is not currently playing, toggle it back on
-                if (wasEnabled && !isCurrentlyPlaying) {
-                    console.log('🎵 Unmount cleanup: Restoring music - toggling back on');
-                    toggleMusic();
-                    // Clear the flag
-                    localStorage.removeItem('godly_kids_music_was_enabled');
-                }
-            }, 100);
+            // Allow app music to resume when leaving book reader
+            setMusicPaused(false);
         };
-    }, [bookId, setGameMode, musicEnabled, toggleMusic]);
+    }, [bookId, setGameMode, setMusicPaused, bookMusicEnabled]);
 
     useEffect(() => {
         const fetchPages = async () => {
             if (!bookId) return;
             try {
                 const data = await ApiService.getBookPages(bookId);
-                
+
                 // Add "The End" page as the last page
                 // Create a beautiful themed background matching the app's aesthetic
                 const theEndBackground = 'data:image/svg+xml;base64,' + btoa(`
@@ -269,7 +240,7 @@ const BookReaderPage: React.FC = () => {
                         <rect width="100%" height="100%" fill="url(#woodGrain)" opacity="0.4"/>
                     </svg>
                 `);
-                
+
                 const theEndPage: Page = {
                     _id: 'the-end-page',
                     pageNumber: data.length + 1,
@@ -310,20 +281,20 @@ const BookReaderPage: React.FC = () => {
                         },
                     ],
                 };
-                
+
                 setPages([...data, theEndPage]);
 
                 // Check if page is specified in URL (from Continue button)
                 const pageParam = searchParams.get('page');
-                    if (pageParam) {
-                        const pageNum = parseInt(pageParam, 10);
-                        if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= data.length) {
-                            const pageIndex = pageNum - 1; // Convert to 0-based
-                            setCurrentPageIndex(pageIndex);
-                            currentPageIndexRef.current = pageIndex;
-                            console.log(`📖 Navigated to page ${pageNum} from URL`);
-                        }
-                    } else {
+                if (pageParam) {
+                    const pageNum = parseInt(pageParam, 10);
+                    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= data.length) {
+                        const pageIndex = pageNum - 1; // Convert to 0-based
+                        setCurrentPageIndex(pageIndex);
+                        currentPageIndexRef.current = pageIndex;
+                        console.log(`📖 Navigated to page ${pageNum} from URL`);
+                    }
+                } else {
                     // Load saved reading progress if no URL param
                     const progress = readingProgressService.getProgress(bookId);
                     if (progress && progress.currentPageIndex >= 0 && progress.currentPageIndex < data.length) {
@@ -419,11 +390,11 @@ const BookReaderPage: React.FC = () => {
         stopAudio();
         if (currentPageIndex < pages.length - 1) {
             // Use desired scroll state if set, otherwise preserve current state from ref
-            const scrollStateToUse = desiredScrollStateRef.current !== null 
-                ? desiredScrollStateRef.current 
+            const scrollStateToUse = desiredScrollStateRef.current !== null
+                ? desiredScrollStateRef.current
                 : showScrollRef.current; // Use ref to get latest value
             desiredScrollStateRef.current = null; // Reset after use
-            
+
             setIsPageTurning(true);
             setFlipState({ direction: 'next', isFlipping: true });
 
@@ -439,7 +410,7 @@ const BookReaderPage: React.FC = () => {
                 // Save progress
                 if (bookId) {
                     readingProgressService.saveProgress(bookId, nextIndex);
-                    
+
                     // Check if book is completed (reached "The End" page)
                     if (nextIndex >= pages.length - 1) {
                         // Increment read count when book is completed
@@ -457,7 +428,7 @@ const BookReaderPage: React.FC = () => {
         if (currentPageIndex > 0) {
             // Preserve scroll state when turning pages manually - use ref to get latest value
             const currentScrollState = showScrollRef.current;
-            
+
             setIsPageTurning(true);
             setFlipState({ direction: 'prev', isFlipping: true });
 
@@ -522,7 +493,7 @@ const BookReaderPage: React.FC = () => {
         if (e) {
             e.stopPropagation();
         }
-        
+
         // If scroll is currently closed and user is opening it, turn to next page
         if (!showScroll && currentPageIndex < pages.length - 1) {
             // Turn to next page with scroll open
@@ -645,7 +616,7 @@ const BookReaderPage: React.FC = () => {
         try {
             // Process text to extract emotional cues
             const processedText = processTextWithEmotionalCues(text);
-            
+
             // Use HTTP API for TTS with emotional cues preserved
             const result = await ApiService.generateTTS(
                 processedText.ttsText, // Send text with cues to ElevenLabs
@@ -678,7 +649,7 @@ const BookReaderPage: React.FC = () => {
                                 }
                             }
                         });
-                        
+
                         const actualDuration = audio.duration;
                         const estimatedDuration = filteredWords.length * 0.4; // Our estimated duration
 
@@ -917,15 +888,15 @@ const BookReaderPage: React.FC = () => {
                     onClick={() => {
                         // Restore music before navigating back
                         const wasEnabled = wasMusicEnabledRef.current || localStorage.getItem('godly_kids_music_was_enabled') === 'true';
-                        
+
                         if (wasEnabled) {
                             console.log('🎵 Back button: Restoring background music before navigating');
-                            
+
                             // First, ensure music is enabled in state
                             if (!musicEnabled) {
                                 toggleMusic();
                             }
-                            
+
                             // Then programmatically click the music button in the header after navigation
                             // This ensures the audio context is unlocked and music actually plays
                             setTimeout(() => {
@@ -935,11 +906,11 @@ const BookReaderPage: React.FC = () => {
                                     musicButton.click();
                                 }
                             }, 150);
-                            
+
                             // Clear the flag
                             localStorage.removeItem('godly_kids_music_was_enabled');
                         }
-                        
+
                         // Navigate back to book detail page explicitly
                         if (bookId) {
                             navigate(`/book/${bookId}`);
@@ -973,18 +944,18 @@ const BookReaderPage: React.FC = () => {
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
-                        
+
                         // Restore music before navigating back
                         const wasEnabled = wasMusicEnabledRef.current || localStorage.getItem('godly_kids_music_was_enabled') === 'true';
-                        
+
                         if (wasEnabled) {
                             console.log('🎵 Back button: Restoring background music before navigating');
-                            
+
                             // First, ensure music is enabled in state
                             if (!musicEnabled) {
                                 toggleMusic();
                             }
-                            
+
                             // Then programmatically click the music button in the header after navigation
                             // This ensures the audio context is unlocked and music actually plays
                             setTimeout(() => {
@@ -994,11 +965,11 @@ const BookReaderPage: React.FC = () => {
                                     musicButton.click();
                                 }
                             }, 150);
-                            
+
                             // Clear the flag
                             localStorage.removeItem('godly_kids_music_was_enabled');
                         }
-                        
+
                         // Navigate back to book detail page explicitly
                         if (bookId) {
                             navigate(`/book/${bookId}`);
@@ -1020,7 +991,7 @@ const BookReaderPage: React.FC = () => {
                                 e.stopPropagation();
                                 const newState = !bookMusicEnabled;
                                 setBookMusicEnabled(newState);
-                                
+
                                 if (bookBackgroundMusicRef.current) {
                                     if (newState) {
                                         // Update volume when playing
@@ -1033,11 +1004,10 @@ const BookReaderPage: React.FC = () => {
                                     }
                                 }
                             }}
-                            className={`bg-black/50 backdrop-blur-md rounded-full p-3 hover:bg-black/70 transition-all border ${
-                                bookMusicEnabled 
-                                    ? 'border-yellow-400/50 shadow-lg shadow-yellow-400/20' 
-                                    : 'border-white/20'
-                            }`}
+                            className={`bg-black/50 backdrop-blur-md rounded-full p-3 hover:bg-black/70 transition-all border ${bookMusicEnabled
+                                ? 'border-yellow-400/50 shadow-lg shadow-yellow-400/20'
+                                : 'border-white/20'
+                                }`}
                             title={bookMusicEnabled ? "Disable background music" : "Enable background music"}
                         >
                             <Music className={`w-6 h-6 ${bookMusicEnabled ? 'text-yellow-300' : 'text-white/50'}`} />
@@ -1050,7 +1020,7 @@ const BookReaderPage: React.FC = () => {
                             )}
                         </div>
                     )}
-                    
+
                     {/* Voice Selector */}
                     <div
                         ref={voiceDropdownRef}
@@ -1072,68 +1042,68 @@ const BookReaderPage: React.FC = () => {
                             </span>
                         </button>
 
-                    {/* Dropdown Menu */}
-                    {showVoiceDropdown && (
-                        <div className="absolute top-full right-0 mt-2 bg-black/95 backdrop-blur-md rounded-xl border border-white/20 shadow-2xl z-50 min-w-[200px] max-w-[280px] max-h-[400px] overflow-y-auto">
-                            <div className="py-2">
-                                {/* Portal voices */}
-                                {voices.length > 0 && (
-                                    <>
-                                        {voices.map(v => (
-                                            <button
-                                                key={v.voice_id}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedVoiceId(v.voice_id);
-                                                    setShowVoiceDropdown(false);
-                                                }}
-                                                className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
-                                                    }`}
-                                            >
-                                                {selectedVoiceId === v.voice_id && (
-                                                    <Check className="w-4 h-4 text-[#FFD700]" />
-                                                )}
-                                                <span className={selectedVoiceId === v.voice_id ? 'font-bold' : ''}>
-                                                    {v.name}
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </>
-                                )}
+                        {/* Dropdown Menu */}
+                        {showVoiceDropdown && (
+                            <div className="absolute top-full right-0 mt-2 bg-black/95 backdrop-blur-md rounded-xl border border-white/20 shadow-2xl z-50 min-w-[200px] max-w-[280px] max-h-[400px] overflow-y-auto">
+                                <div className="py-2">
+                                    {/* Portal voices */}
+                                    {voices.length > 0 && (
+                                        <>
+                                            {voices.map(v => (
+                                                <button
+                                                    key={v.voice_id}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedVoiceId(v.voice_id);
+                                                        setShowVoiceDropdown(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
+                                                        }`}
+                                                >
+                                                    {selectedVoiceId === v.voice_id && (
+                                                        <Check className="w-4 h-4 text-[#FFD700]" />
+                                                    )}
+                                                    <span className={selectedVoiceId === v.voice_id ? 'font-bold' : ''}>
+                                                        {v.name}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </>
+                                    )}
 
-                                {/* Cloned voices */}
-                                {clonedVoices.length > 0 && (
-                                    <>
-                                        {clonedVoices.map(v => (
-                                            <button
-                                                key={v.voice_id}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedVoiceId(v.voice_id);
-                                                    setShowVoiceDropdown(false);
-                                                }}
-                                                className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
-                                                    }`}
-                                            >
-                                                {selectedVoiceId === v.voice_id && (
-                                                    <Check className="w-4 h-4 text-[#FFD700]" />
-                                                )}
-                                                <span className={selectedVoiceId === v.voice_id ? 'font-bold' : ''}>
-                                                    {v.name} (Cloned)
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </>
-                                )}
+                                    {/* Cloned voices */}
+                                    {clonedVoices.length > 0 && (
+                                        <>
+                                            {clonedVoices.map(v => (
+                                                <button
+                                                    key={v.voice_id}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedVoiceId(v.voice_id);
+                                                        setShowVoiceDropdown(false);
+                                                    }}
+                                                    className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-2 ${selectedVoiceId === v.voice_id ? 'bg-white/20' : ''
+                                                        }`}
+                                                >
+                                                    {selectedVoiceId === v.voice_id && (
+                                                        <Check className="w-4 h-4 text-[#FFD700]" />
+                                                    )}
+                                                    <span className={selectedVoiceId === v.voice_id ? 'font-bold' : ''}>
+                                                        {v.name} (Cloned)
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </>
+                                    )}
 
-                                {/* Voice Cloning Feature Disabled - ElevenLabs Limit Reached */}
-                                {/* Separator */}
-                                {(voices.length > 0 || clonedVoices.length > 0) && (
-                                    <div className="border-t border-white/20 my-1"></div>
-                                )}
+                                    {/* Voice Cloning Feature Disabled - ElevenLabs Limit Reached */}
+                                    {/* Separator */}
+                                    {(voices.length > 0 || clonedVoices.length > 0) && (
+                                        <div className="border-t border-white/20 my-1"></div>
+                                    )}
 
-                                {/* Create Voice Option - DISABLED */}
-                                {/* 
+                                    {/* Create Voice Option - DISABLED */}
+                                    {/* 
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -1147,15 +1117,15 @@ const BookReaderPage: React.FC = () => {
                                     </button>
                                     */}
 
-                                {/* No voices message */}
-                                {voices.length === 0 && clonedVoices.length === 0 && (
-                                    <div className="px-4 py-2 text-sm text-white/70 text-center">
-                                        No voices available
-                                    </div>
-                                )}
+                                    {/* No voices message */}
+                                    {voices.length === 0 && clonedVoices.length === 0 && (
+                                        <div className="px-4 py-2 text-sm text-white/70 text-center">
+                                            No voices available
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
                     </div>
                 </div>
             </div>
@@ -1264,17 +1234,16 @@ const BookReaderPage: React.FC = () => {
             </div>
 
             {/* Wood Play Button - Positioned above the scroll */}
-            <div 
-                className={`absolute left-4 z-40 transition-all duration-500 ${
-                    showScroll 
-                        ? 'bottom-[calc(30%+1rem)]' // Position above scroll (30% height + 1rem spacing)
-                        : 'bottom-4' // When scroll is hidden, position at bottom
-                }`}
+            <div
+                className={`absolute left-4 z-40 transition-all duration-500 ${showScroll
+                    ? 'bottom-[calc(30%+1rem)]' // Position above scroll (30% height + 1rem spacing)
+                    : 'bottom-4' // When scroll is hidden, position at bottom
+                    }`}
                 style={{
                     // Use scrollHeight if available, otherwise default to 30%
-                    bottom: showScroll && currentPage.scrollHeight 
+                    bottom: showScroll && currentPage.scrollHeight
                         ? `calc(${currentPage.scrollHeight}px + 1rem)`
-                        : showScroll 
+                        : showScroll
                             ? 'calc(30% + 1rem)'
                             : '1rem'
                 }}
@@ -1323,8 +1292,8 @@ const BookReaderPage: React.FC = () => {
                         >
                             <Home className="w-5 h-5" />
                             <span>Go Home</span>
-                            <div className="absolute inset-0 opacity-20 pointer-events-none" 
-                                 style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 12px)' }}>
+                            <div className="absolute inset-0 opacity-20 pointer-events-none"
+                                style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 12px)' }}>
                             </div>
                             <div className="absolute top-0 left-0 right-0 h-1 bg-white opacity-20"></div>
                         </button>
@@ -1338,16 +1307,15 @@ const BookReaderPage: React.FC = () => {
                                     setIsFavorite(newFavoriteState);
                                 }
                             }}
-                            className={`relative overflow-hidden font-display font-bold transition-transform active:scale-95 rounded-xl shadow-xl border-b-4 px-6 py-3 flex items-center gap-2 ${
-                                isFavorite
-                                    ? 'bg-[#FFD700] border-[#B8860B] hover:bg-[#ffe066] text-[#5c2e0b]'
-                                    : 'bg-[#CD853F] border-[#8B4513] hover:bg-[#DEB887] text-white'
-                            }`}
+                            className={`relative overflow-hidden font-display font-bold transition-transform active:scale-95 rounded-xl shadow-xl border-b-4 px-6 py-3 flex items-center gap-2 ${isFavorite
+                                ? 'bg-[#FFD700] border-[#B8860B] hover:bg-[#ffe066] text-[#5c2e0b]'
+                                : 'bg-[#CD853F] border-[#8B4513] hover:bg-[#DEB887] text-white'
+                                }`}
                         >
                             <Star className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
                             <span>{isFavorite ? 'Favorited' : 'Save to Favs'}</span>
-                            <div className="absolute inset-0 opacity-20 pointer-events-none" 
-                                 style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 12px)' }}>
+                            <div className="absolute inset-0 opacity-20 pointer-events-none"
+                                style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 12px)' }}>
                             </div>
                             <div className="absolute top-0 left-0 right-0 h-1 bg-white opacity-20"></div>
                         </button>
@@ -1361,16 +1329,15 @@ const BookReaderPage: React.FC = () => {
                                     setIsLiked(newLikeState);
                                 }
                             }}
-                            className={`relative overflow-hidden font-display font-bold transition-transform active:scale-95 rounded-xl shadow-xl border-b-4 px-6 py-3 flex items-center gap-2 ${
-                                isLiked
-                                    ? 'bg-[#FF5252] border-[#D32F2F] hover:bg-[#FF6B6B] text-white'
-                                    : 'bg-[#CD853F] border-[#8B4513] hover:bg-[#DEB887] text-white'
-                            }`}
+                            className={`relative overflow-hidden font-display font-bold transition-transform active:scale-95 rounded-xl shadow-xl border-b-4 px-6 py-3 flex items-center gap-2 ${isLiked
+                                ? 'bg-[#FF5252] border-[#D32F2F] hover:bg-[#FF6B6B] text-white'
+                                : 'bg-[#CD853F] border-[#8B4513] hover:bg-[#DEB887] text-white'
+                                }`}
                         >
                             <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
                             <span>{isLiked ? 'Liked' : 'Like'}</span>
-                            <div className="absolute inset-0 opacity-20 pointer-events-none" 
-                                 style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 12px)' }}>
+                            <div className="absolute inset-0 opacity-20 pointer-events-none"
+                                style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 12px)' }}>
                             </div>
                             <div className="absolute top-0 left-0 right-0 h-1 bg-white opacity-20"></div>
                         </button>
