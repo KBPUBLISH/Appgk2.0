@@ -146,7 +146,45 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // --- BACKGROUND MUSIC LOGIC ---
     useEffect(() => {
-        // ... (existing initialization code) ...
+        // Initialize audio elements with error handling
+        if (!bgAudioRef.current) {
+            bgAudioRef.current = new Audio(BG_MUSIC_URL);
+            bgAudioRef.current.loop = true;
+            bgAudioRef.current.volume = 0;
+            bgAudioRef.current.preload = 'auto';
+            bgAudioRef.current.addEventListener('error', (e) => {
+                console.error('❌ BG Music load error:', e, BG_MUSIC_URL);
+            });
+            bgAudioRef.current.addEventListener('canplaythrough', () => {
+                console.log('✅ BG Music loaded');
+            });
+        }
+
+        if (!gameAudioRef.current) {
+            gameAudioRef.current = new Audio(GAME_MUSIC_URL);
+            gameAudioRef.current.loop = true;
+            gameAudioRef.current.volume = 0;
+            gameAudioRef.current.preload = 'auto';
+            gameAudioRef.current.addEventListener('error', (e) => {
+                console.error('❌ Game Music load error:', e, GAME_MUSIC_URL);
+            });
+            gameAudioRef.current.addEventListener('canplaythrough', () => {
+                console.log('✅ Game Music loaded');
+            });
+        }
+
+        if (!workoutAudioRef.current) {
+            workoutAudioRef.current = new Audio(WORKOUT_MUSIC_URL);
+            workoutAudioRef.current.loop = true;
+            workoutAudioRef.current.volume = 0;
+            workoutAudioRef.current.preload = 'auto';
+            workoutAudioRef.current.addEventListener('error', (e) => {
+                console.error('❌ Workout Music load error:', e, WORKOUT_MUSIC_URL);
+            });
+            workoutAudioRef.current.addEventListener('canplaythrough', () => {
+                console.log('✅ Workout Music loaded');
+            });
+        }
 
         const bg = bgAudioRef.current;
         const game = gameAudioRef.current;
