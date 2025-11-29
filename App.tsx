@@ -15,6 +15,8 @@ import AudioPlayerPage from './pages/AudioPlayerPage';
 import PaywallPage from './pages/PaywallPage';
 import SettingsPage from './pages/SettingsPage';
 import BookReaderPage from './pages/BookReaderPage';
+import AudioPage from './pages/AudioPage';
+import PlaylistPlayerPage from './pages/PlaylistPlayerPage';
 import BottomNavigation from './components/layout/BottomNavigation';
 import { BooksProvider } from './context/BooksContext';
 import { UserProvider } from './context/UserContext';
@@ -87,6 +89,7 @@ const PanoramaBackground: React.FC = () => {
     if (path === '/listen') return 2;
     if (path === '/read') return 3;
     if (path === '/library') return 4;
+    if (path === '/audio' || path.startsWith('/audio/')) return 2; // Use same as listen
     if (path.startsWith('/book/')) return 5;
     if (path === '/profile') return 5;
     if (path === '/create-profile') return 5;
@@ -148,6 +151,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isPaywall = location.pathname === '/paywall';
   const isSettings = location.pathname === '/settings';
   const isBookReader = location.pathname.startsWith('/read/');
+  const isAudioPage = location.pathname.startsWith('/audio/');
 
   return (
     <div className="relative h-screen w-full overflow-hidden text-white flex flex-col">
@@ -160,7 +164,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </div>
 
       {/* Only show BottomNavigation on main tab pages */}
-      {!isLanding && !isSignIn && !isOnboarding && !isBookDetail && !isPlayer && !isProfile && !isCreateProfile && !isPaywall && !isSettings && !isBookReader && <BottomNavigation />}
+      {!isLanding && !isSignIn && !isOnboarding && !isBookDetail && !isPlayer && !isProfile && !isCreateProfile && !isPaywall && !isSettings && !isBookReader && !isAudioPage && <BottomNavigation />}
     </div>
   );
 };
@@ -183,6 +187,8 @@ const App: React.FC = () => {
                 <Route path="/book/:id" element={<BookDetailPage />} />
                 <Route path="/read/:bookId" element={<BookReaderPage />} />
                 <Route path="/player/:bookId/:chapterId" element={<AudioPlayerPage />} />
+                <Route path="/audio" element={<AudioPage />} />
+                <Route path="/audio/playlist/:playlistId" element={<PlaylistPlayerPage />} />
                 <Route path="/profile" element={<ProfileSelectionPage />} />
                 <Route path="/create-profile" element={<CreateProfilePage />} />
                 <Route path="/paywall" element={<PaywallPage />} />
