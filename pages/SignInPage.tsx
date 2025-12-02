@@ -123,26 +123,27 @@ const SignInPage: React.FC = () => {
       return;
     }
 
-    // Navigate to onboarding immediately - don't block on sign-up
-    // Sign-up will happen in the background
-    // OnboardingPage's useEffect will call resetUser() to ensure fresh state
-    navigate('/onboarding');
-    
-    // Attempt sign-up in the background (non-blocking)
-    ApiService.signUp(signUpEmail, signUpPassword, {
-      firstName: 'User' // Temporary, will be updated during onboarding
-    }).then((result) => {
+    // Attempt sign-up and wait for result before navigating
+    try {
+      const result = await ApiService.signUp(signUpEmail, signUpPassword, {
+        firstName: 'User' // Temporary, will be updated during onboarding
+      });
+      
       if (result.success) {
         console.log('✅ SignInPage: Sign up successful!');
         window.dispatchEvent(new Event('authTokenUpdated'));
+        // Navigate to onboarding after successful sign-up
+        navigate('/onboarding');
       } else {
-        console.warn('⚠️ Sign-up completed with error:', result.error);
-        // Don't show error to user since they're already in onboarding
+        console.warn('⚠️ Sign-up failed:', result.error);
+        setError(result.error || 'Sign-up failed. Please try again.');
+        setLoading(null);
       }
-    }).catch((err) => {
+    } catch (err) {
       console.error('❌ SignInPage: Sign up exception', err);
-      // Don't block user - they can sign up later if needed
-    });
+      setError('Network error during sign-up. Please try again.');
+      setLoading(null);
+    }
   };
 
   return (

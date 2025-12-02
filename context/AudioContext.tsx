@@ -86,9 +86,10 @@ const AudioContext = createContext<AudioContextType>({
 export const useAudio = () => useContext(AudioContext);
 
 // Default fallback URLs (used if backend music not configured)
-const DEFAULT_BG_MUSIC_URL = "https://res.cloudinary.com/dxh8fuq7b/video/upload/v1763747567/Seaside_Adventure_2025-11-21T174503_i3p43n.mp3";
+// All music hosted on GCS for better native app compatibility
+const DEFAULT_BG_MUSIC_URL = "https://storage.googleapis.com/productiongk/music/1764719601331_app-background.mp3";
 const DEFAULT_GAME_MUSIC_URL = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3";
-const DEFAULT_WORKOUT_MUSIC_URL = "https://res.cloudinary.com/dxh8fuq7b/video/upload/v1763747567/Jump_and_Spin_pczce5.mp3";
+const DEFAULT_WORKOUT_MUSIC_URL = "https://storage.googleapis.com/productiongk/music/1764719639973_workout.mp3";
 
 // Music URLs (will be fetched from backend)
 let BG_MUSIC_URL = DEFAULT_BG_MUSIC_URL;
