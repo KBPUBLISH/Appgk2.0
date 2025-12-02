@@ -202,8 +202,8 @@ const VideoLessonModal: React.FC<VideoLessonModalProps> = ({ isOpen, onClose, le
                         >
                             <div
                                 className={`h-full bg-white transition-all duration-300 ${idx < currentIndex ? 'w-full' :
-                                        idx === currentIndex ? `w-[${currentScreen === 'video' ? videoProgress : 100}%]` :
-                                            'w-0'
+                                    idx === currentIndex ? `w-[${currentScreen === 'video' ? videoProgress : 100}%]` :
+                                        'w-0'
                                     }`}
                                 style={{
                                     width: idx < currentIndex ? '100%' :
@@ -232,7 +232,8 @@ const VideoLessonModal: React.FC<VideoLessonModalProps> = ({ isOpen, onClose, le
                         <video
                             ref={videoRef}
                             src={lesson.videoUrl}
-                            className="w-full h-full object-contain"
+                            className="w-full h-full object-cover"
+                            style={{ objectFit: 'cover' }}
                             playsInline
                         />
 
@@ -263,34 +264,49 @@ const VideoLessonModal: React.FC<VideoLessonModalProps> = ({ isOpen, onClose, le
 
                 {/* Devotional Screen */}
                 {currentScreen === 'devotional' && (
-                    <div className="w-full h-full bg-gradient-to-br from-[#0f172a] to-[#1e293b] overflow-y-auto">
-                        <div className="max-w-2xl mx-auto px-6 py-20">
-                            <div className="text-center mb-8">
-                                <div className="w-16 h-16 bg-gradient-to-br from-[#FFD700] to-[#FFA500] rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                                    <Star className="text-[#8B4513]" size={32} />
+                    <div className="w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1e293b] via-[#0f172a] to-[#020617] overflow-y-auto relative">
+                        {/* Background Effects */}
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-96 bg-[#FFD700]/10 blur-[100px] rounded-full pointer-events-none"></div>
+                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 pointer-events-none"></div>
+
+                        <div className="max-w-2xl mx-auto px-6 py-12 relative z-10 min-h-full flex flex-col justify-center">
+                            <div className="text-center mb-8 animate-in slide-in-from-bottom-4 duration-700 fade-in">
+                                <div className="inline-flex items-center justify-center p-1 rounded-full bg-gradient-to-b from-[#FFD700]/50 to-transparent mb-6">
+                                    <div className="w-20 h-20 bg-gradient-to-br from-[#FFD700] to-[#B8860B] rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(255,215,0,0.4)] border-4 border-[#FFF8E1]">
+                                        <Star className="text-[#FFF8E1]" size={40} fill="#FFF8E1" />
+                                    </div>
                                 </div>
-                                <h2 className="text-3xl font-bold text-white mb-2">
-                                    Today's Devotional
+                                <h2 className="text-4xl md:text-5xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] via-[#FFF8E1] to-[#FFD700] mb-3 drop-shadow-sm">
+                                    Daily Devotional
                                 </h2>
-                                <p className="text-[#94a3b8] text-sm">
-                                    Take a moment to reflect
+                                <p className="text-[#94a3b8] text-lg font-medium tracking-wide uppercase text-xs">
+                                    Pause • Reflect • Grow
                                 </p>
                             </div>
 
-                            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20 mb-8">
+                            <div className="bg-black/30 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-[#FFD700]/20 shadow-[0_0_50px_rgba(0,0,0,0.3)] mb-8 animate-in slide-in-from-bottom-8 duration-1000 fade-in delay-150 relative overflow-hidden group">
+                                {/* Decorative Corner Accents */}
+                                <div className="absolute top-0 left-0 w-16 h-16 border-t-2 border-l-2 border-[#FFD700]/30 rounded-tl-3xl"></div>
+                                <div className="absolute top-0 right-0 w-16 h-16 border-t-2 border-r-2 border-[#FFD700]/30 rounded-tr-3xl"></div>
+                                <div className="absolute bottom-0 left-0 w-16 h-16 border-b-2 border-l-2 border-[#FFD700]/30 rounded-bl-3xl"></div>
+                                <div className="absolute bottom-0 right-0 w-16 h-16 border-b-2 border-r-2 border-[#FFD700]/30 rounded-br-3xl"></div>
+
                                 <div className="prose prose-invert prose-lg max-w-none">
-                                    <p className="text-white/90 leading-relaxed whitespace-pre-wrap">
-                                        {lesson.devotionalText}
+                                    <p className="text-[#E2E8F0] leading-loose text-xl md:text-2xl font-serif text-center drop-shadow-md">
+                                        "{lesson.devotionalText}"
                                     </p>
                                 </div>
                             </div>
 
                             <button
                                 onClick={() => setCurrentScreen('activity')}
-                                className="w-full bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#ffed4e] hover:to-[#FFD700] text-[#8B4513] font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
+                                className="w-full group relative overflow-hidden bg-gradient-to-r from-[#FFD700] via-[#FDB931] to-[#FFD700] text-[#5c2e0b] font-bold py-5 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-[0_0_20px_rgba(255,215,0,0.3)] hover:shadow-[0_0_30px_rgba(255,215,0,0.5)] hover:scale-[1.02] active:scale-[0.98] animate-in slide-in-from-bottom-12 duration-1000 fade-in delay-300"
                             >
-                                Continue to Activity
-                                <ChevronRight size={20} />
+                                <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></span>
+                                <span className="text-lg font-display tracking-wide uppercase">Continue to Activity</span>
+                                <div className="bg-[#5c2e0b]/10 p-1 rounded-full group-hover:translate-x-1 transition-transform">
+                                    <ChevronRight size={24} />
+                                </div>
                             </button>
                         </div>
                     </div>
@@ -324,22 +340,22 @@ const VideoLessonModal: React.FC<VideoLessonModalProps> = ({ isOpen, onClose, le
                                                     onClick={() => handleQuizAnswer(currentQuestionIndex, idx)}
                                                     disabled={showFeedback}
                                                     className={`w-full p-4 rounded-xl border-2 text-left transition-all ${showCorrect
-                                                            ? 'bg-green-500/20 border-green-500 text-white'
-                                                            : showIncorrect
-                                                                ? 'bg-red-500/20 border-red-500 text-white'
-                                                                : isSelected
-                                                                    ? 'bg-[#FFD700]/20 border-[#FFD700] text-white'
-                                                                    : 'bg-white/5 border-white/20 text-white hover:bg-white/10 hover:border-white/40'
+                                                        ? 'bg-green-500/20 border-green-500 text-white'
+                                                        : showIncorrect
+                                                            ? 'bg-red-500/20 border-red-500 text-white'
+                                                            : isSelected
+                                                                ? 'bg-[#FFD700]/20 border-[#FFD700] text-white'
+                                                                : 'bg-white/5 border-white/20 text-white hover:bg-white/10 hover:border-white/40'
                                                         }`}
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${showCorrect
-                                                                ? 'border-green-500 bg-green-500'
-                                                                : showIncorrect
-                                                                    ? 'border-red-500 bg-red-500'
-                                                                    : isSelected
-                                                                        ? 'border-[#FFD700] bg-[#FFD700]'
-                                                                        : 'border-white/40'
+                                                            ? 'border-green-500 bg-green-500'
+                                                            : showIncorrect
+                                                                ? 'border-red-500 bg-red-500'
+                                                                : isSelected
+                                                                    ? 'border-[#FFD700] bg-[#FFD700]'
+                                                                    : 'border-white/40'
                                                             }`}>
                                                             {(showCorrect || (showFeedback && isSelected)) && (
                                                                 <Check size={16} className="text-white" />

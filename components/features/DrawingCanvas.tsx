@@ -41,14 +41,14 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, onComplete }) => 
         const resizeCanvas = () => {
             const rect = canvas.getBoundingClientRect();
             const dpr = window.devicePixelRatio || 1;
-            
+
             // Set actual size in memory (scaled for device pixel ratio)
             canvas.width = rect.width * dpr;
             canvas.height = rect.height * dpr;
-            
+
             // Scale the drawing context to account for device pixel ratio
             ctx.scale(dpr, dpr);
-            
+
             // Set display size (CSS pixels)
             canvas.style.width = rect.width + 'px';
             canvas.style.height = rect.height + 'px';
@@ -70,13 +70,34 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, onComplete }) => 
         return () => window.removeEventListener('resize', resizeCanvas);
     }, []);
 
-    const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    // Add non-passive event listeners for touch to prevent scrolling while drawing
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const handleTouchStart = (e: TouchEvent) => startDrawing(e as any);
+        const handleTouchMove = (e: TouchEvent) => draw(e as any);
+        const handleTouchEnd = (e: TouchEvent) => stopDrawing();
+
+        canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+        canvas.addEventListener('touchend', handleTouchEnd);
+
+        return () => {
+            canvas.removeEventListener('touchstart', handleTouchStart);
+            canvas.removeEventListener('touchmove', handleTouchMove);
+            canvas.removeEventListener('touchend', handleTouchEnd);
+        };
+    }); // Re-bind on every render to capture latest state/closures
+
+    const getCoordinates = (e: any) => {
         const canvas = canvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
 
         const rect = canvas.getBoundingClientRect();
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+        // Handle both React synthetic events and native DOM events
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
         // Since we scaled the context by devicePixelRatio, coordinates should be in CSS pixels
         // which is what we get from getBoundingClientRect
@@ -86,8 +107,8 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, onComplete }) => 
         };
     };
 
-    const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-        e.preventDefault();
+    const startDrawing = (e: any) => {
+        if (e.cancelable) e.preventDefault();
         e.stopPropagation();
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -96,7 +117,7 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, onComplete }) => 
         if (!ctx) return;
 
         const { x, y } = getCoordinates(e);
-        
+
         ctx.beginPath();
         ctx.moveTo(x, y);
         setIsDrawing(true);
@@ -110,8 +131,8 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, onComplete }) => 
         ctx.lineWidth = brushSize;
     };
 
-    const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-        e.preventDefault();
+    const draw = (e: any) => {
+        if (e.cancelable) e.preventDefault();
         e.stopPropagation();
         if (!isDrawing) return;
 
@@ -177,9 +198,6 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, onComplete }) => 
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}
                     onMouseLeave={stopDrawing}
-                    onTouchStart={startDrawing}
-                    onTouchMove={draw}
-                    onTouchEnd={stopDrawing}
                 />
             </div>
 
@@ -193,11 +211,10 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, onComplete }) => 
                                 setSelectedColor(color);
                                 setIsEraser(false);
                             }}
-                            className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 transition-all ${
-                                selectedColor === color && !isEraser
-                                    ? 'border-[#FFD700] scale-110 shadow-lg ring-2 ring-[#FFD700]'
-                                    : 'border-white/30 hover:scale-105'
-                            }`}
+                            className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 transition-all ${selectedColor === color && !isEraser
+                                ? 'border-[#FFD700] scale-110 shadow-lg ring-2 ring-[#FFD700]'
+                                : 'border-white/30 hover:scale-105'
+                                }`}
                             style={{ backgroundColor: color }}
                             title={color}
                         />
@@ -226,11 +243,10 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, onComplete }) => 
                     {/* Eraser */}
                     <button
                         onClick={() => setIsEraser(!isEraser)}
-                        className={`p-2 rounded-lg transition-all ${
-                            isEraser
-                                ? 'bg-[#FFD700] text-black'
-                                : 'bg-white/10 text-white hover:bg-white/20'
-                        }`}
+                        className={`p-2 rounded-lg transition-all ${isEraser
+                            ? 'bg-[#FFD700] text-black'
+                            : 'bg-white/10 text-white hover:bg-white/20'
+                            }`}
                         title="Eraser"
                     >
                         <Eraser className="w-4 h-4 md:w-5 md:h-5" />
