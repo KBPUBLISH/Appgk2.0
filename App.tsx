@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import SignInPage from './pages/SignInPage';
@@ -26,6 +26,7 @@ import BottomNavigation from './components/layout/BottomNavigation';
 import { BooksProvider } from './context/BooksContext';
 import { UserProvider } from './context/UserContext';
 import { AudioProvider } from './context/AudioContext';
+import NotificationService from './services/notificationService';
 
 // --- ASSETS & HELPERS ---
 
@@ -180,6 +181,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const App: React.FC = () => {
+  // Initialize OneSignal notifications
+  useEffect(() => {
+    NotificationService.init();
+  }, []);
+
   return (
     <AudioProvider>
       <UserProvider>
