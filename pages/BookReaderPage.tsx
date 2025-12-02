@@ -560,30 +560,26 @@ const BookReaderPage: React.FC = () => {
             // Preserve scroll state when turning pages manually - use ref to get latest value
             const currentScrollState = showScrollRef.current;
 
+            // For backwards, change the page immediately so the slide animation reveals the previous page
+            const prevIndex = currentPageIndex - 1;
+            setCurrentPageIndex(prevIndex);
+            currentPageIndexRef.current = prevIndex;
+            setShowScroll(currentScrollState);
+            showScrollRef.current = currentScrollState;
+
             setIsPageTurning(true);
             setFlipState({ direction: 'prev', isFlipping: true });
             playPageTurnSound(); // Play page turn sound effect
 
-            // Change page content at the halfway point (when page is perpendicular - 90deg)
-            setTimeout(() => {
-                const prevIndex = currentPageIndex - 1;
-                setCurrentPageIndex(prevIndex);
-                currentPageIndexRef.current = prevIndex;
-                // Preserve the scroll state from previous page
-                setShowScroll(currentScrollState);
-                showScrollRef.current = currentScrollState; // Update ref
-            }, 700); // Halfway through 1.4s animation
-
-            // End the flip animation
+            // End the slide animation (0.5s duration)
             setTimeout(() => {
                 setIsPageTurning(false);
                 setFlipState(null);
                 // Save progress
-                const prevIndex = currentPageIndex - 1;
                 if (bookId) {
                     readingProgressService.saveProgress(bookId, prevIndex);
                 }
-            }, 1500); // Slightly after 1.4s animation completes
+            }, 550); // Slightly after 0.5s animation completes
         }
     };
 
@@ -1416,28 +1412,18 @@ const BookReaderPage: React.FC = () => {
                         }
                     }
                     
-                    /* Previous page animation - page comes from LEFT side */
+                    /* Previous page animation - simple smooth slide from left */
                     @keyframes pageCurlPrev {
                         0% { 
-                            transform: perspective(2000px) rotateY(0deg) rotateX(0deg) translateZ(0px);
+                            transform: translateX(-100%);
+                            opacity: 0;
                         }
-                        15% {
-                            transform: perspective(2000px) rotateY(20deg) rotateX(2deg) translateZ(30px);
-                        }
-                        35% { 
-                            transform: perspective(2000px) rotateY(60deg) rotateX(3deg) translateZ(60px);
-                        }
-                        50% { 
-                            transform: perspective(2000px) rotateY(90deg) rotateX(4deg) translateZ(80px);
-                        }
-                        65% {
-                            transform: perspective(2000px) rotateY(120deg) rotateX(3deg) translateZ(60px);
-                        }
-                        85% {
-                            transform: perspective(2000px) rotateY(160deg) rotateX(2deg) translateZ(30px);
+                        20% {
+                            opacity: 1;
                         }
                         100% { 
-                            transform: perspective(2000px) rotateY(180deg) rotateX(0deg) translateZ(0px);
+                            transform: translateX(0%);
+                            opacity: 1;
                         }
                     }
                     
@@ -1534,9 +1520,7 @@ const BookReaderPage: React.FC = () => {
                     }
                     
                     .page-curl-prev {
-                        animation: pageCurlPrev 1.4s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
-                        transform-origin: left center;
-                        transform-style: preserve-3d;
+                        animation: pageCurlPrev 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
                     }
                     
                     .shimmer-wave-1 {
@@ -1572,8 +1556,8 @@ const BookReaderPage: React.FC = () => {
                 {/* Page Container with deep perspective for realistic 3D curl */}
                 <div className="relative w-full h-full" style={{ perspective: '1800px', perspectiveOrigin: 'center center' }}>
 
-                    {/* The actual page content - always visible underneath */}
-                    <div className="absolute inset-0 z-10">
+                    {/* The actual page content - with slide animation for prev direction */}
+                    <div className={`absolute inset-0 z-10 ${flipState?.direction === 'prev' ? 'page-curl-prev' : ''}`}>
                         <BookPageRenderer
                             page={currentPage}
                             activeTextBoxIndex={activeTextBoxIndex}
@@ -1585,14 +1569,13 @@ const BookReaderPage: React.FC = () => {
                         />
                     </div>
 
-                    {/* High-sheen glossy white page that curls over */}
-                    {flipState && (
+                    {/* High-sheen glossy white page that curls over - ONLY for next direction */}
+                    {flipState && flipState.direction === 'next' && (
                         <>
                             {/* Dynamic shadow cast by the curling page */}
                             <div 
                                 className="absolute top-0 bottom-0 z-40 pointer-events-none curl-shadow"
                                 style={{
-                                    /* For both directions, shadow starts from the left (where the page lifts from) */
                                     left: 0,
                                     right: 'auto',
                                     background: 'linear-gradient(to right, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 30%, rgba(0,0,0,0.05) 70%, transparent 100%)',
@@ -1601,9 +1584,7 @@ const BookReaderPage: React.FC = () => {
                             
                             {/* The curling glossy white page */}
                             <div 
-                                className={`absolute inset-0 z-50 pointer-events-none ${
-                                    flipState.direction === 'next' ? 'page-curl-next' : 'page-curl-prev'
-                                }`}
+                                className="absolute inset-0 z-50 pointer-events-none page-curl-next"
                             >
                                 {/* Front of page - HIGH SHEEN glossy white */}
                                 <div 

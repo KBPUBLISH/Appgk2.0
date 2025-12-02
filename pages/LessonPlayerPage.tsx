@@ -587,9 +587,9 @@ const LessonPlayerPage: React.FC = () => {
                                             </span>
                                         </button>
 
-                                        {/* Dropdown Menu - higher z-index to appear above devotional content */}
+                                        {/* Dropdown Menu - opens BELOW the button */}
                                         {showVoiceDropdown && (
-                                            <div className="absolute bottom-full left-0 right-0 mb-2 bg-[#5D4037] rounded-lg border-2 border-[#3E2723] shadow-xl z-[100] max-h-[300px] overflow-y-auto min-w-[200px]">
+                                            <div className="absolute top-full left-0 mt-2 bg-[#5D4037] rounded-lg border-2 border-[#3E2723] shadow-xl z-[100] max-h-[300px] overflow-y-auto min-w-[220px]">
                                                 <div className="py-2">
                                                     {/* Unlocked Voices Section - show first */}
                                                     {voices.filter(v => isVoiceUnlocked(v.voice_id)).length > 0 && (
