@@ -44,7 +44,7 @@ const HomePage: React.FC = () => {
   const [hasEngagedDailyKey, setHasEngagedDailyKey] = useState(false);
   const [hasEngagedStrength, setHasEngagedStrength] = useState(false);
   const [hasEngagedPrayer, setHasEngagedPrayer] = useState(false);
-  
+
   // Lessons state
   const [lessons, setLessons] = useState<any[]>([]);
   const [lessonsLoading, setLessonsLoading] = useState(true);
@@ -157,24 +157,24 @@ const HomePage: React.FC = () => {
       const data = await ApiService.getLessons();
       console.log('📚 Lessons received:', data.length, data);
       setLessons(data);
-      
+
       // Organize lessons by day for the next 7 days
       const weekMap = new Map<string, any>();
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       // Also include published lessons without scheduled dates (show them as available)
-      const publishedLessons = data.filter((l: any) => 
+      const publishedLessons = data.filter((l: any) =>
         l.status === 'published' && !l.scheduledDate
       );
-      
+
       for (let i = 0; i < 7; i++) {
         const date = new Date(today);
         date.setDate(date.getDate() + i);
         date.setHours(0, 0, 0, 0);
-        
+
         const dateKey = date.toISOString().split('T')[0];
-        
+
         // Find lesson scheduled for this date
         let lesson = data.find((l: any) => {
           if (!l.scheduledDate) return false;
@@ -182,17 +182,17 @@ const HomePage: React.FC = () => {
           scheduled.setHours(0, 0, 0, 0);
           return scheduled.getTime() === date.getTime();
         });
-        
+
         // If no scheduled lesson for this day and it's today, use first available published lesson
         if (!lesson && i === 0 && publishedLessons.length > 0) {
           lesson = publishedLessons[0];
         }
-        
+
         if (lesson) {
           weekMap.set(dateKey, lesson);
         }
       }
-      
+
       console.log('📚 Week lessons map:', Array.from(weekMap.entries()));
       setWeekLessons(weekMap);
     } catch (error) {
@@ -252,7 +252,7 @@ const HomePage: React.FC = () => {
         onClose={() => setShowPrayerGame(false)}
       />
 
-      <div className="px-4 pt-28 space-y-2 pb-52">
+      <div className="px-4 pt-20 space-y-2 pb-52">
 
         {/* --- Stories Section --- */}
         <div className="w-screen overflow-x-auto no-scrollbar pb-6 pt-2 -mt-2 -mx-4">
@@ -382,13 +382,13 @@ const HomePage: React.FC = () => {
                     date.setHours(0, 0, 0, 0);
                     weekDays.push(date);
                   }
-                  
+
                   return weekDays.map((date) => {
                     const dateKey = date.toISOString().split('T')[0];
                     const lesson = weekLessons.get(dateKey);
                     const status = lesson ? getLessonStatus(lesson) : 'empty';
                     const isToday = date.toDateString() === today.toDateString();
-                    
+
                     return (
                       <div
                         key={dateKey}
@@ -406,9 +406,8 @@ const HomePage: React.FC = () => {
                         </div>
 
                         {/* Portrait Thumbnail Container */}
-                        <div className={`relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-800/50 border transition-all ${
-                          isToday ? 'border-2 border-[#FFD700]' : 'border border-white/20'
-                        }`}>
+                        <div className={`relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-800/50 border transition-all ${isToday ? 'border-2 border-[#FFD700]' : 'border border-white/20'
+                          }`}>
                           {status === 'empty' ? (
                             <div className="w-full h-full flex items-center justify-center">
                               <div className="text-white/20 text-[10px] text-center px-1">
@@ -431,13 +430,12 @@ const HomePage: React.FC = () => {
                               )}
 
                               {/* Overlay */}
-                              <div className={`absolute inset-0 ${
-                                status === 'locked' 
-                                    ? 'bg-black/70' 
-                                    : status === 'completed' 
-                                        ? 'bg-green-500/30' 
-                                        : 'bg-black/20'
-                              }`} />
+                              <div className={`absolute inset-0 ${status === 'locked'
+                                ? 'bg-black/70'
+                                : status === 'completed'
+                                  ? 'bg-green-500/30'
+                                  : 'bg-black/20'
+                                }`} />
 
                               {/* Status Icons */}
                               <div className="absolute top-2 right-2">

@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Crown, Music, Hammer, Wrench } from 'lucide-react';
+import { Crown, Music, Hammer, Wrench, User } from 'lucide-react';
 import ShopModal from '../features/ShopModal';
 import AvatarDetailModal from '../features/AvatarDetailModal';
 import { useUser } from '../../context/UserContext';
+import ErrorBoundary from '../common/ErrorBoundary';
 import { useAudio } from '../../context/AudioContext';
 import { AVATAR_ASSETS } from '../avatar/AvatarAssets';
 
@@ -20,7 +20,7 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
   const { musicEnabled, toggleMusic, playClick } = useAudio();
   const [isShopOpen, setIsShopOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  
+
   // Check if we're on book reader page - music should appear muted
   const isBookReader = location.pathname.startsWith('/read/');
   const displayMusicEnabled = isBookReader ? false : musicEnabled;
@@ -189,7 +189,9 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
         </div>
       </header>
 
-      <ShopModal isOpen={isShopOpen} onClose={() => setIsShopOpen(false)} />
+      <ErrorBoundary>
+        <ShopModal isOpen={isShopOpen} onClose={() => setIsShopOpen(false)} />
+      </ErrorBoundary>
       <AvatarDetailModal isOpen={isDetailOpen} onClose={() => setIsDetailOpen(false)} onEdit={() => setIsShopOpen(true)} />
     </>
   );

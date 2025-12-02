@@ -11,9 +11,9 @@ import { ApiService } from '../../services/apiService';
 import { filterVisibleVoices } from '../../services/voiceManagementService';
 
 interface ShopModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  initialTab?: ShopTab;
+    isOpen: boolean;
+    onClose: () => void;
+    initialTab?: ShopTab;
 }
 
 // --- SHOP DATA ---
@@ -169,421 +169,422 @@ const SHOP_ANIMATIONS: ShopItem[] = [
 type ShopTab = 'head' | 'hat' | 'body' | 'arms' | 'legs' | 'moves' | 'voices' | 'saves';
 
 const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) => {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<ShopTab>(initialTab || 'head');
-  const [availableVoices, setAvailableVoices] = useState<any[]>([]);
-  const [loadingVoices, setLoadingVoices] = useState(false);
-  
-  // Update tab when initialTab changes
-  useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-    }
-  }, [initialTab]);
-  
-  // Fetch voices when voices tab is active
-  useEffect(() => {
-    if (!isOpen || activeTab !== 'voices') {
-      return;
-    }
-    
-    setLoadingVoices(true);
-    let isMounted = true;
-    
-    ApiService.getVoices()
-      .then(voices => {
-        if (!isMounted) return;
-        
-        // Safety check for filterVisibleVoices
-        if (typeof filterVisibleVoices !== 'function') {
-          console.error('filterVisibleVoices is not a function');
-          setAvailableVoices([]);
-          return;
+    const navigate = useNavigate();
+    const [activeTab, setActiveTab] = useState<ShopTab>(initialTab || 'head');
+    const [availableVoices, setAvailableVoices] = useState<any[]>([]);
+    const [loadingVoices, setLoadingVoices] = useState(false);
+    const [isMenuMinimized, setIsMenuMinimized] = useState(false);
+    const [isBuilderMode, setIsBuilderMode] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [selectedPart, setSelectedPart] = useState<'leftArm' | 'rightArm' | 'legs' | 'head' | 'body' | 'hat' | null>(null);
+    const [isSavedFeedback, setIsSavedFeedback] = useState(false);
+    const [showScrollHint, setShowScrollHint] = useState(false);
+    const tabsContainerRef = useRef<HTMLDivElement>(null);
+
+    // Update tab when initialTab changes
+    useEffect(() => {
+        if (initialTab) {
+            setActiveTab(initialTab);
         }
-        
-        const visibleVoices = filterVisibleVoices(voices);
-        // Calculate 30% threshold for coin-purchasable voices
-        const totalVoices = visibleVoices.length;
-        const coinPurchasableCount = Math.ceil(totalVoices * 0.3); // 30% available for coins
-        
-        // Convert to ShopItem format
-        const voiceItems: ShopItem[] = visibleVoices.map((voice, index) => {
-          // First 30% are purchasable with coins, rest require premium
-          const isCoinPurchasable = index < coinPurchasableCount;
-          
-          return {
-            id: `voice-${voice.voice_id}`,
-            name: voice.name,
-            price: isCoinPurchasable ? 200 : 0, // 200 coins for purchasable, 0 for premium-only
-            type: 'voice',
-            value: voice.voice_id,
-            isPremium: !isCoinPurchasable, // Premium-only if not in first 30%
-            characterImage: voice.characterImage, // Add character image
-          };
-        });
-        setAvailableVoices(voiceItems);
-      })
-      .catch(error => {
-        if (!isMounted) return;
-        console.error('Error loading voices:', error);
-        setAvailableVoices([]);
-      })
-      .finally(() => {
-        if (isMounted) {
-          setLoadingVoices(false);
+    }, [initialTab]);
+
+    // Fetch voices when voices tab is active
+    useEffect(() => {
+        if (!isOpen || activeTab !== 'voices') {
+            return;
         }
-      });
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, activeTab]);
 
-  // Check if tabs are scrollable and show hint on first visit
-  useEffect(() => {
-    if (!isOpen) return;
+        setLoadingVoices(true);
+        let isMounted = true;
 
-    const hasSeenHint = localStorage.getItem('godlykids_shop_scroll_hint_seen') === 'true';
-    if (hasSeenHint) return;
+        ApiService.getVoices()
+            .then(voices => {
+                if (!isMounted) return;
 
-    // Wait for DOM to render
-    const checkScrollable = setTimeout(() => {
-      const container = tabsContainerRef.current;
-      if (container) {
-        const isScrollable = container.scrollWidth > container.clientWidth;
-        if (isScrollable) {
-          setShowScrollHint(true);
-          // Auto-hide after 5 seconds
-          setTimeout(() => {
+                // Safety check for filterVisibleVoices
+                if (typeof filterVisibleVoices !== 'function') {
+                    console.error('filterVisibleVoices is not a function');
+                    setAvailableVoices([]);
+                    return;
+                }
+
+                const visibleVoices = filterVisibleVoices(voices);
+                // Calculate 30% threshold for coin-purchasable voices
+                const totalVoices = visibleVoices.length;
+                const coinPurchasableCount = Math.ceil(totalVoices * 0.3); // 30% available for coins
+
+                // Convert to ShopItem format
+                const voiceItems: ShopItem[] = visibleVoices.map((voice, index) => {
+                    // First 30% are purchasable with coins, rest require premium
+                    const isCoinPurchasable = index < coinPurchasableCount;
+
+                    return {
+                        id: `voice-${voice.voice_id}`,
+                        name: voice.name,
+                        price: isCoinPurchasable ? 200 : 0, // 200 coins for purchasable, 0 for premium-only
+                        type: 'voice',
+                        value: voice.voice_id,
+                        isPremium: !isCoinPurchasable, // Premium-only if not in first 30%
+                        characterImage: voice.characterImage, // Add character image
+                    };
+                });
+                setAvailableVoices(voiceItems);
+            })
+            .catch(error => {
+                if (!isMounted) return;
+                console.error('Error loading voices:', error);
+                setAvailableVoices([]);
+            })
+            .finally(() => {
+                if (isMounted) {
+                    setLoadingVoices(false);
+                }
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [isOpen, activeTab]);
+
+    // Check if tabs are scrollable and show hint on first visit
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const hasSeenHint = localStorage.getItem('godlykids_shop_scroll_hint_seen') === 'true';
+        if (hasSeenHint) return;
+
+        // Wait for DOM to render
+        const checkScrollable = setTimeout(() => {
+            const container = tabsContainerRef.current;
+            if (container) {
+                const isScrollable = container.scrollWidth > container.clientWidth;
+                if (isScrollable) {
+                    setShowScrollHint(true);
+                    // Auto-hide after 5 seconds
+                    setTimeout(() => {
+                        setShowScrollHint(false);
+                        localStorage.setItem('godlykids_shop_scroll_hint_seen', 'true');
+                    }, 5000);
+                }
+            }
+        }, 500);
+
+        return () => clearTimeout(checkScrollable);
+    }, [isOpen]);
+
+    // Hide hint when user scrolls tabs
+    useEffect(() => {
+        if (!showScrollHint) return;
+
+        const container = tabsContainerRef.current;
+        if (!container) return;
+
+        const handleScroll = () => {
             setShowScrollHint(false);
             localStorage.setItem('godlykids_shop_scroll_hint_seen', 'true');
-          }, 5000);
-        }
-      }
-    }, 500);
+        };
 
-    return () => clearTimeout(checkScrollable);
-  }, [isOpen]);
+        container.addEventListener('scroll', handleScroll, { once: true });
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [showScrollHint]);
 
-  // Hide hint when user scrolls tabs
-  useEffect(() => {
-    if (!showScrollHint) return;
 
-    const container = tabsContainerRef.current;
-    if (!container) return;
 
-    const handleScroll = () => {
-      setShowScrollHint(false);
-      localStorage.setItem('godlykids_shop_scroll_hint_seen', 'true');
+    const {
+        coins,
+        purchaseItem,
+        equipItem,
+        unequipItem,
+        isOwned,
+        isSubscribed,
+        equippedFrame,
+        equippedAvatar,
+        equippedHat,
+        equippedBody,
+        equippedLeftArm,
+        equippedRightArm,
+        equippedLegs,
+        equippedAnimation,
+        equippedLeftArmRotation,
+        equippedRightArmRotation,
+        equippedLegsRotation,
+        setPartRotation,
+        leftArmOffset, rightArmOffset, legsOffset, headOffset, bodyOffset, hatOffset,
+        setPartOffset,
+        leftArmScale, rightArmScale, legsScale, headScale, bodyScale, hatScale,
+        setPartScale,
+        swapArms,
+        savedCharacters,
+        saveCurrentCharacter,
+        deleteSavedCharacter,
+        equipSavedCharacter
+    } = useUser();
+
+    if (!isOpen) return null;
+
+    const handleBuy = (item: ShopItem) => {
+        purchaseItem(item);
     };
 
-    container.addEventListener('scroll', handleScroll, { once: true });
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [showScrollHint]);
-  
-  const [isMenuMinimized, setIsMenuMinimized] = useState(false);
-  const [isBuilderMode, setIsBuilderMode] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [selectedPart, setSelectedPart] = useState<'leftArm' | 'rightArm' | 'legs' | 'head' | 'body' | 'hat' | null>(null);
-  const [isSavedFeedback, setIsSavedFeedback] = useState(false);
-  const [showScrollHint, setShowScrollHint] = useState(false);
-  const tabsContainerRef = useRef<HTMLDivElement>(null);
+    const handleEquip = (item: ShopItem) => {
+        equipItem(item.type, item.value);
+        if (item.type === 'animation') {
+            setIsPlaying(true); // Auto play preview
+        }
+    };
 
-  const { 
-      coins, 
-      purchaseItem, 
-      equipItem, 
-      unequipItem, 
-      isOwned, 
-      isSubscribed,
-      equippedFrame, 
-      equippedAvatar,
-      equippedHat,
-      equippedBody,
-      equippedLeftArm,
-      equippedRightArm,
-      equippedLegs,
-      equippedAnimation,
-      equippedLeftArmRotation,
-      equippedRightArmRotation,
-      equippedLegsRotation,
-      setPartRotation,
-      leftArmOffset, rightArmOffset, legsOffset, headOffset, bodyOffset, hatOffset,
-      setPartOffset,
-      leftArmScale, rightArmScale, legsScale, headScale, bodyScale, hatScale,
-      setPartScale,
-      swapArms,
-      savedCharacters,
-      saveCurrentCharacter,
-      deleteSavedCharacter,
-      equipSavedCharacter
-  } = useUser();
+    const handleUnequip = (type: ShopItem['type']) => {
+        unequipItem(type);
+    };
 
-  if (!isOpen) return null;
+    const handleQuickSave = () => {
+        saveCurrentCharacter();
+        setIsPlaying(false); // Stop animation on save to prevent weirdness
+        setIsSavedFeedback(true);
+        setTimeout(() => setIsSavedFeedback(false), 1500);
+    };
 
-  const handleBuy = (item: ShopItem) => {
-    purchaseItem(item);
-  };
+    const isBodyEquipped = !!equippedBody;
 
-  const handleEquip = (item: ShopItem) => {
-    equipItem(item.type, item.value);
-    if (item.type === 'animation') {
-        setIsPlaying(true); // Auto play preview
-    }
-  };
+    const handleCardClick = (item: ShopItem) => {
+        if (isOwned(item.id)) {
+            if (item.type === 'voice') {
+                // Voices don't need to be equipped, they're just unlocked
+                return;
+            }
+            if (isEquipped(item)) {
+                // Animations cannot be unequipped to null, only swapped
+                if (item.type !== 'animation') {
+                    handleUnequip(item.type);
+                }
+            } else {
+                const isLimb = ['leftArm', 'rightArm', 'legs'].includes(item.type);
+                if (isLimb && !isBodyEquipped) return;
+                handleEquip(item);
+            }
+        } else if (item.isPremium && !isSubscribed) {
+            // Premium voices require subscription
+            onClose();
+            navigate('/paywall');
+        } else if (item.type === 'voice') {
+            // Handle voice purchase
+            if (item.isPremium && isSubscribed) {
+                // Premium voices are free for subscribed users
+                handleBuy(item);
+            } else if (item.price > 0 && coins >= item.price) {
+                // Coin-purchasable voices
+                handleBuy(item);
+            }
+        }
+    };
 
-  const handleUnequip = (type: ShopItem['type']) => {
-      unequipItem(type);
-  };
+    const getActiveItems = () => {
+        switch (activeTab) {
+            case 'head': return SHOP_AVATARS;
+            case 'hat': return SHOP_HATS;
+            case 'body': return SHOP_BODIES;
+            case 'arms': return SHOP_ARMS;
+            case 'legs': return SHOP_LEGS;
+            case 'moves': return SHOP_ANIMATIONS;
+            case 'voices': return availableVoices;
+            case 'saves': return []; // Handled separately
+            default: return [];
+        }
+    };
 
-  const handleQuickSave = () => {
-    saveCurrentCharacter();
-    setIsPlaying(false); // Stop animation on save to prevent weirdness
-    setIsSavedFeedback(true);
-    setTimeout(() => setIsSavedFeedback(false), 1500);
-  };
+    const isEquipped = (item: ShopItem) => {
+        switch (item.type) {
+            case 'avatar': return equippedAvatar === item.value;
+            case 'hat': return equippedHat === item.value;
+            case 'body': return equippedBody === item.value;
+            case 'leftArm': return equippedLeftArm === item.value;
+            case 'rightArm': return equippedRightArm === item.value;
+            case 'legs': return equippedLegs === item.value;
+            case 'animation': return equippedAnimation === item.value;
+            case 'voice': return false; // Voices don't have an "equipped" state
+            default: return false;
+        }
+    };
 
-  const isBodyEquipped = !!equippedBody;
+    // --- BUILDER CONTROLS LOGIC ---
+    const handlePartClick = (part: 'leftArm' | 'rightArm' | 'legs' | 'head' | 'body' | 'hat') => {
+        if (isBuilderMode) {
+            setSelectedPart(part);
+        }
+    };
 
-  const handleCardClick = (item: ShopItem) => {
-      if (isOwned(item.id)) {
-          if (item.type === 'voice') {
-              // Voices don't need to be equipped, they're just unlocked
-              return;
-          }
-          if (isEquipped(item)) {
-             // Animations cannot be unequipped to null, only swapped
-             if (item.type !== 'animation') {
-                 handleUnequip(item.type);
-             }
-          } else {
-             const isLimb = ['leftArm', 'rightArm', 'legs'].includes(item.type);
-             if (isLimb && !isBodyEquipped) return; 
-             handleEquip(item);
-          }
-      } else if (item.isPremium && !isSubscribed) {
-          // Premium voices require subscription
-          onClose();
-          navigate('/paywall');
-      } else if (item.type === 'voice') {
-          // Handle voice purchase
-          if (item.isPremium && isSubscribed) {
-              // Premium voices are free for subscribed users
-              handleBuy(item);
-          } else if (item.price > 0 && coins >= item.price) {
-              // Coin-purchasable voices
-              handleBuy(item);
-          }
-      }
-  };
+    const updateOffset = (axis: 'x' | 'y', delta: number) => {
+        if (!selectedPart) return;
 
-  const getActiveItems = () => {
-      switch(activeTab) {
-          case 'head': return SHOP_AVATARS;
-          case 'hat': return SHOP_HATS;
-          case 'body': return SHOP_BODIES;
-          case 'arms': return SHOP_ARMS;
-          case 'legs': return SHOP_LEGS;
-          case 'moves': return SHOP_ANIMATIONS;
-          case 'voices': return availableVoices;
-          case 'saves': return []; // Handled separately
-          default: return [];
-      }
-  };
+        let currentVal = 0;
+        if (selectedPart === 'leftArm') currentVal = leftArmOffset[axis];
+        else if (selectedPart === 'rightArm') currentVal = rightArmOffset[axis];
+        else if (selectedPart === 'legs') currentVal = legsOffset[axis];
+        else if (selectedPart === 'head') currentVal = headOffset[axis];
+        else if (selectedPart === 'body') currentVal = bodyOffset[axis];
+        else if (selectedPart === 'hat') currentVal = hatOffset[axis];
 
-  const isEquipped = (item: ShopItem) => {
-      switch(item.type) {
-          case 'avatar': return equippedAvatar === item.value;
-          case 'hat': return equippedHat === item.value;
-          case 'body': return equippedBody === item.value;
-          case 'leftArm': return equippedLeftArm === item.value;
-          case 'rightArm': return equippedRightArm === item.value;
-          case 'legs': return equippedLegs === item.value;
-          case 'animation': return equippedAnimation === item.value;
-          case 'voice': return false; // Voices don't have an "equipped" state
-          default: return false;
-      }
-  };
+        const minVal = -50;
+        const maxVal = axis === 'y' ? 120 : 100;
+        const next = Math.max(minVal, Math.min(maxVal, currentVal + delta));
+        setPartOffset(selectedPart, axis, next);
+    };
 
-  // --- BUILDER CONTROLS LOGIC ---
-  const handlePartClick = (part: 'leftArm' | 'rightArm' | 'legs' | 'head' | 'body' | 'hat') => {
-      if (isBuilderMode) {
-          setSelectedPart(part);
-      }
-  };
+    const updateRotation = (delta: number) => {
+        if (!selectedPart) return;
+        let current = 0;
+        if (selectedPart === 'leftArm') current = equippedLeftArmRotation;
+        if (selectedPart === 'rightArm') current = equippedRightArmRotation;
+        if (selectedPart === 'legs') current = equippedLegsRotation;
 
-  const updateOffset = (axis: 'x' | 'y', delta: number) => {
-      if (!selectedPart) return;
-      
-      let currentVal = 0;
-      if (selectedPart === 'leftArm') currentVal = leftArmOffset[axis];
-      else if (selectedPart === 'rightArm') currentVal = rightArmOffset[axis];
-      else if (selectedPart === 'legs') currentVal = legsOffset[axis];
-      else if (selectedPart === 'head') currentVal = headOffset[axis];
-      else if (selectedPart === 'body') currentVal = bodyOffset[axis];
-      else if (selectedPart === 'hat') currentVal = hatOffset[axis];
+        let next = current + delta;
+        if (next > 180) next = 180;
+        if (next < -180) next = -180;
+        setPartRotation(selectedPart, next);
+    };
 
-      const minVal = -50;
-      const maxVal = axis === 'y' ? 120 : 100;
-      const next = Math.max(minVal, Math.min(maxVal, currentVal + delta)); 
-      setPartOffset(selectedPart, axis, next);
-  };
+    const updateScale = (delta: number) => {
+        if (!selectedPart) return;
 
-  const updateRotation = (delta: number) => {
-      if (!selectedPart) return;
-      let current = 0;
-      if (selectedPart === 'leftArm') current = equippedLeftArmRotation;
-      if (selectedPart === 'rightArm') current = equippedRightArmRotation;
-      if (selectedPart === 'legs') current = equippedLegsRotation;
+        let currentScale = 1;
+        if (selectedPart === 'leftArm') currentScale = leftArmScale;
+        else if (selectedPart === 'rightArm') currentScale = rightArmScale;
+        else if (selectedPart === 'legs') currentScale = legsScale;
+        else if (selectedPart === 'head') currentScale = headScale;
+        else if (selectedPart === 'body') currentScale = bodyScale;
+        else if (selectedPart === 'hat') currentScale = hatScale;
 
-      let next = current + delta;
-      if (next > 180) next = 180;
-      if (next < -180) next = -180;
-      setPartRotation(selectedPart, next);
-  };
+        const step = 0.1; // 10% increments
+        const next = currentScale + (delta * step);
+        setPartScale(selectedPart, next);
+    };
 
-  const updateScale = (delta: number) => {
-      if (!selectedPart) return;
-      
-      let currentScale = 1;
-      if (selectedPart === 'leftArm') currentScale = leftArmScale;
-      else if (selectedPart === 'rightArm') currentScale = rightArmScale;
-      else if (selectedPart === 'legs') currentScale = legsScale;
-      else if (selectedPart === 'head') currentScale = headScale;
-      else if (selectedPart === 'body') currentScale = bodyScale;
-      else if (selectedPart === 'hat') currentScale = hatScale;
+    const renderItem = (item: ShopItem) => {
+        const owned = isOwned(item.id);
+        const equipped = isEquipped(item);
+        const isLimb = ['leftArm', 'rightArm', 'legs'].includes(item.type);
+        const isDisabled = isLimb && !isBodyEquipped;
+        const isLocked = item.isPremium && !isSubscribed;
 
-      const step = 0.1; // 10% increments
-      const next = currentScale + (delta * step);
-      setPartScale(selectedPart, next);
-  };
-
-  const renderItem = (item: ShopItem) => {
-    const owned = isOwned(item.id);
-    const equipped = isEquipped(item);
-    const isLimb = ['leftArm', 'rightArm', 'legs'].includes(item.type);
-    const isDisabled = isLimb && !isBodyEquipped;
-    const isLocked = item.isPremium && !isSubscribed;
-
-    return (
-        <div 
-            key={item.id} 
-            onClick={() => handleCardClick(item)}
-            className={`bg-[#3E1F07] rounded-xl p-3 border-2 border-[#5c2e0b] shadow-lg flex flex-col items-center group ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-[#d4a373]'} relative transition-colors`}
-        >
-            {/* Item Preview Box */}
-            <div className={`w-20 h-20 rounded-xl bg-[#f3e5ab] mb-3 overflow-hidden shadow-inner relative flex items-center justify-center ${item.type === 'frame' ? item.value + ' border-[6px] rounded-full' : 'border-2 border-[#eecaa0]/30'} ${isLocked ? 'grayscale opacity-70' : ''}`}>
-                {item.type === 'avatar' && (
-                    AVATAR_ASSETS[item.value] ? (
-                        <div className="w-[90%] h-[90%]">
-                            <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
-                                {AVATAR_ASSETS[item.value]}
-                            </svg>
-                        </div>
-                    ) : (
-                        <img src={item.value} alt={item.name} className="w-full h-full object-cover" />
-                    )
-                )}
-                {item.type === 'animation' && (
-                    <div className="flex flex-col items-center justify-center text-[#8B4513]">
-                        <Activity size={32} className="animate-pulse" />
-                    </div>
-                )}
-                {item.type === 'voice' && (
-                    <>
-                        {(item as any).characterImage ? (
-                            <img 
-                                src={(item as any).characterImage} 
-                                alt={item.name}
-                                className="w-full h-full object-cover rounded-lg"
-                            />
-                        ) : (
-                            <div className="flex flex-col items-center justify-center text-[#8B4513]">
-                                <Mic size={32} className="text-[#8B4513]" />
+        return (
+            <div
+                key={item.id}
+                onClick={() => handleCardClick(item)}
+                className={`bg-[#3E1F07] rounded-xl p-3 border-2 border-[#5c2e0b] shadow-lg flex flex-col items-center group ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-[#d4a373]'} relative transition-colors`}
+            >
+                {/* Item Preview Box */}
+                <div className={`w-20 h-20 rounded-xl bg-[#f3e5ab] mb-3 overflow-hidden shadow-inner relative flex items-center justify-center ${item.type === 'frame' ? item.value + ' border-[6px] rounded-full' : 'border-2 border-[#eecaa0]/30'} ${isLocked ? 'grayscale opacity-70' : ''}`}>
+                    {item.type === 'avatar' && (
+                        AVATAR_ASSETS[item.value] ? (
+                            <div className="w-[90%] h-[90%]">
+                                <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
+                                    {AVATAR_ASSETS[item.value]}
+                                </svg>
                             </div>
-                        )}
-                    </>
-                )}
-                {(['hat', 'body', 'leftArm', 'rightArm', 'legs'].includes(item.type)) && AVATAR_ASSETS[item.value] && (
-                    <svg viewBox="0 0 100 100" className="w-full h-full p-2 overflow-visible">
-                        {AVATAR_ASSETS[item.value]}
-                    </svg>
-                )}
-                {isDisabled && !isLocked && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-[1px]">
-                       <span className="text-white font-bold text-[8px] uppercase text-center px-1">Needs Body</span>
-                    </div>
-                )}
-                {isLocked && (
-                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[1px]">
-                         <Crown size={36} className="text-[#FFD700] drop-shadow-md mb-1" fill="#B8860B" />
-                         <span className="text-[#FFD700] text-[8px] font-extrabold uppercase tracking-wide bg-black/60 px-1.5 py-0.5 rounded-full">Locked</span>
-                    </div>
-                )}
-            </div>
-
-            <h3 className="text-white font-display font-bold text-xs mb-2 text-center leading-tight h-8 flex items-center justify-center">{item.name}</h3>
-            
-            {/* Action Buttons */}
-            {isLocked ? (
-                <WoodButton
-                    variant="gold"
-                    fullWidth
-                    className="text-[10px] py-1.5 flex items-center justify-center gap-1 border border-[#B8860B] shadow-[0_2px_0_#8B4513]"
-                    onClick={(e) => { e.stopPropagation(); onClose(); navigate('/paywall'); }}
-                >
-                    <Crown size={10} fill="currentColor" /> PREMIUM
-                </WoodButton>
-            ) : owned ? (
-                <div className="flex w-full gap-1">
-                    {equipped ? (
-                         <button 
-                            onClick={(e) => { 
-                                e.stopPropagation(); 
-                                if (item.type !== 'animation') handleUnequip(item.type); 
-                            }}
-                            disabled={item.type === 'animation'} // Can't unequip animation, must swap
-                            className={`flex-1 bg-[#2e7d32] text-white font-bold text-[10px] py-1.5 rounded-lg flex items-center justify-center gap-1 border border-white/20 shadow-inner ${item.type !== 'animation' ? 'hover:bg-[#d32f2f] group-hover:content-["UNEQUIP"]' : ''}`}
-                         >
-                            <Check size={12} /> 
-                            {item.type === 'animation' ? <span>ACTIVE</span> : (
-                                <>
-                                    <span className="group-hover:hidden">ON</span> 
-                                    <span className="hidden group-hover:block"><Trash2 size={10} /></span>
-                                </>
+                        ) : (
+                            <img src={item.value} alt={item.name} className="w-full h-full object-cover" />
+                        )
+                    )}
+                    {item.type === 'animation' && (
+                        <div className="flex flex-col items-center justify-center text-[#8B4513]">
+                            <Activity size={32} className="animate-pulse" />
+                        </div>
+                    )}
+                    {item.type === 'voice' && (
+                        <>
+                            {(item as any).characterImage ? (
+                                <img
+                                    src={(item as any).characterImage}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover rounded-lg"
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center text-[#8B4513]">
+                                    <Mic size={32} className="text-[#8B4513]" />
+                                </div>
                             )}
-                        </button>
-                    ) : (
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); handleEquip(item); }}
-                            disabled={isDisabled}
-                            className={`flex-1 font-bold text-[10px] py-1.5 rounded-lg flex items-center justify-center gap-1 shadow-[0_2px_0_rgba(0,0,0,0.2)] active:translate-y-[2px] active:shadow-none transition-all ${isDisabled ? 'bg-gray-400 text-gray-800 cursor-not-allowed' : 'bg-[#f3e5ab] hover:bg-[#fff5cc] text-[#5c2e0b] shadow-[0_2px_0_#d4a373]'}`}
-                        >
-                            {isDisabled ? 'NEED BODY' : 'WEAR'}
-                        </button>
+                        </>
+                    )}
+                    {(['hat', 'body', 'leftArm', 'rightArm', 'legs'].includes(item.type)) && AVATAR_ASSETS[item.value] && (
+                        <svg viewBox="0 0 100 100" className="w-full h-full p-2 overflow-visible">
+                            {AVATAR_ASSETS[item.value]}
+                        </svg>
+                    )}
+                    {isDisabled && !isLocked && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-[1px]">
+                            <span className="text-white font-bold text-[8px] uppercase text-center px-1">Needs Body</span>
+                        </div>
+                    )}
+                    {isLocked && (
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[1px]">
+                            <Crown size={36} className="text-[#FFD700] drop-shadow-md mb-1" fill="#B8860B" />
+                            <span className="text-[#FFD700] text-[8px] font-extrabold uppercase tracking-wide bg-black/60 px-1.5 py-0.5 rounded-full">Locked</span>
+                        </div>
                     )}
                 </div>
-            ) : (
-                <WoodButton 
-                    variant="primary" 
-                    fullWidth 
-                    className={`text-[10px] py-1.5 ${(coins < item.price || isDisabled) ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
-                    onClick={(e) => { e.stopPropagation(); handleBuy(item); }}
-                    disabled={coins < item.price || isDisabled}
-                >
-                    {isDisabled ? 'NEED BODY' : item.price === 0 ? 'FREE' : `${item.price} gold`}
-                </WoodButton>
-            )}
-        </div>
-    );
-  };
 
-  const renderSavedCharacter = (character: SavedCharacter) => (
-      <div key={character.id} className="bg-[#3E1F07] rounded-xl p-2 border-2 border-[#5c2e0b] shadow-lg relative group">
-          {/* Unstyled wrapper, Compositor handles frame */}
-          <div className="w-full aspect-square relative overflow-hidden mb-2">
-               <div className="w-full h-full transform scale-75 translate-y-2">
-                   <AvatarCompositor 
+                <h3 className="text-white font-display font-bold text-xs mb-2 text-center leading-tight h-8 flex items-center justify-center">{item.name}</h3>
+
+                {/* Action Buttons */}
+                {isLocked ? (
+                    <WoodButton
+                        variant="gold"
+                        fullWidth
+                        className="text-[10px] py-1.5 flex items-center justify-center gap-1 border border-[#B8860B] shadow-[0_2px_0_#8B4513]"
+                        onClick={(e) => { e.stopPropagation(); onClose(); navigate('/paywall'); }}
+                    >
+                        <Crown size={10} fill="currentColor" /> PREMIUM
+                    </WoodButton>
+                ) : owned ? (
+                    <div className="flex w-full gap-1">
+                        {equipped ? (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (item.type !== 'animation') handleUnequip(item.type);
+                                }}
+                                disabled={item.type === 'animation'} // Can't unequip animation, must swap
+                                className={`flex-1 bg-[#2e7d32] text-white font-bold text-[10px] py-1.5 rounded-lg flex items-center justify-center gap-1 border border-white/20 shadow-inner ${item.type !== 'animation' ? 'hover:bg-[#d32f2f] group-hover:content-["UNEQUIP"]' : ''}`}
+                            >
+                                <Check size={12} />
+                                {item.type === 'animation' ? <span>ACTIVE</span> : (
+                                    <>
+                                        <span className="group-hover:hidden">ON</span>
+                                        <span className="hidden group-hover:block"><Trash2 size={10} /></span>
+                                    </>
+                                )}
+                            </button>
+                        ) : (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handleEquip(item); }}
+                                disabled={isDisabled}
+                                className={`flex-1 font-bold text-[10px] py-1.5 rounded-lg flex items-center justify-center gap-1 shadow-[0_2px_0_rgba(0,0,0,0.2)] active:translate-y-[2px] active:shadow-none transition-all ${isDisabled ? 'bg-gray-400 text-gray-800 cursor-not-allowed' : 'bg-[#f3e5ab] hover:bg-[#fff5cc] text-[#5c2e0b] shadow-[0_2px_0_#d4a373]'}`}
+                            >
+                                {isDisabled ? 'NEED BODY' : 'WEAR'}
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <WoodButton
+                        variant="primary"
+                        fullWidth
+                        className={`text-[10px] py-1.5 ${(coins < item.price || isDisabled) ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
+                        onClick={(e) => { e.stopPropagation(); handleBuy(item); }}
+                        disabled={coins < item.price || isDisabled}
+                    >
+                        {isDisabled ? 'NEED BODY' : item.price === 0 ? 'FREE' : `${item.price} gold`}
+                    </WoodButton>
+                )}
+            </div>
+        );
+    };
+
+    const renderSavedCharacter = (character: SavedCharacter) => (
+        <div key={character.id} className="bg-[#3E1F07] rounded-xl p-2 border-2 border-[#5c2e0b] shadow-lg relative group">
+            {/* Unstyled wrapper, Compositor handles frame */}
+            <div className="w-full aspect-square relative overflow-hidden mb-2">
+                <div className="w-full h-full transform scale-75 translate-y-2">
+                    <AvatarCompositor
                         headUrl={character.avatar}
                         hat={character.hat}
                         body={character.body}
@@ -598,223 +599,223 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
                         rightArmOffset={character.rightArmOffset}
                         legsOffset={character.legsOffset}
                         frameClass="border-[#8B4513]" // Default frame for saved view
-                   />
-               </div>
-          </div>
-          <h3 className="text-white text-xs font-bold text-center mb-2 truncate px-1">{character.name}</h3>
-          
-          <div className="flex gap-1">
-              <button 
-                onClick={() => equipSavedCharacter(character)}
-                className="flex-1 bg-[#2e7d32] hover:bg-[#388e3c] text-white text-[10px] font-bold py-1.5 rounded flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-transform"
-              >
-                  <Check size={10} /> WEAR
-              </button>
-              <button 
-                onClick={() => deleteSavedCharacter(character.id)}
-                className="w-8 bg-[#d32f2f] hover:bg-[#e53935] text-white rounded flex items-center justify-center shadow-sm active:scale-95 transition-transform"
-              >
-                  <Trash2 size={12} />
-              </button>
-          </div>
-      </div>
-  );
-
-  const renderTab = (id: ShopTab, label: string) => (
-    <button 
-        id={`shop-tab-${id}`}
-        onClick={() => {
-            setActiveTab(id);
-            document.getElementById(`shop-tab-${id}`)?.scrollIntoView({ 
-                behavior: 'smooth', 
-                inline: 'center', 
-                block: 'nearest' 
-            });
-        }}
-        className={`flex-shrink-0 px-4 py-2 rounded-xl font-display font-bold text-sm transition-all whitespace-nowrap z-10 relative ${activeTab === id ? 'bg-[#8B4513] text-[#FFD700] shadow-md border border-[#FFD700]/20' : 'text-[#8B4513] hover:bg-[#3E1F07]/10'}`}
-    >
-        {label}
-    </button>
-  );
-
-  const content = (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 pointer-events-auto">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
-        onClick={onClose}
-      ></div>
-
-      {/* Main Shop Card */}
-      <div className="relative w-full max-w-md h-[90vh] bg-[#f3e5ab] rounded-3xl border-4 border-[#8B4513] shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-5 overflow-hidden flex flex-col">
-          
-          {/* Header */}
-          <div className="bg-[#5c2e0b] p-4 flex justify-between items-center border-b-4 border-[#3E1F07] relative z-10 shadow-md shrink-0">
-             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#8B4513] rounded-full flex items-center justify-center border-2 border-[#CD853F] shadow-md">
-                    <ShoppingBag size={20} className="text-[#FFD700]" />
+                    />
                 </div>
-                <div className="leading-tight">
-                    <h2 className="font-display font-bold text-white text-lg tracking-wide">Builder Shop</h2>
-                    <span className="text-[#eecaa0] text-[10px] font-bold uppercase tracking-wider">Create your monster!</span>
+            </div>
+            <h3 className="text-white text-xs font-bold text-center mb-2 truncate px-1">{character.name}</h3>
+
+            <div className="flex gap-1">
+                <button
+                    onClick={() => equipSavedCharacter(character)}
+                    className="flex-1 bg-[#2e7d32] hover:bg-[#388e3c] text-white text-[10px] font-bold py-1.5 rounded flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-transform"
+                >
+                    <Check size={10} /> WEAR
+                </button>
+                <button
+                    onClick={() => deleteSavedCharacter(character.id)}
+                    className="w-8 bg-[#d32f2f] hover:bg-[#e53935] text-white rounded flex items-center justify-center shadow-sm active:scale-95 transition-transform"
+                >
+                    <Trash2 size={12} />
+                </button>
+            </div>
+        </div>
+    );
+
+    const renderTab = (id: ShopTab, label: string) => (
+        <button
+            id={`shop-tab-${id}`}
+            onClick={() => {
+                setActiveTab(id);
+                document.getElementById(`shop-tab-${id}`)?.scrollIntoView({
+                    behavior: 'smooth',
+                    inline: 'center',
+                    block: 'nearest'
+                });
+            }}
+            className={`flex-shrink-0 px-4 py-2 rounded-xl font-display font-bold text-sm transition-all whitespace-nowrap z-10 relative ${activeTab === id ? 'bg-[#8B4513] text-[#FFD700] shadow-md border border-[#FFD700]/20' : 'text-[#8B4513] hover:bg-[#3E1F07]/10'}`}
+        >
+            {label}
+        </button>
+    );
+
+    const content = (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 pointer-events-auto">
+            {/* Backdrop */}
+            <div
+                className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
+                onClick={onClose}
+            ></div>
+
+            {/* Main Shop Card */}
+            <div className="relative w-full max-w-md h-[90vh] bg-[#f3e5ab] rounded-3xl border-4 border-[#8B4513] shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-5 overflow-hidden flex flex-col">
+
+                {/* Header */}
+                <div className="bg-[#5c2e0b] p-4 flex justify-between items-center border-b-4 border-[#3E1F07] relative z-10 shadow-md shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-[#8B4513] rounded-full flex items-center justify-center border-2 border-[#CD853F] shadow-md">
+                            <ShoppingBag size={20} className="text-[#FFD700]" />
+                        </div>
+                        <div className="leading-tight">
+                            <h2 className="font-display font-bold text-white text-lg tracking-wide">Builder Shop</h2>
+                            <span className="text-[#eecaa0] text-[10px] font-bold uppercase tracking-wider">Create your monster!</span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-full border border-[#FFD700]/30 shadow-inner">
+                        <div className="w-5 h-5 rounded-full bg-[#FFD700] border border-[#B8860B] flex items-center justify-center text-[#B8860B] font-bold text-[10px]">$</div>
+                        <span className="text-[#FFD700] font-bold font-display text-lg">{coins}</span>
+                    </div>
+
+                    <button onClick={onClose} className="ml-2 text-[#eecaa0] hover:text-white active:scale-95 transition-transform">
+                        <X size={24} />
+                    </button>
                 </div>
-             </div>
-             
-             <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-full border border-[#FFD700]/30 shadow-inner">
-                <div className="w-5 h-5 rounded-full bg-[#FFD700] border border-[#B8860B] flex items-center justify-center text-[#B8860B] font-bold text-[10px]">$</div>
-                <span className="text-[#FFD700] font-bold font-display text-lg">{coins}</span>
-             </div>
 
-             <button onClick={onClose} className="ml-2 text-[#eecaa0] hover:text-white active:scale-95 transition-transform">
-                <X size={24} />
-             </button>
-          </div>
+                {/* Preview Area (Live updates) */}
+                <div
+                    className={`w-full bg-[#8B4513] relative shrink-0 shadow-inner overflow-hidden flex flex-col items-center transition-all duration-500 ease-in-out ${isMenuMinimized ? 'flex-1' : 'h-[20rem] shrink-0'}`}
+                >
+                    {/* Background Pattern */}
+                    <div className="absolute inset-0 opacity-10 pointer-events-none"
+                        style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '10px 10px' }}>
+                    </div>
 
-          {/* Preview Area (Live updates) */}
-          <div 
-              className={`w-full bg-[#8B4513] relative shrink-0 shadow-inner overflow-hidden flex flex-col items-center transition-all duration-500 ease-in-out ${isMenuMinimized ? 'flex-1' : 'h-[20rem] shrink-0'}`}
-          >
-              {/* Background Pattern */}
-              <div className="absolute inset-0 opacity-10 pointer-events-none" 
-                   style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '10px 10px' }}>
-              </div>
-              
-              {/* Spotlight */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-full bg-gradient-to-b from-white/20 to-transparent pointer-events-none blur-md"></div>
+                    {/* Spotlight */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-full bg-gradient-to-b from-white/20 to-transparent pointer-events-none blur-md"></div>
 
-              {/* Toolbar: Builder Mode & Play */}
-              <div className="absolute top-4 left-4 right-4 flex justify-between z-30 pointer-events-none">
-                  <div className="flex gap-2 pointer-events-auto">
-                      <button 
-                        onClick={() => {
-                            setIsBuilderMode(!isBuilderMode);
-                            if (!isBuilderMode) setSelectedPart(null);
-                        }}
-                        className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 transition-all active:scale-95 ${isBuilderMode ? 'bg-[#FFD700] border-[#B8860B] text-[#5c2e0b]' : 'bg-black/30 border-white/20 text-white/70 hover:bg-black/50'}`}
-                      >
-                          <Wrench size={18} fill={isBuilderMode ? "currentColor" : "none"} />
-                      </button>
+                    {/* Toolbar: Builder Mode & Play */}
+                    <div className="absolute top-4 left-4 right-4 flex justify-between z-30 pointer-events-none">
+                        <div className="flex gap-2 pointer-events-auto">
+                            <button
+                                onClick={() => {
+                                    setIsBuilderMode(!isBuilderMode);
+                                    if (!isBuilderMode) setSelectedPart(null);
+                                }}
+                                className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 transition-all active:scale-95 ${isBuilderMode ? 'bg-[#FFD700] border-[#B8860B] text-[#5c2e0b]' : 'bg-black/30 border-white/20 text-white/70 hover:bg-black/50'}`}
+                            >
+                                <Wrench size={18} fill={isBuilderMode ? "currentColor" : "none"} />
+                            </button>
 
-                      {/* Swap Arms Button in Toolbar when Builder Mode is Active */}
-                      {isBuilderMode && (
-                          <button 
-                            onClick={swapArms}
-                            className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 transition-all active:scale-95 bg-[#FFD700] border-[#B8860B] text-[#5c2e0b]"
-                            title="Swap Arms"
-                          >
-                              <ArrowLeftRight size={18} />
-                          </button>
-                      )}
-                  </div>
+                            {/* Swap Arms Button in Toolbar when Builder Mode is Active */}
+                            {isBuilderMode && (
+                                <button
+                                    onClick={swapArms}
+                                    className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 transition-all active:scale-95 bg-[#FFD700] border-[#B8860B] text-[#5c2e0b]"
+                                    title="Swap Arms"
+                                >
+                                    <ArrowLeftRight size={18} />
+                                </button>
+                            )}
+                        </div>
 
-                  <div className="flex gap-2 pointer-events-auto">
-                      {/* Quick Save Button - Updated Style */}
-                      <button 
-                        onClick={handleQuickSave}
-                        className={`w-auto px-4 h-10 rounded-full flex items-center justify-center gap-2 shadow-lg border-2 transition-all active:scale-95 ${isSavedFeedback ? 'bg-green-500 border-green-600 text-white' : 'bg-[#FFD700] border-[#B8860B] text-[#5c2e0b] hover:bg-[#ffe066]'}`}
-                        title="Save Character"
-                      >
-                          {isSavedFeedback ? <Check size={18} /> : <Save size={18} />}
-                          <span className="font-display font-bold text-xs">{isSavedFeedback ? 'SAVED' : 'SAVE'}</span>
-                      </button>
+                        <div className="flex gap-2 pointer-events-auto">
+                            {/* Quick Save Button - Updated Style */}
+                            <button
+                                onClick={handleQuickSave}
+                                className={`w-auto px-4 h-10 rounded-full flex items-center justify-center gap-2 shadow-lg border-2 transition-all active:scale-95 ${isSavedFeedback ? 'bg-green-500 border-green-600 text-white' : 'bg-[#FFD700] border-[#B8860B] text-[#5c2e0b] hover:bg-[#ffe066]'}`}
+                                title="Save Character"
+                            >
+                                {isSavedFeedback ? <Check size={18} /> : <Save size={18} />}
+                                <span className="font-display font-bold text-xs">{isSavedFeedback ? 'SAVED' : 'SAVE'}</span>
+                            </button>
 
-                      {/* Play Animation */}
-                      <button 
-                        onClick={() => setIsPlaying(!isPlaying)}
-                        className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 transition-all active:scale-95 ${isPlaying ? 'bg-green-500 border-green-700 text-white' : 'bg-black/30 border-white/20 text-white/70 hover:bg-black/50'}`}
-                      >
-                          {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
-                      </button>
-                  </div>
-              </div>
+                            {/* Play Animation */}
+                            <button
+                                onClick={() => setIsPlaying(!isPlaying)}
+                                className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 transition-all active:scale-95 ${isPlaying ? 'bg-green-500 border-green-700 text-white' : 'bg-black/30 border-white/20 text-white/70 hover:bg-black/50'}`}
+                            >
+                                {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
+                            </button>
+                        </div>
+                    </div>
 
-              {/* The Compositor */}
-              <div 
-                className={`w-40 h-40 relative z-20 transition-all duration-500 ease-in-out mt-10 ${isMenuMinimized ? 'scale-125 mt-20' : ''}`}
-                onClick={() => setIsMenuMinimized(true)} 
-              >
-                   {/* Wrapper now only sizes; Compositor handles frame */}
-                   <div className="w-full h-full relative">
-                        <AvatarCompositor 
-                            headUrl={equippedAvatar}
-                            hat={equippedHat}
-                            body={equippedBody}
-                            leftArm={equippedLeftArm}
-                            rightArm={equippedRightArm}
-                            legs={equippedLegs}
-                            animationStyle={equippedAnimation} // Pass equipped animation
-                            leftArmRotation={equippedLeftArmRotation}
-                            rightArmRotation={equippedRightArmRotation}
-                            legsRotation={equippedLegsRotation}
-                            leftArmOffset={leftArmOffset}
-                            rightArmOffset={rightArmOffset}
-                            legsOffset={legsOffset}
-                            headOffset={headOffset}
-                            bodyOffset={bodyOffset}
-                            hatOffset={hatOffset}
-                            leftArmScale={leftArmScale}
-                            rightArmScale={rightArmScale}
-                            legsScale={legsScale}
-                            headScale={headScale}
-                            bodyScale={bodyScale}
-                            hatScale={hatScale}
-                            onPartClick={isBuilderMode ? handlePartClick : undefined}
-                            isAnimating={isPlaying}
-                            frameClass={equippedFrame} // Pass frame
-                        />
-                   </div>
-                   {/* Tip */}
-                   {isBuilderMode && !selectedPart && (
-                       <div className="absolute -bottom-12 left-0 right-0 text-center animate-bounce">
-                           <span className="text-[#FFD700] text-[10px] font-bold bg-black/60 px-2 py-1 rounded-full">
-                               Tap parts to edit!
-                           </span>
-                       </div>
-                   )}
-              </div>
-          </div>
+                    {/* The Compositor */}
+                    <div
+                        className={`w-40 h-40 relative z-20 transition-all duration-500 ease-in-out mt-10 ${isMenuMinimized ? 'scale-125 mt-20' : ''}`}
+                        onClick={() => setIsMenuMinimized(true)}
+                    >
+                        {/* Wrapper now only sizes; Compositor handles frame */}
+                        <div className="w-full h-full relative">
+                            <AvatarCompositor
+                                headUrl={equippedAvatar}
+                                hat={equippedHat}
+                                body={equippedBody}
+                                leftArm={equippedLeftArm}
+                                rightArm={equippedRightArm}
+                                legs={equippedLegs}
+                                animationStyle={equippedAnimation} // Pass equipped animation
+                                leftArmRotation={equippedLeftArmRotation}
+                                rightArmRotation={equippedRightArmRotation}
+                                legsRotation={equippedLegsRotation}
+                                leftArmOffset={leftArmOffset}
+                                rightArmOffset={rightArmOffset}
+                                legsOffset={legsOffset}
+                                headOffset={headOffset}
+                                bodyOffset={bodyOffset}
+                                hatOffset={hatOffset}
+                                leftArmScale={leftArmScale}
+                                rightArmScale={rightArmScale}
+                                legsScale={legsScale}
+                                headScale={headScale}
+                                bodyScale={bodyScale}
+                                hatScale={hatScale}
+                                onPartClick={isBuilderMode ? handlePartClick : undefined}
+                                isAnimating={isPlaying}
+                                frameClass={equippedFrame} // Pass frame
+                            />
+                        </div>
+                        {/* Tip */}
+                        {isBuilderMode && !selectedPart && (
+                            <div className="absolute -bottom-12 left-0 right-0 text-center animate-bounce">
+                                <span className="text-[#FFD700] text-[10px] font-bold bg-black/60 px-2 py-1 rounded-full">
+                                    Tap parts to edit!
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </div>
 
-          {/* Menu Container */}
-          <div className={`flex flex-col bg-[#f3e5ab] border-t-4 border-[#8B4513] rounded-t-3xl -mt-6 relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.4)] transition-all duration-500 ease-in-out ${isMenuMinimized ? 'h-auto shrink-0' : 'flex-1 min-h-0'}`}>
-             
-             {/* Handle Bar */}
-             <div 
-                className="w-full h-9 flex items-center justify-center cursor-pointer touch-none shrink-0 hover:bg-black/5 transition-colors rounded-t-3xl"
-                onClick={() => setIsMenuMinimized(!isMenuMinimized)}
-             >
-                <div className={`w-12 h-1.5 rounded-full bg-[#8B4513]/30 transition-all duration-300 ${isMenuMinimized ? 'rotate-0' : ''}`}></div>
-             </div>
+                {/* Menu Container */}
+                <div className={`flex flex-col bg-[#f3e5ab] border-t-4 border-[#8B4513] rounded-t-3xl -mt-6 relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.4)] transition-all duration-500 ease-in-out ${isMenuMinimized ? 'h-auto shrink-0' : 'flex-1 min-h-0'}`}>
 
-             {/* Tabs Scroller - Updated visual cues */}
-             <div className="relative w-full border-b border-[#8B4513]/20 bg-[#eecaa0]/30 shrink-0">
-                 <div className="absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-[#eecaa0] to-transparent z-20 pointer-events-none"></div>
-                 <div className="absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-[#eecaa0] to-transparent z-20 pointer-events-none"></div>
-                 
-                 <div 
-                    ref={tabsContainerRef}
-                    className="flex overflow-x-auto p-2 gap-1 no-scrollbar relative z-10 px-4"
-                 >
-                    {renderTab('head', 'HEADS')}
-                    {renderTab('hat', 'HATS')}
-                    {renderTab('body', 'BODIES')}
-                    {renderTab('arms', 'ARMS')}
-                    {renderTab('legs', 'LEGS')}
-                    {renderTab('moves', 'MOVES')}
-                    {renderTab('voices', 'VOICES')}
-                    {renderTab('saves', 'MY SAVES')}
-                 </div>
+                    {/* Handle Bar */}
+                    <div
+                        className="w-full h-9 flex items-center justify-center cursor-pointer touch-none shrink-0 hover:bg-black/5 transition-colors rounded-t-3xl"
+                        onClick={() => setIsMenuMinimized(!isMenuMinimized)}
+                    >
+                        <div className={`w-12 h-1.5 rounded-full bg-[#8B4513]/30 transition-all duration-300 ${isMenuMinimized ? 'rotate-0' : ''}`}></div>
+                    </div>
 
-                 {/* Scroll Hint Animation */}
-                 {showScrollHint && (
-                     <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none z-30 flex items-center justify-center">
-                         <div className="animate-scroll-hint">
-                             <div className="relative flex items-center gap-2">
-                                 {/* Pointing finger emoji with arrow */}
-                                 <div className="text-4xl drop-shadow-2xl">👉</div>
-                                 <div className="text-2xl text-[#FFD700] animate-pulse">→</div>
-                             </div>
-                         </div>
-                         <style>{`
+                    {/* Tabs Scroller - Updated visual cues */}
+                    <div className="relative w-full border-b border-[#8B4513]/20 bg-[#eecaa0]/30 shrink-0">
+                        <div className="absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-[#eecaa0] to-transparent z-20 pointer-events-none"></div>
+                        <div className="absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-[#eecaa0] to-transparent z-20 pointer-events-none"></div>
+
+                        <div
+                            ref={tabsContainerRef}
+                            className="flex overflow-x-auto p-2 gap-1 no-scrollbar relative z-10 px-4"
+                        >
+                            {renderTab('head', 'HEADS')}
+                            {renderTab('hat', 'HATS')}
+                            {renderTab('body', 'BODIES')}
+                            {renderTab('arms', 'ARMS')}
+                            {renderTab('legs', 'LEGS')}
+                            {renderTab('moves', 'MOVES')}
+                            {renderTab('voices', 'VOICES')}
+                            {renderTab('saves', 'MY SAVES')}
+                        </div>
+
+                        {/* Scroll Hint Animation */}
+                        {showScrollHint && (
+                            <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none z-30 flex items-center justify-center">
+                                <div className="animate-scroll-hint">
+                                    <div className="relative flex items-center gap-2">
+                                        {/* Pointing finger emoji with arrow */}
+                                        <div className="text-4xl drop-shadow-2xl">👉</div>
+                                        <div className="text-2xl text-[#FFD700] animate-pulse">→</div>
+                                    </div>
+                                </div>
+                                <style>{`
                              @keyframes scroll-hint {
                                  0%, 100% { 
                                      transform: translateX(-30px) scale(1);
@@ -837,123 +838,123 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
                                  animation: scroll-hint 2.5s ease-in-out infinite;
                              }
                          `}</style>
-                     </div>
-                 )}
-             </div>
+                            </div>
+                        )}
+                    </div>
 
-             {/* Scrollable Items Content */}
-             <div className={`overflow-y-auto p-4 bg-[#f3e5ab] relative transition-all duration-500 ${isMenuMinimized ? 'h-0 p-0 opacity-0' : 'flex-1 opacity-100'}`}>
-                 {activeTab === 'saves' ? (
-                     <div className="flex flex-col gap-4 pb-20">
-                         {/* Save Current Button */}
-                         <WoodButton 
-                            fullWidth 
-                            variant="primary"
-                            onClick={handleQuickSave}
-                            className="py-3 flex items-center justify-center gap-2 shadow-lg"
-                         >
-                             <Save size={20} /> {isSavedFeedback ? 'SAVED!' : 'SAVE CURRENT LOOK'}
-                         </WoodButton>
+                    {/* Scrollable Items Content */}
+                    <div className={`overflow-y-auto p-4 bg-[#f3e5ab] relative transition-all duration-500 ${isMenuMinimized ? 'h-0 p-0 opacity-0' : 'flex-1 opacity-100'}`}>
+                        {activeTab === 'saves' ? (
+                            <div className="flex flex-col gap-4 pb-20">
+                                {/* Save Current Button */}
+                                <WoodButton
+                                    fullWidth
+                                    variant="primary"
+                                    onClick={handleQuickSave}
+                                    className="py-3 flex items-center justify-center gap-2 shadow-lg"
+                                >
+                                    <Save size={20} /> {isSavedFeedback ? 'SAVED!' : 'SAVE CURRENT LOOK'}
+                                </WoodButton>
 
-                         <h3 className="font-display font-bold text-[#8B4513] text-sm uppercase tracking-wider border-b border-[#8B4513]/20 pb-1">
-                             Saved Characters
-                         </h3>
+                                <h3 className="font-display font-bold text-[#8B4513] text-sm uppercase tracking-wider border-b border-[#8B4513]/20 pb-1">
+                                    Saved Characters
+                                </h3>
 
-                         {savedCharacters.length === 0 ? (
-                             <div className="text-center p-8 text-[#8B4513]/60 italic">
-                                 No saved characters yet. <br/> Build something cool and save it!
-                             </div>
-                         ) : (
-                             <div className="grid grid-cols-2 gap-4">
-                                 {savedCharacters.map(renderSavedCharacter)}
-                             </div>
-                         )}
-                     </div>
-                 ) : (
-                     <div className="grid grid-cols-3 gap-3 pb-20">
-                        {getActiveItems().map(renderItem)}
-                     </div>
-                 )}
-             </div>
-          </div>
+                                {savedCharacters.length === 0 ? (
+                                    <div className="text-center p-8 text-[#8B4513]/60 italic">
+                                        No saved characters yet. <br /> Build something cool and save it!
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {savedCharacters.map(renderSavedCharacter)}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-3 gap-3 pb-20">
+                                {getActiveItems().map(renderItem)}
+                            </div>
+                        )}
+                    </div>
+                </div>
 
-          {/* Builder Controls Overlay */}
-          {isBuilderMode && selectedPart && (
-              <div className="absolute bottom-0 left-0 right-0 bg-[#2b1d13] border-t-4 border-[#8B4513] p-6 rounded-t-3xl z-50 animate-in slide-in-from-bottom-10 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-                  
-                  <div className="flex justify-between items-center mb-4">
-                       <div className="flex items-center gap-2">
-                           <div className="bg-[#FFD700] w-2 h-6 rounded-full"></div>
-                           <span className="text-white font-display font-bold text-lg uppercase tracking-wider">
-                              Adjust {selectedPart === 'legs' ? 'Legs' : selectedPart === 'leftArm' ? 'Left Arm' : selectedPart === 'rightArm' ? 'Right Arm' : selectedPart === 'head' ? 'Head' : selectedPart === 'hat' ? 'Hat' : 'Body'}
-                           </span>
-                       </div>
-                       <button 
-                          onClick={() => setSelectedPart(null)} 
-                          className="bg-white/10 p-2 rounded-full text-white/70 hover:bg-red-500 hover:text-white transition-colors"
-                       >
-                          <X size={20}/>
-                       </button>
-                  </div>
+                {/* Builder Controls Overlay */}
+                {isBuilderMode && selectedPart && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-[#2b1d13] border-t-4 border-[#8B4513] p-6 rounded-t-3xl z-50 animate-in slide-in-from-bottom-10 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
 
-                  <div className="flex justify-around items-center">
-                      <div className="flex flex-col gap-2 items-center">
-                          <span className="text-[10px] text-[#eecaa0]/60 font-bold uppercase tracking-wider">Move</span>
-                          <div className="grid grid-cols-2 gap-2">
-                              <button onClick={() => updateOffset('x', -5)} className="w-12 h-12 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><MoveHorizontal size={20} className="rotate-180" /></button>
-                              <button onClick={() => updateOffset('x', 5)} className="w-12 h-12 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><MoveHorizontal size={20} /></button>
-                              <button onClick={() => updateOffset('y', -5)} className="w-12 h-12 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><ArrowUpToLine size={20} /></button>
-                              <button onClick={() => updateOffset('y', 5)} className="w-12 h-12 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><ArrowDownToLine size={20} /></button>
-                          </div>
-                      </div>
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-2">
+                                <div className="bg-[#FFD700] w-2 h-6 rounded-full"></div>
+                                <span className="text-white font-display font-bold text-lg uppercase tracking-wider">
+                                    Adjust {selectedPart === 'legs' ? 'Legs' : selectedPart === 'leftArm' ? 'Left Arm' : selectedPart === 'rightArm' ? 'Right Arm' : selectedPart === 'head' ? 'Head' : selectedPart === 'hat' ? 'Hat' : 'Body'}
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => setSelectedPart(null)}
+                                className="bg-white/10 p-2 rounded-full text-white/70 hover:bg-red-500 hover:text-white transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
 
-                      {/* Rotation Controls (Not for Head/Body/Hat) */}
-                      {selectedPart !== 'head' && selectedPart !== 'body' && selectedPart !== 'hat' && (
-                          <>
-                              <div className="w-px h-24 bg-white/10"></div>
+                        <div className="flex justify-around items-center">
+                            <div className="flex flex-col gap-2 items-center">
+                                <span className="text-[10px] text-[#eecaa0]/60 font-bold uppercase tracking-wider">Move</span>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button onClick={() => updateOffset('x', -5)} className="w-12 h-12 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><MoveHorizontal size={20} className="rotate-180" /></button>
+                                    <button onClick={() => updateOffset('x', 5)} className="w-12 h-12 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><MoveHorizontal size={20} /></button>
+                                    <button onClick={() => updateOffset('y', -5)} className="w-12 h-12 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><ArrowUpToLine size={20} /></button>
+                                    <button onClick={() => updateOffset('y', 5)} className="w-12 h-12 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><ArrowDownToLine size={20} /></button>
+                                </div>
+                            </div>
 
-                              <div className="flex flex-col gap-2 items-center">
-                                  <span className="text-[10px] text-[#eecaa0]/60 font-bold uppercase tracking-wider">Rotate</span>
-                                  <div className="flex gap-2 h-full items-center">
-                                      <button onClick={() => updateRotation(-15)} className="w-14 h-14 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><RotateCcw size={24} /></button>
-                                      <button onClick={() => updateRotation(15)} className="w-14 h-14 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><RotateCw size={24} /></button>
-                                  </div>
-                              </div>
-                          </>
-                      )}
+                            {/* Rotation Controls (Not for Head/Body/Hat) */}
+                            {selectedPart !== 'head' && selectedPart !== 'body' && selectedPart !== 'hat' && (
+                                <>
+                                    <div className="w-px h-24 bg-white/10"></div>
 
-                      {/* Scale Controls (All Parts) */}
-                      <div className="w-px h-24 bg-white/10"></div>
+                                    <div className="flex flex-col gap-2 items-center">
+                                        <span className="text-[10px] text-[#eecaa0]/60 font-bold uppercase tracking-wider">Rotate</span>
+                                        <div className="flex gap-2 h-full items-center">
+                                            <button onClick={() => updateRotation(-15)} className="w-14 h-14 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><RotateCcw size={24} /></button>
+                                            <button onClick={() => updateRotation(15)} className="w-14 h-14 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center"><RotateCw size={24} /></button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
 
-                      <div className="flex flex-col gap-2 items-center">
-                          <span className="text-[10px] text-[#eecaa0]/60 font-bold uppercase tracking-wider">Scale</span>
-                          <div className="flex gap-2 h-full items-center">
-                              <button onClick={() => updateScale(-1)} className="w-14 h-14 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center" title="Make Smaller"><ZoomOut size={24} /></button>
-                              <button onClick={() => updateScale(1)} className="w-14 h-14 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center" title="Make Bigger"><ZoomIn size={24} /></button>
-                          </div>
-                          {/* Display current scale percentage */}
-                          <span className="text-[10px] text-[#eecaa0] font-bold mt-1">
-                              {(() => {
-                                  let currentScale = 1;
-                                  if (selectedPart === 'leftArm') currentScale = leftArmScale;
-                                  else if (selectedPart === 'rightArm') currentScale = rightArmScale;
-                                  else if (selectedPart === 'legs') currentScale = legsScale;
-                                  else if (selectedPart === 'head') currentScale = headScale;
-                                  else if (selectedPart === 'body') currentScale = bodyScale;
-                                  else if (selectedPart === 'hat') currentScale = hatScale;
-                                  return `${Math.round(currentScale * 100)}%`;
-                              })()}
-                          </span>
-                      </div>
-                  </div>
-              </div>
-          )}
+                            {/* Scale Controls (All Parts) */}
+                            <div className="w-px h-24 bg-white/10"></div>
 
-      </div>
-    </div>
-  );
+                            <div className="flex flex-col gap-2 items-center">
+                                <span className="text-[10px] text-[#eecaa0]/60 font-bold uppercase tracking-wider">Scale</span>
+                                <div className="flex gap-2 h-full items-center">
+                                    <button onClick={() => updateScale(-1)} className="w-14 h-14 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center" title="Make Smaller"><ZoomOut size={24} /></button>
+                                    <button onClick={() => updateScale(1)} className="w-14 h-14 bg-[#3E1F07] rounded-xl text-[#eecaa0] hover:bg-[#5c2e0b] active:scale-95 border-b-4 border-[#2a1505] active:border-b-0 active:translate-y-1 flex items-center justify-center" title="Make Bigger"><ZoomIn size={24} /></button>
+                                </div>
+                                {/* Display current scale percentage */}
+                                <span className="text-[10px] text-[#eecaa0] font-bold mt-1">
+                                    {(() => {
+                                        let currentScale = 1;
+                                        if (selectedPart === 'leftArm') currentScale = leftArmScale;
+                                        else if (selectedPart === 'rightArm') currentScale = rightArmScale;
+                                        else if (selectedPart === 'legs') currentScale = legsScale;
+                                        else if (selectedPart === 'head') currentScale = headScale;
+                                        else if (selectedPart === 'body') currentScale = bodyScale;
+                                        else if (selectedPart === 'hat') currentScale = hatScale;
+                                        return `${Math.round(currentScale * 100)}%`;
+                                    })()}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
-  return createPortal(content, document.body);
+            </div>
+        </div>
+    );
+
+    return createPortal(content, document.body);
 };
 
 export default ShopModal;
