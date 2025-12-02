@@ -121,9 +121,18 @@ const BookReaderPage: React.FC = () => {
 
     // Use ref to track music enabled state for intervals/callbacks
     const bookMusicEnabledRef = useRef<boolean>(bookMusicEnabled);
+    // Use ref to track volume for intervals/callbacks (avoid stale closure)
+    const bookMusicVolumeRef = useRef<number>(bookMusicVolume);
     useEffect(() => {
         bookMusicEnabledRef.current = bookMusicEnabled;
     }, [bookMusicEnabled]);
+    useEffect(() => {
+        bookMusicVolumeRef.current = bookMusicVolume;
+        // Also update the actual audio element when volume changes
+        if (bookBackgroundMusicRef.current) {
+            bookBackgroundMusicRef.current.volume = bookMusicVolume;
+        }
+    }, [bookMusicVolume]);
 
     const [hasBookMusic, setHasBookMusic] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
@@ -249,6 +258,8 @@ const BookReaderPage: React.FC = () => {
             killAllAudio();
             // Ensure book music continues playing if it should be
             if (bookBackgroundMusicRef.current && bookMusicEnabledRef.current && bookBackgroundMusicRef.current.paused) {
+                // Always apply current volume before playing
+                bookBackgroundMusicRef.current.volume = bookMusicVolumeRef.current;
                 bookBackgroundMusicRef.current.play().catch(() => {
                     // Ignore play errors - might be user interaction required
                 });
@@ -261,6 +272,8 @@ const BookReaderPage: React.FC = () => {
                     killAllAudio();
                     // Keep book music playing
                     if (bookBackgroundMusicRef.current && bookMusicEnabledRef.current && bookBackgroundMusicRef.current.paused) {
+                        // Always apply current volume before playing
+                        bookBackgroundMusicRef.current.volume = bookMusicVolumeRef.current;
                         bookBackgroundMusicRef.current.play().catch(() => { });
                     }
                 }, 200);
@@ -288,14 +301,16 @@ const BookReaderPage: React.FC = () => {
 
                         const audio = new Audio(musicUrl);
                         audio.loop = true;
-                        audio.volume = bookMusicVolume; // Use slider volume (default 0.5 = 50%)
+                        audio.volume = bookMusicVolumeRef.current; // Use ref to get current volume
                         audio.preload = 'auto';
                         bookBackgroundMusicRef.current = audio;
 
                         // Start playing book music automatically when loaded
                         audio.addEventListener('canplaythrough', () => {
                             if (bookMusicEnabledRef.current) {
-                                console.log('🎵 Book music ready - starting playback');
+                                // Apply current volume before playing
+                                audio.volume = bookMusicVolumeRef.current;
+                                console.log('🎵 Book music ready - starting playback at volume:', bookMusicVolumeRef.current);
                                 audio.play().catch(err => {
                                     console.warn('⚠️ Book music auto-play prevented:', err);
                                 });
@@ -1179,8 +1194,8 @@ const BookReaderPage: React.FC = () => {
 
                                     if (bookBackgroundMusicRef.current) {
                                         if (newState) {
-                                            // Update volume when playing
-                                            bookBackgroundMusicRef.current.volume = bookMusicVolume;
+                                            // Update volume when playing (use ref for current value)
+                                            bookBackgroundMusicRef.current.volume = bookMusicVolumeRef.current;
                                             bookBackgroundMusicRef.current.play().catch(err => {
                                                 console.warn('Could not play book music:', err);
                                             });
