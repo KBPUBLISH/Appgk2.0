@@ -117,22 +117,13 @@ const BookReaderPage: React.FC = () => {
     const desiredScrollStateRef = useRef<boolean | null>(null); // Track desired scroll state for next page turn
     const showScrollRef = useRef<boolean>(true); // Track scroll state to avoid closure issues
     const [bookMusicEnabled, setBookMusicEnabled] = useState(true); // Default to enabled
-    const [bookMusicVolume, setBookMusicVolume] = useState(0.5); // Default to 50% (halfway)
+    const BOOK_MUSIC_VOLUME = 0.3; // Hardcoded at 30% volume
 
     // Use ref to track music enabled state for intervals/callbacks
     const bookMusicEnabledRef = useRef<boolean>(bookMusicEnabled);
-    // Use ref to track volume for intervals/callbacks (avoid stale closure)
-    const bookMusicVolumeRef = useRef<number>(bookMusicVolume);
     useEffect(() => {
         bookMusicEnabledRef.current = bookMusicEnabled;
     }, [bookMusicEnabled]);
-    useEffect(() => {
-        bookMusicVolumeRef.current = bookMusicVolume;
-        // Also update the actual audio element when volume changes
-        if (bookBackgroundMusicRef.current) {
-            bookBackgroundMusicRef.current.volume = bookMusicVolume;
-        }
-    }, [bookMusicVolume]);
 
     const [hasBookMusic, setHasBookMusic] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
@@ -259,7 +250,7 @@ const BookReaderPage: React.FC = () => {
             // Ensure book music continues playing if it should be
             if (bookBackgroundMusicRef.current && bookMusicEnabledRef.current && bookBackgroundMusicRef.current.paused) {
                 // Always apply current volume before playing
-                bookBackgroundMusicRef.current.volume = bookMusicVolumeRef.current;
+                bookBackgroundMusicRef.current.volume = BOOK_MUSIC_VOLUME;
                 bookBackgroundMusicRef.current.play().catch(() => {
                     // Ignore play errors - might be user interaction required
                 });
@@ -273,7 +264,7 @@ const BookReaderPage: React.FC = () => {
                     // Keep book music playing
                     if (bookBackgroundMusicRef.current && bookMusicEnabledRef.current && bookBackgroundMusicRef.current.paused) {
                         // Always apply current volume before playing
-                        bookBackgroundMusicRef.current.volume = bookMusicVolumeRef.current;
+                        bookBackgroundMusicRef.current.volume = BOOK_MUSIC_VOLUME;
                         bookBackgroundMusicRef.current.play().catch(() => { });
                     }
                 }, 200);
@@ -301,7 +292,7 @@ const BookReaderPage: React.FC = () => {
 
                         const audio = new Audio(musicUrl);
                         audio.loop = true;
-                        audio.volume = bookMusicVolumeRef.current; // Use ref to get current volume
+                        audio.volume = BOOK_MUSIC_VOLUME; // Use ref to get current volume
                         audio.preload = 'auto';
                         bookBackgroundMusicRef.current = audio;
 
@@ -309,8 +300,8 @@ const BookReaderPage: React.FC = () => {
                         audio.addEventListener('canplaythrough', () => {
                             if (bookMusicEnabledRef.current) {
                                 // Apply current volume before playing
-                                audio.volume = bookMusicVolumeRef.current;
-                                console.log('🎵 Book music ready - starting playback at volume:', bookMusicVolumeRef.current);
+                                audio.volume = BOOK_MUSIC_VOLUME;
+                                console.log('🎵 Book music ready - starting playback at volume:', BOOK_MUSIC_VOLUME);
                                 audio.play().catch(err => {
                                     console.warn('⚠️ Book music auto-play prevented:', err);
                                 });
@@ -560,10 +551,12 @@ const BookReaderPage: React.FC = () => {
 
                     // Check if book is completed (reached "The End" page)
                     if (nextIndex >= pages.length - 1) {
-                        // Increment read count when book is completed
+                        // Increment read count when book is completed (local)
                         readCountService.incrementReadCount(bookId);
                         // Mark book as permanently completed (unlocks games forever)
                         bookCompletionService.markBookCompleted(bookId);
+                        // Increment global read count in database
+                        ApiService.incrementBookReadCount(bookId);
                     }
                 }
             }, 1500); // Slightly after 1.4s animation completes
@@ -969,6 +962,8 @@ const BookReaderPage: React.FC = () => {
                                     readCountService.incrementReadCount(bookId);
                                     // Mark book as permanently completed (unlocks games forever)
                                     bookCompletionService.markBookCompleted(bookId);
+                                    // Increment global read count in database
+                                    ApiService.incrementBookReadCount(bookId);
                                 }
                             } else if (isAutoPlayingRef.current) {
                                 console.log('⏸️ Auto-play: Already processing, skipping');
@@ -1045,6 +1040,8 @@ const BookReaderPage: React.FC = () => {
                                 readCountService.incrementReadCount(bookId);
                                 // Mark book as permanently completed (unlocks games forever)
                                 bookCompletionService.markBookCompleted(bookId);
+                                // Increment global read count in database
+                                ApiService.incrementBookReadCount(bookId);
                             }
                         } else if (isAutoPlayingRef.current) {
                             console.log('⏸️ Auto-play: Already processing, skipping');
@@ -1195,7 +1192,7 @@ const BookReaderPage: React.FC = () => {
                                     if (bookBackgroundMusicRef.current) {
                                         if (newState) {
                                             // Update volume when playing (use ref for current value)
-                                            bookBackgroundMusicRef.current.volume = bookMusicVolumeRef.current;
+                                            bookBackgroundMusicRef.current.volume = BOOK_MUSIC_VOLUME;
                                             bookBackgroundMusicRef.current.play().catch(err => {
                                                 console.warn('Could not play book music:', err);
                                             });
@@ -1213,61 +1210,6 @@ const BookReaderPage: React.FC = () => {
                                 <Music className={`w-6 h-6 ${bookMusicEnabled ? 'text-yellow-300' : 'text-white/50'}`} />
                             </button>
                             
-                            {/* Volume Slider - Only show when music is enabled */}
-                            {bookMusicEnabled && (
-                                <div 
-                                    className="flex items-center gap-2 bg-black/50 backdrop-blur-md rounded-full px-3 py-2 border border-white/20"
-                                    onClick={(e) => e.stopPropagation()}
-                                    onTouchStart={(e) => e.stopPropagation()}
-                                    onTouchMove={(e) => e.stopPropagation()}
-                                    onTouchEnd={(e) => e.stopPropagation()}
-                                >
-                                    <Volume2 className="w-4 h-4 text-white/70" />
-                                    <input
-                                        type="range"
-                                        min="0"
-                                        max="1"
-                                        step="0.05"
-                                        value={bookMusicVolume}
-                                        onChange={(e) => {
-                                            e.stopPropagation();
-                                            const newVolume = parseFloat(e.target.value);
-                                            setBookMusicVolume(newVolume);
-                                            if (bookBackgroundMusicRef.current) {
-                                                bookBackgroundMusicRef.current.volume = newVolume;
-                                            }
-                                        }}
-                                        onInput={(e) => {
-                                            e.stopPropagation();
-                                            const newVolume = parseFloat((e.target as HTMLInputElement).value);
-                                            setBookMusicVolume(newVolume);
-                                            if (bookBackgroundMusicRef.current) {
-                                                bookBackgroundMusicRef.current.volume = newVolume;
-                                            }
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        onTouchStart={(e) => e.stopPropagation()}
-                                        onTouchMove={(e) => e.stopPropagation()}
-                                        onTouchEnd={(e) => e.stopPropagation()}
-                                        className="w-24 h-2 bg-white/30 rounded-full appearance-none cursor-pointer touch-none
-                                            [&::-webkit-slider-thumb]:appearance-none
-                                            [&::-webkit-slider-thumb]:w-5
-                                            [&::-webkit-slider-thumb]:h-5
-                                            [&::-webkit-slider-thumb]:rounded-full
-                                            [&::-webkit-slider-thumb]:bg-yellow-400
-                                            [&::-webkit-slider-thumb]:shadow-md
-                                            [&::-webkit-slider-thumb]:cursor-pointer
-                                            [&::-moz-range-thumb]:w-5
-                                            [&::-moz-range-thumb]:h-5
-                                            [&::-moz-range-thumb]:rounded-full
-                                            [&::-moz-range-thumb]:bg-yellow-400
-                                            [&::-moz-range-thumb]:border-0
-                                            [&::-moz-range-thumb]:cursor-pointer"
-                                        title={`Volume: ${Math.round(bookMusicVolume * 100)}%`}
-                                    />
-                                    <span className="text-white/60 text-xs min-w-[28px]">{Math.round(bookMusicVolume * 100)}%</span>
-                                </div>
-                            )}
                         </>
                     ) : (
                         <div className="text-xs text-white/50 px-2">

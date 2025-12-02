@@ -552,7 +552,7 @@ const LessonPlayerPage: React.FC = () => {
                     {/* Content */}
                     <div className="flex-1 overflow-y-auto">
                         {currentScreen === 'devotional' && (
-                            <div className="h-full flex flex-col p-4 relative overflow-hidden"
+                            <div className="h-full flex flex-col p-4 relative"
                                 style={{
                                     backgroundColor: '#8B4513',
                                     backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 50px, rgba(0,0,0,0.1) 50px, rgba(0,0,0,0.1) 53px), 
@@ -565,11 +565,11 @@ const LessonPlayerPage: React.FC = () => {
                                 <div className="absolute bottom-4 right-4 w-3 h-3 rounded-full bg-[#4a2810] shadow-inner opacity-60"></div>
                                 
                                 {/* Audio Controls - Wood style */}
-                                <div className="mb-6 flex justify-center items-center gap-3 relative z-10">
+                                <div className="mb-6 flex justify-center items-center gap-3 relative z-50">
                                     {/* Voice Selector */}
                                     <div
                                         ref={voiceDropdownRef}
-                                        className="relative"
+                                        className="relative z-[200]"
                                         onClick={(e) => e.stopPropagation()}
                                     >
                                         <button
@@ -589,7 +589,7 @@ const LessonPlayerPage: React.FC = () => {
 
                                         {/* Dropdown Menu - opens BELOW the button */}
                                         {showVoiceDropdown && (
-                                            <div className="absolute top-full left-0 mt-2 bg-[#5D4037] rounded-lg border-2 border-[#3E2723] shadow-xl z-[100] max-h-[300px] overflow-y-auto min-w-[220px]">
+                                            <div className="absolute top-full left-0 mt-2 bg-[#5D4037] rounded-lg border-2 border-[#3E2723] shadow-xl z-[9999] max-h-[300px] overflow-y-auto min-w-[220px]">
                                                 <div className="py-2">
                                                     {/* Unlocked Voices Section - show first */}
                                                     {voices.filter(v => isVoiceUnlocked(v.voice_id)).length > 0 && (

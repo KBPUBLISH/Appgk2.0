@@ -988,6 +988,87 @@ export const ApiService = {
     }
   },
 
+  // Increment book read count (called when user completes reading a book)
+  incrementBookReadCount: async (bookId: string): Promise<number | null> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetchWithTimeout(`${baseUrl}books/${bookId}/read`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`📖 Book read count incremented to ${data.readCount}`);
+        return data.readCount;
+      }
+      return null;
+    } catch (error) {
+      console.warn('⚠️ Could not increment book read count:', error);
+      return null;
+    }
+  },
+
+  // Update book favorite count
+  updateBookFavoriteCount: async (bookId: string, action: 'add' | 'remove'): Promise<number | null> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetchWithTimeout(`${baseUrl}books/${bookId}/favorite`, {
+        method: 'POST',
+        body: JSON.stringify({ action }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`❤️ Book favorite count: ${data.favoriteCount}`);
+        return data.favoriteCount;
+      }
+      return null;
+    } catch (error) {
+      console.warn('⚠️ Could not update book favorite count:', error);
+      return null;
+    }
+  },
+
+  // Increment playlist play count
+  incrementPlaylistPlayCount: async (playlistId: string): Promise<number | null> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetchWithTimeout(`${baseUrl}playlists/${playlistId}/play`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`🎵 Playlist play count: ${data.playCount}`);
+        return data.playCount;
+      }
+      return null;
+    } catch (error) {
+      console.warn('⚠️ Could not increment playlist play count:', error);
+      return null;
+    }
+  },
+
+  // Increment individual song/episode play count
+  incrementItemPlayCount: async (playlistId: string, itemId: string): Promise<{ itemPlayCount: number; playlistPlayCount: number } | null> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetchWithTimeout(`${baseUrl}playlists/${playlistId}/items/${itemId}/play`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`🎵 Song play count: ${data.itemPlayCount}, Playlist total: ${data.playlistPlayCount}`);
+        return data;
+      }
+      return null;
+    } catch (error) {
+      console.warn('⚠️ Could not increment item play count:', error);
+      return null;
+    }
+  },
+
   // Get all playlists (optionally filtered by status)
   getPlaylists: async (status?: 'draft' | 'published'): Promise<any[]> => {
     try {

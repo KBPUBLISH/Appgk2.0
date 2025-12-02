@@ -266,6 +266,17 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setIsPlaying(true);
         // Ensure background music is paused when playlist starts
         setMusicPaused(true);
+        
+        // Increment play count in database
+        const playlistId = (playlist as any)._id || (playlist as any).id;
+        const track = playlist.items[startIndex];
+        const trackId = (track as any)._id || (track as any).id;
+        
+        if (playlistId && trackId) {
+            ApiService.incrementItemPlayCount(playlistId, trackId);
+        } else if (playlistId) {
+            ApiService.incrementPlaylistPlayCount(playlistId);
+        }
     }, []);
 
     const togglePlayPause = useCallback(() => {
