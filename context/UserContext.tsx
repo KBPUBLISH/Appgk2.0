@@ -38,11 +38,27 @@ export interface CoinTransaction {
   timestamp: number;
 }
 
+// Generate a fun, easy-to-remember referral code
+const generateReferralCode = (): string => {
+  const adjectives = ['HAPPY', 'BRAVE', 'KIND', 'WISE', 'JOYFUL', 'BLESSED', 'FAITHFUL', 'LOVING'];
+  const nouns = ['STAR', 'HEART', 'LION', 'ANGEL', 'LIGHT', 'HOPE', 'GRACE', 'PEACE'];
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  const num = Math.floor(Math.random() * 100);
+  return `${adj}${noun}${num}`;
+};
+
 interface UserContextType {
   coins: number;
   addCoins: (amount: number, reason?: string, source?: CoinTransaction['source']) => void;
   spendCoins: (amount: number, reason?: string) => boolean;
   coinTransactions: CoinTransaction[];
+  
+  // Referral System
+  referralCode: string;
+  redeemedCodes: string[];
+  redeemCode: (code: string) => { success: boolean; message: string };
+  
   ownedItems: string[];
   
   // Unlocked Voices
@@ -123,6 +139,9 @@ const UserContext = createContext<UserContextType>({
   addCoins: () => {},
   spendCoins: () => false,
   coinTransactions: [],
+  referralCode: '',
+  redeemedCodes: [],
+  redeemCode: () => ({ success: false, message: '' }),
   ownedItems: [],
   unlockedVoices: [],
   unlockVoice: () => {},
@@ -194,6 +213,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [coins, setCoins] = useState(saved?.coins ?? 2650); // Start with 2650 for testing
   const [coinTransactions, setCoinTransactions] = useState<CoinTransaction[]>(saved?.coinTransactions ?? []);
+  const [referralCode] = useState<string>(saved?.referralCode ?? generateReferralCode());
+  const [redeemedCodes, setRedeemedCodes] = useState<string[]>(saved?.redeemedCodes ?? []);
   const [ownedItems, setOwnedItems] = useState<string[]>(saved?.ownedItems ?? ['f1', 'anim1']); // anim1 is default breathe
   const [unlockedVoices, setUnlockedVoices] = useState<string[]>(saved?.unlockedVoices ?? []); // Voices unlocked by user
   
@@ -301,6 +322,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const stateToSave = {
       coins,
       coinTransactions,
+      referralCode,
+      redeemedCodes,
       ownedItems,
       unlockedVoices,
       parentName,
@@ -335,7 +358,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
   }, [
-    coins, coinTransactions, ownedItems, unlockedVoices, parentName, kids, currentProfileId,
+    coins, coinTransactions, referralCode, redeemedCodes, ownedItems, unlockedVoices, parentName, kids, currentProfileId,
       equippedAvatar, equippedFrame, equippedHat, equippedBody,
     equippedLeftArm, equippedRightArm, equippedLegs, equippedAnimation,
     equippedLeftArmRotation, equippedRightArmRotation, equippedLegsRotation,
@@ -375,6 +398,33 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     setCoinTransactions(prev => [transaction, ...prev].slice(0, 100));
     return true;
+  };
+
+  const redeemCode = (code: string): { success: boolean; message: string } => {
+    const normalizedCode = code.trim().toUpperCase();
+    
+    // Check if it's their own code
+    if (normalizedCode === referralCode) {
+      return { success: false, message: "You can't use your own code, silly! 😄" };
+    }
+    
+    // Check if already redeemed
+    if (redeemedCodes.includes(normalizedCode)) {
+      return { success: false, message: "You've already used this code!" };
+    }
+    
+    // For now, accept any code that matches our format (WORD+WORD+NUMBER)
+    // In production, this would validate against a backend
+    const codePattern = /^[A-Z]+[A-Z]+\d+$/;
+    if (!codePattern.test(normalizedCode)) {
+      return { success: false, message: "Hmm, that doesn't look like a valid code. Try again!" };
+    }
+    
+    // Redeem successful!
+    setRedeemedCodes(prev => [...prev, normalizedCode]);
+    addCoins(100, `Referral from friend`, 'referral');
+    
+    return { success: true, message: "🎉 Awesome! You earned 100 gold coins!" };
   };
 
   const addKid = (kid: KidProfile) => {
@@ -757,6 +807,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resetUser = () => {
     setCoins(2650);
     setCoinTransactions([]);
+    setRedeemedCodes([]);
     setOwnedItems(['f1', 'anim1']);
     setUnlockedVoices([]);
     setParentName('');
@@ -819,6 +870,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addCoins,
       spendCoins,
       coinTransactions,
+      referralCode,
+      redeemedCodes,
+      redeemCode,
       ownedItems,
       unlockedVoices,
       unlockVoice,
