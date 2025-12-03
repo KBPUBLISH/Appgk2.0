@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Crown, Music, Hammer, Wrench } from 'lucide-react';
+import { Crown, Music, Coins } from 'lucide-react';
 const ShopModal = lazy(() => import('../features/ShopModal'));
 import AvatarDetailModal from '../features/AvatarDetailModal';
 import { useUser } from '../../context/UserContext';
@@ -157,6 +157,26 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
                   className={displayMusicEnabled ? "text-[#FFD700]" : "text-white/50"}
                   fill={displayMusicEnabled ? "#FFD700" : "none"}
                 />
+              </button>
+
+              {/* Gold Coins Display */}
+              <button
+                onClick={() => setIsShopOpen(true)}
+                className="bg-gradient-to-b from-[#FFD700] to-[#DAA520] px-2.5 py-1.5 rounded-lg border-2 border-[#B8860B] shadow-[0_3px_0_#8B6914,inset_0_1px_0_rgba(255,255,255,0.4)] active:translate-y-[2px] active:shadow-none transition-all flex items-center gap-1.5 group"
+                title="Your Gold Coins - Click to visit Shop"
+              >
+                {/* Coin Icon */}
+                <div className="relative">
+                  <div className="w-5 h-5 bg-gradient-to-br from-[#FFE55C] to-[#DAA520] rounded-full border border-[#B8860B] shadow-inner flex items-center justify-center">
+                    <span className="text-[#8B6914] font-black text-[10px]">G</span>
+                  </div>
+                  {/* Shine effect */}
+                  <div className="absolute top-0.5 left-0.5 w-1.5 h-1.5 bg-white/50 rounded-full"></div>
+                </div>
+                {/* Coin Count */}
+                <span className="text-[#5c2e0b] font-display font-black text-sm tracking-wide drop-shadow-[0_1px_0_rgba(255,255,255,0.3)] group-hover:text-[#3e1f07] transition-colors">
+                  {coins.toLocaleString()}
+                </span>
               </button>
 
               {/* Shop Sign Button */}
