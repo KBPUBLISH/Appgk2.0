@@ -125,9 +125,8 @@ const SignInPage: React.FC = () => {
 
     // Attempt sign-up and wait for result before navigating
     try {
-      const result = await ApiService.signUp(signUpEmail, signUpPassword, {
-        firstName: 'User' // Temporary, will be updated during onboarding
-      });
+      // Don't send firstName - backend will generate unique username from email
+      const result = await ApiService.signUp(signUpEmail, signUpPassword);
       
       if (result.success) {
         console.log('✅ SignInPage: Sign up successful!');
