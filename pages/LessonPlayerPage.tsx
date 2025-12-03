@@ -782,7 +782,8 @@ const LessonPlayerPage: React.FC = () => {
                                         {lesson.devotional.content && (
                                             <div className="mb-6 relative z-10">
                                                 <div className="text-[#3E2723] text-xl md:text-2xl leading-relaxed whitespace-pre-line font-medium font-serif">
-                                                    {lesson.devotional.content}
+                                                    {/* Clean content to remove emotional prompts like [happy] for display */}
+                                                    {lesson.devotional.content.replace(/\[.*?\]/g, '')}
                                                 </div>
                                             </div>
                                         )}
