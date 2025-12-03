@@ -440,16 +440,58 @@ export const ApiService = {
       if (response.ok) {
         const data = await response.json();
         const booksArray = Array.isArray(data) ? data : (data.books || data.data || []);
-        return transformBooks(booksArray).slice(0, 3);
+        return transformBooks(booksArray);
       }
 
       // Fallback to getting all books and slicing
       const books = await ApiService.getBooks();
-      return books.slice(0, 3);
+      return books.slice(0, 5);
     } catch (error) {
       console.warn("Failed to fetch featured books, using fallback:", error);
       const books = await ApiService.getBooks();
-      return books.slice(0, 3);
+      return books.slice(0, 5);
+    }
+  },
+
+  getFeaturedPlaylists: async (): Promise<Playlist[]> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetchWithTimeout(`${baseUrl}playlists/featured`, {
+        method: 'GET',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return Array.isArray(data) ? data : (data.playlists || data.data || []);
+      }
+
+      return [];
+    } catch (error) {
+      console.warn("Failed to fetch featured playlists:", error);
+      return [];
+    }
+  },
+
+  getFeaturedContent: async (): Promise<Array<Book | Playlist>> => {
+    try {
+      const [featuredBooks, featuredPlaylists] = await Promise.all([
+        ApiService.getFeaturedBooks(),
+        ApiService.getFeaturedPlaylists(),
+      ]);
+
+      // Combine and sort by featuredOrder
+      const combined = [
+        ...featuredBooks.map(b => ({ ...b, _itemType: 'book' as const })),
+        ...featuredPlaylists.map(p => ({ ...p, _itemType: 'playlist' as const })),
+      ];
+
+      // Sort by featuredOrder (lower = first)
+      combined.sort((a, b) => ((a as any).featuredOrder || 0) - ((b as any).featuredOrder || 0));
+
+      return combined;
+    } catch (error) {
+      console.warn("Failed to fetch featured content:", error);
+      return [];
     }
   },
 

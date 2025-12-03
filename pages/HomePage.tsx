@@ -55,6 +55,10 @@ const HomePage: React.FC = () => {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [playlistsLoading, setPlaylistsLoading] = useState(true);
+  
+  // Featured content state
+  const [featuredContent, setFeaturedContent] = useState<any[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
@@ -163,11 +167,12 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // Fetch lessons, categories, and playlists
+  // Fetch lessons, categories, playlists, and featured content
   useEffect(() => {
     fetchLessons();
     fetchExploreCategories();
     fetchPlaylists();
+    fetchFeaturedContent();
   }, []);
 
   const fetchLessons = async () => {
@@ -275,6 +280,20 @@ const HomePage: React.FC = () => {
     }
   };
 
+  // Fetch featured content for carousel
+  const fetchFeaturedContent = async () => {
+    try {
+      setFeaturedLoading(true);
+      const data = await ApiService.getFeaturedContent();
+      console.log('⭐ Featured content loaded:', data.length, 'items');
+      setFeaturedContent(data);
+    } catch (error) {
+      console.error('❌ Error fetching featured content:', error);
+    } finally {
+      setFeaturedLoading(false);
+    }
+  };
+
   // Group books and playlists by category
   const getBooksByCategory = (categoryName: string) => {
     const matchedBooks = books.filter(book => {
@@ -319,7 +338,14 @@ const HomePage: React.FC = () => {
       }));
   };
 
-  const featuredBooks = books.slice(0, 5); // Top 5 featured
+  // Use manually selected featured content, or fallback to first 5 books
+  const featuredBooks = featuredContent.length > 0 
+    ? featuredContent.map(item => ({
+        ...item,
+        id: item._id || item.id,
+        coverUrl: item.coverImage || (item as any).files?.coverImage || '',
+      }))
+    : books.slice(0, 5);
 
   return (
     <div
@@ -459,7 +485,16 @@ const HomePage: React.FC = () => {
 
         {/* Featured Carousel */}
         {!loading && featuredBooks.length > 0 && (
-          <FeaturedCarousel books={featuredBooks} onBookClick={handleBookClick} />
+          <FeaturedCarousel 
+            books={featuredBooks} 
+            onBookClick={(id, isPlaylist) => {
+              if (isPlaylist) {
+                navigate(`/audio/playlist/${id}`);
+              } else {
+                handleBookClick(id);
+              }
+            }} 
+          />
         )}
 
         {/* Daily Lessons Section */}
