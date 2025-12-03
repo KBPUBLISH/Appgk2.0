@@ -607,77 +607,136 @@ const OnboardingPage: React.FC = () => {
           </div>
         )}
 
-        {/* --- STEP 4: PAYWALL / DEAL --- */}
+        {/* --- STEP 4: PAYWALL / VALUE PROPOSITION --- */}
         {step === 4 && (
             <div className="w-full max-w-md px-4 animate-in slide-in-from-right-10 duration-500 pb-10">
                  
-                 {/* Main Card */}
-                <div className="bg-white/90 backdrop-blur-md rounded-[2rem] p-6 shadow-2xl border-4 border-[#FFD700] flex flex-col items-center text-center relative">
+                 {/* Hero Section */}
+                 <div className="text-center mb-6">
+                    <div className="inline-block bg-gradient-to-r from-[#FFD700] to-[#FFA500] px-4 py-1.5 rounded-full mb-3 animate-pulse">
+                      <span className="text-[#3E1F07] font-extrabold text-sm">🎁 3-DAY FREE TRIAL</span>
+                    </div>
+                    <h2 className="text-white font-display font-extrabold text-2xl leading-tight mb-2">
+                      Sunday School<br/>
+                      <span className="text-[#FFD700]">In Your Pocket</span>
+                    </h2>
+                    <p className="text-[#eecaa0] text-sm">
+                      The #1 Christian app for kids. Trusted by thousands of families.
+                    </p>
+                 </div>
+                 
+                 {/* Value Proposition Cards */}
+                 <div className="space-y-3 mb-6">
+                    {/* Animated Books */}
+                    <div className="bg-gradient-to-r from-[#3E1F07] to-[#5c2e0b] rounded-xl p-4 border border-[#8B4513] flex items-start gap-3">
+                      <div className="text-3xl">📚</div>
+                      <div>
+                        <h3 className="text-white font-bold text-sm">Interactive Animated Books</h3>
+                        <p className="text-[#eecaa0] text-xs">Choose from 10+ voice narrators, word-by-word highlighting, and beautiful video backgrounds</p>
+                      </div>
+                    </div>
                     
-                    {/* Best Value Badge */}
-                    <div className="absolute -top-4 bg-gradient-to-r from-[#d32f2f] to-[#c62828] text-white px-4 py-1 rounded-full font-bold shadow-md text-xs uppercase tracking-widest border-2 border-white transform rotate-2">
-                        Special Launch Offer
+                    {/* Games */}
+                    <div className="bg-gradient-to-r from-[#3E1F07] to-[#5c2e0b] rounded-xl p-4 border border-[#8B4513] flex items-start gap-3">
+                      <div className="text-3xl">🎮</div>
+                      <div>
+                        <h3 className="text-white font-bold text-sm">Faith-Building Games</h3>
+                        <p className="text-[#eecaa0] text-xs">Memory games, daily challenges, and quizzes that make learning Scripture fun</p>
+                      </div>
+                    </div>
+                    
+                    {/* Gamification */}
+                    <div className="bg-gradient-to-r from-[#3E1F07] to-[#5c2e0b] rounded-xl p-4 border border-[#8B4513] flex items-start gap-3">
+                      <div className="text-3xl">⭐</div>
+                      <div>
+                        <h3 className="text-white font-bold text-sm">Rewards & Achievements</h3>
+                        <p className="text-[#eecaa0] text-xs">Earn gold coins, unlock voices, customize avatars - kids stay motivated to learn!</p>
+                      </div>
+                    </div>
+                    
+                    {/* Audio */}
+                    <div className="bg-gradient-to-r from-[#3E1F07] to-[#5c2e0b] rounded-xl p-4 border border-[#8B4513] flex items-start gap-3">
+                      <div className="text-3xl">🎵</div>
+                      <div>
+                        <h3 className="text-white font-bold text-sm">Screen-Free Listening</h3>
+                        <p className="text-[#eecaa0] text-xs">Worship music, audio adventures, and Bible stories for car rides & bedtime</p>
+                      </div>
+                    </div>
+                 </div>
+                 
+                 {/* Perfect For Section */}
+                 <div className="bg-[#FFD700]/10 rounded-xl p-4 mb-6 border border-[#FFD700]/30">
+                    <h3 className="text-[#FFD700] font-bold text-sm text-center mb-3">✨ Perfect For</h3>
+                    <div className="flex justify-center gap-2 flex-wrap">
+                      <span className="bg-white/10 text-white text-xs px-3 py-1 rounded-full">Homeschool Families</span>
+                      <span className="bg-white/10 text-white text-xs px-3 py-1 rounded-full">Christian Parents</span>
+                      <span className="bg-white/10 text-white text-xs px-3 py-1 rounded-full">Car Rides</span>
+                      <span className="bg-white/10 text-white text-xs px-3 py-1 rounded-full">Bedtime Stories</span>
+                      <span className="bg-white/10 text-white text-xs px-3 py-1 rounded-full">Screen Time Alternative</span>
+                    </div>
+                 </div>
+                 
+                 {/* Main Card */}
+                <div className="bg-white/95 backdrop-blur-md rounded-[2rem] p-5 shadow-2xl border-4 border-[#FFD700] flex flex-col items-center text-center relative">
+                    
+                    {/* Try Free Badge */}
+                    <div className="absolute -top-4 bg-gradient-to-r from-[#4CAF50] to-[#45a049] text-white px-4 py-1 rounded-full font-bold shadow-md text-xs uppercase tracking-wider border-2 border-white">
+                        Try Everything Free
                     </div>
 
-                    <h2 className="text-[#3E1F07] font-display font-extrabold text-3xl leading-none mb-2 mt-2">
-                        Unlock Everything
-                    </h2>
-                    <p className="text-[#5c2e0b] font-sans font-medium text-sm mb-6 opacity-80">
-                        Give your kids unlimited access to faith-filled adventures.
+                    <p className="text-[#5c2e0b] font-sans font-semibold text-xs mb-4 mt-2 opacity-80">
+                        100% ad-free. Cancel anytime during trial.
                     </p>
 
                     {/* Pricing Options */}
-                    <div className="w-full space-y-3 mb-6">
+                    <div className="w-full space-y-2 mb-4">
                         {/* Annual Option */}
                         <div 
                             onClick={() => setSelectedPlan('annual')}
-                            className={`relative w-full rounded-2xl border-2 overflow-hidden cursor-pointer transition-all ${
+                            className={`relative w-full rounded-xl border-2 overflow-hidden cursor-pointer transition-all ${
                                 selectedPlan === 'annual' 
                                 ? 'bg-[#fff8e1] border-[#FFD700] shadow-md scale-[1.02] ring-1 ring-[#FFD700]' 
                                 : 'bg-gray-50 border-gray-200'
                             }`}
                         >
-                            <div className="absolute top-0 right-0 bg-[#FFD700] text-[#3E1F07] text-[10px] font-extrabold px-3 py-1 rounded-bl-lg">
-                                BEST VALUE
+                            <div className="absolute top-0 right-0 bg-[#FFD700] text-[#3E1F07] text-[9px] font-extrabold px-2 py-0.5 rounded-bl-lg">
+                                SAVE 44%
                             </div>
-                            <div className="px-4 py-4 flex items-center justify-between">
-                                <div className="flex flex-col text-left">
-                                    <span className="font-display font-bold text-lg text-[#3E1F07]">Annual Plan</span>
-                                    <span className="text-xs text-[#8B4513]">$1.54 / week</span>
+                            <div className="px-4 py-3 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === 'annual' ? 'bg-[#FFD700] border-[#FFD700]' : 'border-gray-300'}`}>
+                                      {selectedPlan === 'annual' && <Check size={12} className="text-[#3E1F07]" strokeWidth={4} />}
+                                    </div>
+                                    <div className="text-left">
+                                        <span className="font-display font-bold text-sm text-[#3E1F07]">Annual</span>
+                                        <span className="text-[10px] text-[#8B4513] block">$1.54/week after trial</span>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col items-end pr-2">
-                                        <span className="font-display font-extrabold text-2xl text-[#3E1F07]">$79.99</span>
-                                </div>
+                                <span className="font-display font-extrabold text-xl text-[#3E1F07]">$79.99<span className="text-xs font-normal">/yr</span></span>
                             </div>
-                            {selectedPlan === 'annual' && (
-                                <div className="absolute top-1/2 -translate-y-1/2 left-3 bg-[#FFD700] rounded-full p-0.5">
-                                    <Check size={12} className="text-[#3E1F07]" strokeWidth={4} />
-                                </div>
-                            )}
                         </div>
 
                         {/* Monthly Option */}
                         <div 
                             onClick={() => setSelectedPlan('monthly')}
-                            className={`relative w-full rounded-2xl border-2 overflow-hidden cursor-pointer transition-all ${
+                            className={`relative w-full rounded-xl border-2 overflow-hidden cursor-pointer transition-all ${
                                 selectedPlan === 'monthly' 
                                 ? 'bg-[#fff8e1] border-[#FFD700] shadow-md scale-[1.02]' 
                                 : 'bg-gray-50 border-gray-200'
                             }`}
                         >
-                             <div className="px-4 py-4 flex items-center justify-between">
-                                <div className="flex flex-col text-left pl-6">
-                                    <span className="font-display font-bold text-lg text-[#3E1F07]">Monthly</span>
+                             <div className="px-4 py-3 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === 'monthly' ? 'bg-[#FFD700] border-[#FFD700]' : 'border-gray-300'}`}>
+                                      {selectedPlan === 'monthly' && <Check size={12} className="text-[#3E1F07]" strokeWidth={4} />}
+                                    </div>
+                                    <div className="text-left">
+                                        <span className="font-display font-bold text-sm text-[#3E1F07]">Monthly</span>
+                                        <span className="text-[10px] text-[#8B4513] block">Flexible, cancel anytime</span>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col items-end">
-                                     <span className="font-display font-extrabold text-2xl text-[#3E1F07]">$11.99</span>
-                                </div>
+                                <span className="font-display font-extrabold text-xl text-[#3E1F07]">$11.99<span className="text-xs font-normal">/mo</span></span>
                             </div>
-                            {selectedPlan === 'monthly' && (
-                                <div className="absolute top-1/2 -translate-y-1/2 left-3 bg-[#FFD700] rounded-full p-0.5">
-                                    <Check size={12} className="text-[#3E1F07]" strokeWidth={4} />
-                                </div>
-                            )}
                         </div>
                     </div>
 
@@ -686,17 +745,28 @@ const OnboardingPage: React.FC = () => {
                         fullWidth 
                         variant="gold"
                         onClick={handleSubscribeClick}
-                        className="py-4 text-xl shadow-xl mb-4 border-b-4 border-[#B8860B]"
+                        className="py-4 text-lg shadow-xl mb-3 border-b-4 border-[#B8860B]"
                     >
-                        START FREE TRIAL
+                        🎁 START 3-DAY FREE TRIAL
                     </WoodButton>
+                    
+                    <p className="text-[#5c2e0b] text-[10px] mb-3 opacity-70">
+                        You won't be charged until after your free trial ends
+                    </p>
 
                     <button 
                         onClick={() => navigate('/home')}
-                        className="text-[#8B4513] text-xs font-bold underline decoration-dotted opacity-70 hover:opacity-100"
+                        className="text-[#8B4513] text-xs font-bold underline decoration-dotted opacity-60 hover:opacity-100"
                     >
-                        No thanks, I'll continue with limited access
+                        Continue with limited access
                     </button>
+                </div>
+                
+                {/* Trust Indicators */}
+                <div className="mt-6 text-center">
+                  <p className="text-white/50 text-[10px]">
+                    Loved by 10,000+ Christian families worldwide 🙏
+                  </p>
                 </div>
             </div>
         )}
