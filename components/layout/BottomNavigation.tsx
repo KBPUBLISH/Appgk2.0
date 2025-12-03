@@ -3,6 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Compass, Headphones, BookOpen, Library } from 'lucide-react';
 import { useAudio } from '../../context/AudioContext';
 
+// Key for storing wheel hint state
+const WHEEL_HINT_KEY = 'godlykids_wheel_hint_shown';
+
 const BottomNavigation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -10,6 +13,27 @@ const BottomNavigation: React.FC = () => {
   const { playTab, currentPlaylist } = useAudio();
   const isPlayerActive = !!currentPlaylist;
   const [isHidden, setIsHidden] = useState(false);
+  
+  // Wheel hint for new users
+  const [showWheelHint, setShowWheelHint] = useState(false);
+  
+  // Check if user has seen the wheel hint before
+  useEffect(() => {
+    const hasSeenHint = localStorage.getItem(WHEEL_HINT_KEY);
+    if (!hasSeenHint) {
+      // Show hint after a short delay for new users
+      const timer = setTimeout(() => {
+        setShowWheelHint(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+  
+  // Dismiss the hint
+  const dismissHint = () => {
+    setShowWheelHint(false);
+    localStorage.setItem(WHEEL_HINT_KEY, 'true');
+  };
 
   // Listen for modal open/close to hide the ship wheel
   useEffect(() => {
@@ -72,6 +96,11 @@ const BottomNavigation: React.FC = () => {
   };
 
   const onStart = (clientX: number, clientY: number) => {
+    // Dismiss the wheel hint on first interaction
+    if (showWheelHint) {
+      dismissHint();
+    }
+    
     startAngleRef.current = getAngle(clientX, clientY);
     // Positive rotation aligns with index when items are on the left/CCW side
     startRotationRef.current = (activeItem.index * ITEM_ANGLE);
@@ -137,6 +166,54 @@ const BottomNavigation: React.FC = () => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 h-0 flex justify-center pointer-events-none">
+
+      {/* Wheel Hint for New Users */}
+      {showWheelHint && (
+        <div 
+          className={`absolute z-[50] pointer-events-auto transition-all duration-500 ease-in-out ${
+            isPlayerActive ? 'bottom-[180px] md:bottom-[280px]' : 'bottom-[100px] md:bottom-[200px]'
+          }`}
+          onClick={dismissHint}
+        >
+          {/* Hint Container */}
+          <div className="relative flex flex-col items-center animate-in fade-in duration-500">
+            {/* Text Bubble */}
+            <div className="bg-[#FFD700] text-[#3E1F07] px-4 py-2 rounded-xl font-bold text-sm shadow-lg mb-2 relative">
+              <span>Spin the wheel to navigate!</span>
+              {/* Bubble Arrow */}
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-[#FFD700]"></div>
+            </div>
+            
+            {/* Animated Finger */}
+            <div className="relative">
+              <svg 
+                viewBox="0 0 64 64" 
+                className="w-16 h-16 animate-wheel-hint drop-shadow-lg"
+              >
+                {/* Hand pointing */}
+                <g transform="rotate(-30 32 32)">
+                  {/* Finger */}
+                  <ellipse cx="32" cy="20" rx="8" ry="14" fill="#FFDAB9" stroke="#D2691E" strokeWidth="1.5"/>
+                  {/* Knuckle */}
+                  <ellipse cx="32" cy="32" rx="10" ry="8" fill="#FFDAB9" stroke="#D2691E" strokeWidth="1.5"/>
+                  {/* Palm hint */}
+                  <ellipse cx="32" cy="42" rx="14" ry="10" fill="#FFDAB9" stroke="#D2691E" strokeWidth="1.5"/>
+                  {/* Fingernail */}
+                  <ellipse cx="32" cy="10" rx="5" ry="4" fill="#FFE4C4" stroke="#D2691E" strokeWidth="0.5"/>
+                </g>
+              </svg>
+              
+              {/* Circular motion indicator */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-20 h-20 border-2 border-dashed border-[#FFD700]/50 rounded-full animate-spin-slow"></div>
+              </div>
+            </div>
+            
+            {/* Tap to dismiss */}
+            <span className="text-white/60 text-[10px] mt-2">Tap anywhere to dismiss</span>
+          </div>
+        </div>
+      )}
 
       {/* Active Indicator Jewel */}
       <div
@@ -280,6 +357,32 @@ const BottomNavigation: React.FC = () => {
           })}
         </div>
       </div>
+      
+      {/* CSS for wheel hint animation */}
+      <style>{`
+        @keyframes wheel-hint {
+          0%, 100% {
+            transform: translateX(-15px) rotate(-20deg);
+          }
+          50% {
+            transform: translateX(15px) rotate(20deg);
+          }
+        }
+        .animate-wheel-hint {
+          animation: wheel-hint 1.5s ease-in-out infinite;
+        }
+        @keyframes spin-slow {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        .animate-spin-slow {
+          animation: spin-slow 3s linear infinite;
+        }
+      `}</style>
     </div>
   );
 };
