@@ -523,16 +523,23 @@ const HomePage: React.FC = () => {
 
         {/* Featured Carousel */}
         {!loading && featuredBooks.length > 0 && (
-          <FeaturedCarousel 
-            books={featuredBooks} 
-            onBookClick={(id, isPlaylist) => {
-              if (isPlaylist) {
-                navigate(`/audio/playlist/${id}`);
-              } else {
-                handleBookClick(id);
-              }
-            }} 
-          />
+          <>
+            <SectionTitle 
+              title="Featured Stories" 
+              icon="⭐"
+              color="#FFD700"
+            />
+            <FeaturedCarousel 
+              books={featuredBooks} 
+              onBookClick={(id, isPlaylist) => {
+                if (isPlaylist) {
+                  navigate(`/audio/playlist/${id}`);
+                } else {
+                  handleBookClick(id);
+                }
+              }} 
+            />
+          </>
         )}
 
         {/* Games Section - Portrait Thumbnail Carousel Style */}
