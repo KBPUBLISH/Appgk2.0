@@ -570,9 +570,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isVoiceUnlocked = (voiceId: string): boolean => {
-    // Premium users have all voices unlocked
-    if (isSubscribed) return true;
-    // Otherwise check if voice is in unlocked list
+    // Check if voice is in the user's purchased/unlocked list
+    // Premium users do NOT automatically get all voices - they still need to purchase them
+    // Premium just allows them to purchase the 70% of voices that are "premium only"
     return unlockedVoices.includes(voiceId);
   };
 

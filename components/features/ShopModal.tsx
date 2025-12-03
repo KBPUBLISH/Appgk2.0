@@ -209,22 +209,23 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
                 }
 
                 const visibleVoices = filterVisibleVoices(voices);
-                // Calculate 30% threshold for coin-purchasable voices
+                // Calculate 30% threshold for coin-purchasable voices (free tier)
                 const totalVoices = visibleVoices.length;
-                const coinPurchasableCount = Math.ceil(totalVoices * 0.3); // 30% available for coins
+                const freeTierCount = Math.ceil(totalVoices * 0.3); // 30% available to free users
 
                 // Convert to ShopItem format
+                // All voices cost coins - premium just unlocks ACCESS to buy the other 70%
                 const voiceItems: ShopItem[] = visibleVoices.map((voice, index) => {
-                    // First 30% are purchasable with coins, rest require premium
-                    const isCoinPurchasable = index < coinPurchasableCount;
+                    // First 30% are available to all users, rest require premium subscription to purchase
+                    const isFreeTier = index < freeTierCount;
 
                     return {
                         id: `voice-${voice.voice_id}`,
                         name: voice.name,
-                        price: isCoinPurchasable ? 200 : 0, // 200 coins for purchasable, 0 for premium-only
+                        price: 200, // All voices cost 200 coins (even for premium users)
                         type: 'voice',
                         value: voice.voice_id,
-                        isPremium: !isCoinPurchasable, // Premium-only if not in first 30%
+                        isPremium: !isFreeTier, // Premium-only if not in first 30% (requires subscription to BUY)
                         characterImage: voice.characterImage, // Add character image
                     };
                 });
@@ -359,11 +360,33 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
     const isBodyEquipped = !!equippedBody;
 
     const handleCardClick = (item: ShopItem) => {
-        if (isOwned(item.id)) {
-            if (item.type === 'voice') {
-                // Voices don't need to be equipped, they're just unlocked
+        // For voices, check if already unlocked
+        if (item.type === 'voice') {
+            const voiceUnlocked = isVoiceUnlocked(item.value);
+            if (voiceUnlocked) {
+                // Already unlocked, do nothing
                 return;
             }
+            
+            // Check if user can purchase this voice
+            if (item.isPremium && !isSubscribed) {
+                // Premium-only voice and user isn't subscribed - go to paywall
+                onClose();
+                navigate('/paywall');
+                return;
+            }
+            
+            // User can purchase - check if they have enough coins
+            // All voices cost coins (even for premium users)
+            const voicePrice = item.price > 0 ? item.price : 200; // Default price for premium voices
+            if (coins >= voicePrice) {
+                handleBuy({ ...item, price: voicePrice });
+            }
+            return;
+        }
+        
+        // Non-voice items
+        if (isOwned(item.id)) {
             if (isEquipped(item)) {
                 // Animations cannot be unequipped to null, only swapped
                 if (item.type !== 'animation') {
@@ -375,18 +398,9 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
                 handleEquip(item);
             }
         } else if (item.isPremium && !isSubscribed) {
-            // Premium voices require subscription
+            // Premium item requires subscription
             onClose();
             navigate('/paywall');
-        } else if (item.type === 'voice') {
-            // Handle voice purchase
-            if (item.isPremium && isSubscribed) {
-                // Premium voices are free for subscribed users
-                handleBuy(item);
-            } else if (item.price > 0 && coins >= item.price) {
-                // Coin-purchasable voices
-                handleBuy(item);
-            }
         }
     };
 
@@ -480,9 +494,12 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
         // For voices, check if unlocked; for other items, check premium status
         const isVoice = item.type === 'voice';
         const voiceUnlocked = isVoice ? isVoiceUnlocked(item.value) : false;
+        // For voices: locked = premium-only voice AND user is not subscribed (can't even buy it)
+        // Premium users can BUY all voices, but don't get them automatically
+        // Non-premium users can only BUY the 30% that aren't marked isPremium
         const isLocked = isVoice 
-            ? (!voiceUnlocked && !isSubscribed) // Voice is locked if not unlocked AND not subscribed
-            : (item.isPremium && !isSubscribed); // Other items use premium check
+            ? (item.isPremium && !isSubscribed) // Voice is locked if it's premium-only AND user isn't subscribed
+            : (item.isPremium && !isSubscribed); // Other items use same premium check
 
         return (
             <div
