@@ -643,66 +643,128 @@ const HomePage: React.FC = () => {
         </section>
 
         {/* Recently Read Section */}
-        {recentlyReadBooks.length > 0 && (
-          <section className="mt-6">
-            <SectionTitle 
-              title="Recently Read" 
-              icon="📖"
-              color="#4CAF50"
-            />
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
-              {recentlyReadBooks.slice(0, 6).map((book) => {
-                const isComplete = bookCompletionService.isBookCompleted(book.id || book._id);
-                return (
-                  <div key={book.id || book._id} className="relative">
-                    <BookCard
-                      book={book}
-                      onClick={() => handleBookClick(book.id || book._id)}
-                    />
-                    {isComplete && (
-                      <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1 shadow-lg">
-                        <CheckCircle className="w-5 h-5 text-white" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
+        {recentlyReadBooks.length > 0 && (() => {
+          const isExpanded = expandedCategories.has('recently-read');
+          const hasMoreItems = recentlyReadBooks.length > COLLAPSED_ITEM_COUNT;
+          const displayItems = isExpanded ? recentlyReadBooks : recentlyReadBooks.slice(0, COLLAPSED_ITEM_COUNT);
+          const hiddenCount = recentlyReadBooks.length - COLLAPSED_ITEM_COUNT;
+          
+          return (
+            <section className="mt-6">
+              <SectionTitle 
+                title="Recently Read" 
+                icon="📖"
+                color="#4CAF50"
+              />
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
+                {displayItems.map((book) => {
+                  const isComplete = bookCompletionService.isBookCompleted(book.id || book._id);
+                  return (
+                    <div key={book.id || book._id} className="relative">
+                      <BookCard
+                        book={book}
+                        onClick={() => handleBookClick(book.id || book._id)}
+                      />
+                      {isComplete && (
+                        <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1 shadow-lg">
+                          <CheckCircle className="w-5 h-5 text-white" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Collapse/Expand Button */}
+              {hasMoreItems && (
+                <button
+                  onClick={() => toggleCategoryExpansion('recently-read')}
+                  className="w-full mt-4 py-3 px-4 bg-gradient-to-r from-[#4CAF50]/80 to-[#45a049]/80 hover:from-[#4CAF50] hover:to-[#45a049] rounded-xl border-2 border-[#2e7d32]/50 shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                >
+                  {isExpanded ? (
+                    <>
+                      <ChevronUp className="w-5 h-5 text-white" />
+                      <span className="text-white font-display font-bold text-sm">
+                        Show Less
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-5 h-5 text-white" />
+                      <span className="text-white font-display font-bold text-sm">
+                        Show {hiddenCount} More
+                      </span>
+                    </>
+                  )}
+                </button>
+              )}
+            </section>
+          );
+        })()}
 
         {/* Recently Played Section */}
-        {recentlyPlayedPlaylists.length > 0 && (
-          <section className="mt-6">
-            <SectionTitle 
-              title="Recently Played" 
-              icon="🎵"
-              color="#9C27B0"
-            />
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
-              {recentlyPlayedPlaylists.slice(0, 6).map((playlist) => {
-                const playlistItem = {
-                  id: playlist._id || playlist.id,
-                  title: playlist.title,
-                  author: playlist.author || 'Kingdom Builders',
-                  coverUrl: playlist.coverImage,
-                  isAudio: true,
-                };
-                return (
-                  <div key={playlist._id || playlist.id} className="relative">
-                    <BookCard
-                      book={playlistItem}
-                      onClick={() => navigate(`/audio/playlist/${playlist._id || playlist.id}`)}
-                    />
-                    <div className="absolute top-2 right-2 bg-purple-500 rounded-full p-1 shadow-lg">
-                      <CheckCircle className="w-5 h-5 text-white" />
+        {recentlyPlayedPlaylists.length > 0 && (() => {
+          const isExpanded = expandedCategories.has('recently-played');
+          const hasMoreItems = recentlyPlayedPlaylists.length > COLLAPSED_ITEM_COUNT;
+          const displayItems = isExpanded ? recentlyPlayedPlaylists : recentlyPlayedPlaylists.slice(0, COLLAPSED_ITEM_COUNT);
+          const hiddenCount = recentlyPlayedPlaylists.length - COLLAPSED_ITEM_COUNT;
+          
+          return (
+            <section className="mt-6">
+              <SectionTitle 
+                title="Recently Played" 
+                icon="🎵"
+                color="#9C27B0"
+              />
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
+                {displayItems.map((playlist) => {
+                  const playlistItem = {
+                    id: playlist._id || playlist.id,
+                    title: playlist.title,
+                    author: playlist.author || 'Kingdom Builders',
+                    coverUrl: playlist.coverImage,
+                    isAudio: true,
+                  };
+                  return (
+                    <div key={playlist._id || playlist.id} className="relative">
+                      <BookCard
+                        book={playlistItem}
+                        onClick={() => navigate(`/audio/playlist/${playlist._id || playlist.id}`)}
+                      />
+                      <div className="absolute top-2 right-2 bg-purple-500 rounded-full p-1 shadow-lg">
+                        <CheckCircle className="w-5 h-5 text-white" />
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
+                  );
+                })}
+              </div>
+              
+              {/* Collapse/Expand Button */}
+              {hasMoreItems && (
+                <button
+                  onClick={() => toggleCategoryExpansion('recently-played')}
+                  className="w-full mt-4 py-3 px-4 bg-gradient-to-r from-[#9C27B0]/80 to-[#7B1FA2]/80 hover:from-[#9C27B0] hover:to-[#7B1FA2] rounded-xl border-2 border-[#6A1B9A]/50 shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                >
+                  {isExpanded ? (
+                    <>
+                      <ChevronUp className="w-5 h-5 text-white" />
+                      <span className="text-white font-display font-bold text-sm">
+                        Show Less
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-5 h-5 text-white" />
+                      <span className="text-white font-display font-bold text-sm">
+                        Show {hiddenCount} More
+                      </span>
+                    </>
+                  )}
+                </button>
+              )}
+            </section>
+          );
+        })()}
 
         {/* Explore Categories Sections */}
         {categoriesLoading ? (
