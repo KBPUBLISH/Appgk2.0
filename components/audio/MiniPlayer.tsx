@@ -24,10 +24,11 @@ const MiniPlayer: React.FC = () => {
 
     // Don't show mini player if:
     // 1. No playlist is active
-    // 2. We are already on the full player page
+    // 2. We are already on the full player page (path includes /play/)
     // 3. We are in a book reader (distraction free)
+    // Note: We DO want to show on playlist detail page (/audio/playlist/:id) but NOT on player page (/audio/playlist/:id/play/:index)
     if (!currentPlaylist ||
-        location.pathname.includes('/audio/playlist/') ||
+        location.pathname.includes('/play/') ||
         location.pathname.includes('/read/') ||
         location.pathname.includes('/book-reader')) {
         return null;

@@ -1,8 +1,87 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Crown, Play, Music, Headphones, Heart, Bookmark, Eye, Hammer, Wrench } from 'lucide-react';
+import { ChevronLeft, Crown, Play, Pause, Music, Headphones, Heart, Bookmark, Eye, Hammer, Wrench } from 'lucide-react';
 import { getApiBaseUrl } from '../services/apiService';
 import { libraryService } from '../services/libraryService';
+import { useAudio } from '../context/AudioContext';
+import MiniPlayer from '../components/audio/MiniPlayer';
+
+// Helper function to extract dominant colors from an image
+const extractColors = (imgSrc: string): Promise<{ primary: string; secondary: string; accent: string }> => {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                resolve({ primary: '#8B4513', secondary: '#5c2e0b', accent: '#d4a373' });
+                return;
+            }
+            
+            // Sample at a smaller size for performance
+            const size = 50;
+            canvas.width = size;
+            canvas.height = size;
+            ctx.drawImage(img, 0, 0, size, size);
+            
+            const imageData = ctx.getImageData(0, 0, size, size).data;
+            const colorCounts: { [key: string]: number } = {};
+            
+            // Sample pixels and count colors
+            for (let i = 0; i < imageData.length; i += 16) { // Skip some pixels for speed
+                const r = imageData[i];
+                const g = imageData[i + 1];
+                const b = imageData[i + 2];
+                
+                // Quantize colors to reduce variations
+                const qr = Math.round(r / 32) * 32;
+                const qg = Math.round(g / 32) * 32;
+                const qb = Math.round(b / 32) * 32;
+                
+                // Skip very light colors (near white) and very dark colors (near black)
+                const brightness = (qr + qg + qb) / 3;
+                if (brightness < 30 || brightness > 225) continue;
+                
+                const key = `${qr},${qg},${qb}`;
+                colorCounts[key] = (colorCounts[key] || 0) + 1;
+            }
+            
+            // Sort by frequency
+            const sortedColors = Object.entries(colorCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+            
+            if (sortedColors.length >= 2) {
+                const [r1, g1, b1] = sortedColors[0][0].split(',').map(Number);
+                const [r2, g2, b2] = sortedColors[1][0].split(',').map(Number);
+                
+                // Create a darker version for primary (for better text contrast)
+                const darken = (c: number) => Math.max(0, Math.floor(c * 0.6));
+                const primary = `rgb(${darken(r1)}, ${darken(g1)}, ${darken(b1)})`;
+                
+                // Secondary is slightly lighter
+                const lighten = (c: number) => Math.min(255, Math.floor(c * 0.8));
+                const secondary = `rgb(${lighten(r1)}, ${lighten(g1)}, ${lighten(b1)})`;
+                
+                // Accent from second most common color
+                const accent = `rgb(${r2}, ${g2}, ${b2})`;
+                
+                resolve({ primary, secondary, accent });
+            } else {
+                // Fallback colors
+                resolve({ primary: '#8B4513', secondary: '#5c2e0b', accent: '#d4a373' });
+            }
+        };
+        
+        img.onerror = () => {
+            resolve({ primary: '#8B4513', secondary: '#5c2e0b', accent: '#d4a373' });
+        };
+        
+        img.src = imgSrc;
+    });
+};
 
 interface AudioItem {
     _id?: string;
@@ -31,6 +110,7 @@ interface Playlist {
 const PlaylistDetailPage: React.FC = () => {
     const { playlistId } = useParams();
     const navigate = useNavigate();
+    const { currentPlaylist, currentTrackIndex, isPlaying, togglePlayPause, playPlaylist } = useAudio();
     const [playlist, setPlaylist] = useState<Playlist | null>(null);
     const [loading, setLoading] = useState(true);
     const [isFavorited, setIsFavorited] = useState(false);
@@ -38,6 +118,16 @@ const PlaylistDetailPage: React.FC = () => {
     const [localLikeCount, setLocalLikeCount] = useState(0);
     const [isInLibrary, setIsInLibrary] = useState(false);
     const [viewCount, setViewCount] = useState(0);
+    
+    // Dynamic gradient colors extracted from cover image
+    const [gradientColors, setGradientColors] = useState({
+        primary: '#8B4513',
+        secondary: '#5c2e0b', 
+        accent: '#d4a373'
+    });
+    
+    // Check if this playlist is currently playing
+    const isThisPlaylistPlaying = currentPlaylist?._id === playlistId;
 
     useEffect(() => {
         fetchPlaylist();
@@ -69,6 +159,15 @@ const PlaylistDetailPage: React.FC = () => {
             setViewCount(totalPlays);
         }
     }, [playlistId, playlist]);
+    
+    // Extract colors from cover image when playlist loads
+    useEffect(() => {
+        if (playlist?.coverImage) {
+            extractColors(playlist.coverImage).then(colors => {
+                setGradientColors(colors);
+            });
+        }
+    }, [playlist?.coverImage]);
 
     const fetchPlaylist = async () => {
         try {
@@ -139,7 +238,24 @@ const PlaylistDetailPage: React.FC = () => {
     };
 
     const handleItemClick = (itemIndex: number) => {
-        navigate(`/audio/playlist/${playlistId}/play/${itemIndex}`);
+        // Check if this exact track is already playing
+        if (isThisPlaylistPlaying && currentTrackIndex === itemIndex) {
+            // Toggle play/pause
+            togglePlayPause();
+        } else {
+            // Navigate to player with this track
+            navigate(`/audio/playlist/${playlistId}/play/${itemIndex}`);
+        }
+    };
+    
+    // Check if a specific track is currently playing
+    const isTrackPlaying = (itemIndex: number): boolean => {
+        return isThisPlaylistPlaying && currentTrackIndex === itemIndex && isPlaying;
+    };
+    
+    // Check if a specific track is the current track (playing or paused)
+    const isCurrentTrack = (itemIndex: number): boolean => {
+        return isThisPlaylistPlaying && currentTrackIndex === itemIndex;
     };
 
     const formatDuration = (seconds?: number) => {
@@ -174,26 +290,48 @@ const PlaylistDetailPage: React.FC = () => {
 
     return (
         <div className="flex flex-col h-full overflow-y-auto no-scrollbar bg-[#fdf6e3]">
-            {/* TOP SECTION - WOOD BACKGROUND */}
+            {/* TOP SECTION - DYNAMIC GRADIENT BACKGROUND */}
             <div className="relative pb-8 shadow-2xl z-10 overflow-hidden shrink-0 w-full">
-                {/* Vertical Wood Plank Pattern */}
-                <div className="absolute inset-0 bg-[#8B4513]" style={{
-                    backgroundImage: `repeating-linear-gradient(
-                        90deg, 
-                        #a05f2c 0%, #a05f2c 14%, 
-                        #3e1f07 14%, #3e1f07 15%, 
-                        #c28246 15%, #c28246 29%, 
-                        #3e1f07 29%, #3e1f07 30%, 
-                        #945829 30%, #945829 49%, 
-                        #3e1f07 49%, #3e1f07 50%, 
-                        #b06d36 50%, #b06d36 74%, 
-                        #3e1f07 74%, #3e1f07 75%,
-                        #a05f2c 75%, #a05f2c 100%
-                    )`
-                }}></div>
+                {/* Dynamic gradient based on cover image colors */}
+                <div 
+                    className="absolute inset-0 transition-all duration-700"
+                    style={{
+                        background: `linear-gradient(180deg, 
+                            ${gradientColors.primary} 0%, 
+                            ${gradientColors.secondary} 50%,
+                            ${gradientColors.primary} 100%
+                        )`
+                    }}
+                />
+                
+                {/* Blurred cover image overlay for extra depth */}
+                {playlist?.coverImage && (
+                    <div 
+                        className="absolute inset-0 opacity-30"
+                        style={{
+                            backgroundImage: `url(${playlist.coverImage})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            filter: 'blur(60px) saturate(1.5)',
+                            transform: 'scale(1.2)',
+                        }}
+                    />
+                )}
+                
+                {/* Gradient overlay for better text contrast */}
+                <div 
+                    className="absolute inset-0"
+                    style={{
+                        background: `linear-gradient(180deg, 
+                            rgba(0,0,0,0.2) 0%, 
+                            rgba(0,0,0,0.1) 50%,
+                            rgba(0,0,0,0.3) 100%
+                        )`
+                    }}
+                />
 
-                {/* Subtle Grain Overlay */}
-                <div className="absolute inset-0 opacity-10 pointer-events-none"
+                {/* Subtle noise texture for visual interest */}
+                <div className="absolute inset-0 opacity-5 pointer-events-none"
                     style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.5'/%3E%3C/svg%3E")` }}>
                 </div>
 
@@ -210,9 +348,15 @@ const PlaylistDetailPage: React.FC = () => {
 
                 {/* Playlist Info */}
                 <div className="relative z-20 px-6 pt-4 pb-6">
-                    {/* Cover Image - SIGNIFICANTLY INCREASED SIZE */}
+                    {/* Cover Image - With dynamic border color */}
                     {playlist.coverImage && (
-                        <div className="w-72 h-72 mx-auto mb-6 rounded-3xl overflow-hidden border-4 border-[#d4c5a0] shadow-2xl">
+                        <div 
+                            className="w-72 h-72 mx-auto mb-6 rounded-3xl overflow-hidden shadow-2xl transition-all duration-500"
+                            style={{
+                                border: `4px solid ${gradientColors.accent}`,
+                                boxShadow: `0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px ${gradientColors.accent}40`
+                            }}
+                        >
                             <img
                                 src={playlist.coverImage}
                                 alt={playlist.title}
@@ -282,59 +426,121 @@ const PlaylistDetailPage: React.FC = () => {
             {/* CONTENT SECTION - Audio Items List */}
             <div className="flex-1 w-full px-6 pt-8 pb-32">
                 <div className="max-w-2xl mx-auto space-y-3">
-                    {playlist.items.map((item, index) => (
-                        <div
-                            key={item._id || index}
-                            onClick={() => handleItemClick(index)}
-                            className="bg-white rounded-xl overflow-hidden shadow-md border-2 border-[#d4c5a0] hover:shadow-xl hover:scale-[1.02] transition-all cursor-pointer group"
-                        >
-                            <div className="flex items-center gap-4 p-4">
-                                {/* Cover Image or Icon */}
-                                <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-[#d4c5a0] shrink-0">
-                                    {item.coverImage ? (
-                                        <img
-                                            src={item.coverImage}
-                                            alt={item.title}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                                            {playlist.type === 'Song' ? (
-                                                <Music className="w-8 h-8 text-white opacity-50" />
-                                            ) : (
-                                                <Headphones className="w-8 h-8 text-white opacity-50" />
+                    {playlist.items.map((item, index) => {
+                        const trackPlaying = isTrackPlaying(index);
+                        const isCurrent = isCurrentTrack(index);
+                        
+                        return (
+                            <div
+                                key={item._id || index}
+                                onClick={() => handleItemClick(index)}
+                                className={`rounded-xl overflow-hidden shadow-md border-2 hover:shadow-xl hover:scale-[1.02] transition-all cursor-pointer group ${
+                                    isCurrent 
+                                        ? 'bg-[#FFF8E1] border-[#FFD700] ring-2 ring-[#FFD700]/50' 
+                                        : 'bg-white border-[#d4c5a0]'
+                                }`}
+                            >
+                                <div className="flex items-center gap-4 p-4">
+                                    {/* Cover Image or Icon */}
+                                    <div className={`w-16 h-16 rounded-lg overflow-hidden border-2 shrink-0 relative ${
+                                        isCurrent ? 'border-[#FFD700]' : 'border-[#d4c5a0]'
+                                    }`}>
+                                        {item.coverImage ? (
+                                            <img
+                                                src={item.coverImage}
+                                                alt={item.title}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                                                {playlist.type === 'Song' ? (
+                                                    <Music className="w-8 h-8 text-white opacity-50" />
+                                                ) : (
+                                                    <Headphones className="w-8 h-8 text-white opacity-50" />
+                                                )}
+                                            </div>
+                                        )}
+                                        {/* Playing indicator on cover */}
+                                        {trackPlaying && (
+                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                                <div className="flex items-end gap-0.5 h-4">
+                                                    <div className="w-1 bg-[#FFD700] rounded-full animate-[soundBar1_0.5s_ease-in-out_infinite]" style={{ height: '100%' }} />
+                                                    <div className="w-1 bg-[#FFD700] rounded-full animate-[soundBar2_0.5s_ease-in-out_infinite_0.1s]" style={{ height: '60%' }} />
+                                                    <div className="w-1 bg-[#FFD700] rounded-full animate-[soundBar3_0.5s_ease-in-out_infinite_0.2s]" style={{ height: '80%' }} />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Item Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className={`text-lg font-bold truncate font-display ${
+                                            isCurrent ? 'text-[#8B4513]' : 'text-[#3E1F07]'
+                                        }`}>
+                                            {item.title}
+                                        </h3>
+                                        {item.author && (
+                                            <p className="text-sm text-[#8B4513] truncate">{item.author}</p>
+                                        )}
+                                        <div className="flex items-center gap-2 mt-1">
+                                            {item.duration && (
+                                                <p className="text-xs text-[#5c2e0b] opacity-75">
+                                                    {formatDuration(item.duration)}
+                                                </p>
+                                            )}
+                                            {isCurrent && (
+                                                <span className="text-xs font-bold text-[#8B4513] bg-[#FFD700]/30 px-2 py-0.5 rounded-full">
+                                                    {trackPlaying ? 'Now Playing' : 'Paused'}
+                                                </span>
                                             )}
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
 
-                                {/* Item Info */}
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-bold text-[#3E1F07] truncate font-display">
-                                        {item.title}
-                                    </h3>
-                                    {item.author && (
-                                        <p className="text-sm text-[#8B4513] truncate">{item.author}</p>
-                                    )}
-                                    {item.duration && (
-                                        <p className="text-xs text-[#5c2e0b] opacity-75 mt-1">
-                                            {formatDuration(item.duration)}
-                                        </p>
-                                    )}
-                                </div>
-
-                                {/* Play Button */}
-                                <div className="w-12 h-12 bg-[#8B4513] rounded-full flex items-center justify-center shadow-lg group-hover:bg-[#6B3410] transition-colors shrink-0">
-                                    <Play className="w-6 h-6 text-white ml-1" fill="white" />
+                                    {/* Play/Pause Button */}
+                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-colors shrink-0 ${
+                                        trackPlaying 
+                                            ? 'bg-[#FFD700] group-hover:bg-[#FFC107]' 
+                                            : 'bg-[#8B4513] group-hover:bg-[#6B3410]'
+                                    }`}>
+                                        {trackPlaying ? (
+                                            <Pause className="w-6 h-6 text-[#3E1F07]" fill="#3E1F07" />
+                                        ) : (
+                                            <Play className="w-6 h-6 text-white ml-1" fill="white" />
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
+            
+            {/* Mini Player - shows when audio is playing */}
+            <MiniPlayer />
         </div>
     );
 };
+
+// Add sound bar animation keyframes
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+@keyframes soundBar1 {
+    0%, 100% { height: 40%; }
+    50% { height: 100%; }
+}
+@keyframes soundBar2 {
+    0%, 100% { height: 100%; }
+    50% { height: 40%; }
+}
+@keyframes soundBar3 {
+    0%, 100% { height: 60%; }
+    50% { height: 100%; }
+}
+`;
+if (!document.getElementById('playlist-detail-animations')) {
+    styleSheet.id = 'playlist-detail-animations';
+    document.head.appendChild(styleSheet);
+}
 
 export default PlaylistDetailPage;
 
