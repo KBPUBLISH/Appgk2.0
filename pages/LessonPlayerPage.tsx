@@ -392,7 +392,7 @@ const LessonPlayerPage: React.FC = () => {
 
         // Award coins: 10 per correct answer
         const coinsEarned = correct * 10;
-        addCoins(coinsEarned);
+        addCoins(coinsEarned, `Lesson Quiz - ${correct} correct`, 'lesson');
 
         // Mark activity as completed
         setActivityCompleted(true);

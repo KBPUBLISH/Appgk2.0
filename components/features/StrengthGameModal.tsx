@@ -159,7 +159,7 @@ const StrengthGameModal: React.FC<StrengthGameModalProps> = ({ isOpen, onClose }
     else if (earnedStars === 2) reward = 25;
     else if (earnedStars === 1) reward = 10;
     
-    addCoins(reward); 
+    addCoins(reward, `Strength Challenge - ${earnedStars} ⭐`, 'game'); 
     setTimeout(() => {
         onClose();
     }, 1500);

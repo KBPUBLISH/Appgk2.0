@@ -406,7 +406,7 @@ const PrayerGameModal: React.FC<PrayerGameModalProps> = ({ isOpen, onClose }) =>
 
   const handleClaim = () => {
     setIsClaiming(true);
-    addCoins(30); 
+    addCoins(30, 'Prayer Time Complete', 'game'); 
     setTimeout(() => {
         onClose();
     }, 1500);

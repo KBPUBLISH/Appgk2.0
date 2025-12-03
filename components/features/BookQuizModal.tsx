@@ -194,7 +194,7 @@ const BookQuizModal: React.FC<BookQuizModalProps> = ({
                 
                 // Add coins to user
                 if (result.coinsEarned > 0) {
-                    addCoins(result.coinsEarned);
+                    addCoins(result.coinsEarned, `Book Quiz - ${result.correctAnswers} correct`, 'quiz');
                 }
 
                 // Notify parent

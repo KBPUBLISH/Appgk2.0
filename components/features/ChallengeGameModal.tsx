@@ -285,7 +285,7 @@ const ChallengeGameModal: React.FC<ChallengeGameModalProps> = ({ isOpen, onClose
     setIsClaiming(true);
     // COIN REWARDS: 50/25/10
     const coinReward = earnedStars === 3 ? 50 : earnedStars === 2 ? 25 : 10;
-    addCoins(coinReward);
+    addCoins(coinReward, `Memory Challenge - ${earnedStars} ⭐`, 'game');
     
     // Store completion timestamp
     localStorage.setItem(STORAGE_KEY, Date.now().toString());

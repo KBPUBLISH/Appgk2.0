@@ -257,7 +257,7 @@ const DailyRewardModal: React.FC<DailyRewardModalProps> = ({ isOpen, onClose }) 
     setIsClaiming(true);
     // UPDATED COIN REWARDS: 50/25/10
     const coinReward = earnedStars === 3 ? 50 : earnedStars === 2 ? 25 : 10;
-    addCoins(coinReward);
+    addCoins(coinReward, `Daily Verse - ${earnedStars} ⭐`, 'daily');
     
     // Store completion timestamp
     localStorage.setItem(STORAGE_KEY, Date.now().toString());

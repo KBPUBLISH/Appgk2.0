@@ -30,9 +30,19 @@ export interface SavedCharacter {
   legsOffset: { x: number, y: number };
 }
 
+export interface CoinTransaction {
+  id: string;
+  amount: number;
+  reason: string;
+  source: 'quiz' | 'lesson' | 'game' | 'daily' | 'referral' | 'purchase' | 'other';
+  timestamp: number;
+}
+
 interface UserContextType {
   coins: number;
-  addCoins: (amount: number) => void;
+  addCoins: (amount: number, reason?: string, source?: CoinTransaction['source']) => void;
+  spendCoins: (amount: number, reason?: string) => boolean;
+  coinTransactions: CoinTransaction[];
   ownedItems: string[];
   
   // Unlocked Voices
@@ -111,6 +121,8 @@ interface UserContextType {
 const UserContext = createContext<UserContextType>({
   coins: 2650,
   addCoins: () => {},
+  spendCoins: () => false,
+  coinTransactions: [],
   ownedItems: [],
   unlockedVoices: [],
   unlockVoice: () => {},
@@ -181,6 +193,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const saved = loadState();
 
   const [coins, setCoins] = useState(saved?.coins ?? 2650); // Start with 2650 for testing
+  const [coinTransactions, setCoinTransactions] = useState<CoinTransaction[]>(saved?.coinTransactions ?? []);
   const [ownedItems, setOwnedItems] = useState<string[]>(saved?.ownedItems ?? ['f1', 'anim1']); // anim1 is default breathe
   const [unlockedVoices, setUnlockedVoices] = useState<string[]>(saved?.unlockedVoices ?? []); // Voices unlocked by user
   
@@ -287,6 +300,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const stateToSave = {
       coins,
+      coinTransactions,
       ownedItems,
       unlockedVoices,
       parentName,
@@ -321,7 +335,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
   }, [
-    coins, ownedItems, unlockedVoices, parentName, kids, currentProfileId,
+    coins, coinTransactions, ownedItems, unlockedVoices, parentName, kids, currentProfileId,
       equippedAvatar, equippedFrame, equippedHat, equippedBody,
     equippedLeftArm, equippedRightArm, equippedLegs, equippedAnimation,
     equippedLeftArmRotation, equippedRightArmRotation, equippedLegsRotation,
@@ -332,8 +346,35 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     parentAvatarData
   ]);
 
-  const addCoins = (amount: number) => {
+  const addCoins = (amount: number, reason: string = 'Coins earned', source: CoinTransaction['source'] = 'other') => {
     setCoins(prev => prev + amount);
+    
+    // Record transaction
+    const transaction: CoinTransaction = {
+      id: Date.now().toString(),
+      amount,
+      reason,
+      source,
+      timestamp: Date.now(),
+    };
+    setCoinTransactions(prev => [transaction, ...prev].slice(0, 100)); // Keep last 100 transactions
+  };
+
+  const spendCoins = (amount: number, reason: string = 'Purchase'): boolean => {
+    if (coins < amount) return false;
+    
+    setCoins(prev => prev - amount);
+    
+    // Record transaction (negative amount)
+    const transaction: CoinTransaction = {
+      id: Date.now().toString(),
+      amount: -amount,
+      reason,
+      source: 'purchase',
+      timestamp: Date.now(),
+    };
+    setCoinTransactions(prev => [transaction, ...prev].slice(0, 100));
+    return true;
   };
 
   const addKid = (kid: KidProfile) => {
@@ -715,6 +756,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetUser = () => {
     setCoins(2650);
+    setCoinTransactions([]);
     setOwnedItems(['f1', 'anim1']);
     setUnlockedVoices([]);
     setParentName('');
@@ -775,6 +817,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <UserContext.Provider value={{
       coins,
       addCoins,
+      spendCoins,
+      coinTransactions,
       ownedItems,
       unlockedVoices,
       unlockVoice,

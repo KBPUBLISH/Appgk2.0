@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Crown, Music, Coins } from 'lucide-react';
+import { Crown, Music } from 'lucide-react';
 const ShopModal = lazy(() => import('../features/ShopModal'));
 import AvatarDetailModal from '../features/AvatarDetailModal';
+import CoinHistoryModal from '../features/CoinHistoryModal';
 import { useUser } from '../../context/UserContext';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { useAudio } from '../../context/AudioContext';
@@ -21,6 +22,7 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
   const { musicEnabled, toggleMusic, playClick } = useAudio();
   const [isShopOpen, setIsShopOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isCoinHistoryOpen, setIsCoinHistoryOpen] = useState(false);
 
   // Check if we're on book reader page - music should appear muted
   const isBookReader = location.pathname.startsWith('/read/');
@@ -161,9 +163,9 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
 
               {/* Gold Coins Display */}
               <button
-                onClick={() => setIsShopOpen(true)}
+                onClick={() => setIsCoinHistoryOpen(true)}
                 className="bg-gradient-to-b from-[#FFD700] to-[#DAA520] px-2.5 py-1.5 rounded-lg border-2 border-[#B8860B] shadow-[0_3px_0_#8B6914,inset_0_1px_0_rgba(255,255,255,0.4)] active:translate-y-[2px] active:shadow-none transition-all flex items-center gap-1.5 group"
-                title="Your Gold Coins - Click to visit Shop"
+                title="Your Gold Coins - Click to view history"
               >
                 {/* Coin Icon */}
                 <div className="relative">
@@ -215,6 +217,11 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
           <ShopModal isOpen={isShopOpen} onClose={() => setIsShopOpen(false)} />
         </Suspense>
       )}
+      <CoinHistoryModal 
+        isOpen={isCoinHistoryOpen} 
+        onClose={() => setIsCoinHistoryOpen(false)} 
+        onOpenShop={() => setIsShopOpen(true)}
+      />
       <AvatarDetailModal isOpen={isDetailOpen} onClose={() => setIsDetailOpen(false)} onEdit={() => setIsShopOpen(true)} />
     </>
   );
