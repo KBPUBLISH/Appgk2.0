@@ -11,15 +11,24 @@ interface DailyRewardModalProps {
 }
 
 // --- DATA ---
+// Each verse has 6-15 words for the fill-in-the-blank game
 const DAILY_VERSES = [
-  { text: "I am with you always", ref: "Matthew 28:20" },
-  { text: "Love one another", ref: "John 13:34" },
-  { text: "Do not be afraid", ref: "Joshua 1:9" },
-  { text: "Trust in the Lord", ref: "Proverbs 3:5" },
-  { text: "The Lord is my shepherd", ref: "Psalm 23:1" },
-  { text: "Let your light shine", ref: "Matthew 5:16" },
-  { text: "God is love", ref: "1 John 4:8" },
-  { text: "Rejoice always", ref: "1 Thess 5:16" }
+  { text: "I am with you always to the very end", ref: "Matthew 28:20" }, // 10 words
+  { text: "Love one another as I have loved you", ref: "John 13:34" }, // 8 words
+  { text: "Be strong and courageous do not be afraid", ref: "Joshua 1:9" }, // 8 words
+  { text: "Trust in the Lord with all your heart", ref: "Proverbs 3:5" }, // 8 words
+  { text: "The Lord is my shepherd I shall not want", ref: "Psalm 23:1" }, // 10 words
+  { text: "Let your light shine before others for good", ref: "Matthew 5:16" }, // 8 words
+  { text: "God is love and whoever abides in love abides in God", ref: "1 John 4:8" }, // 12 words
+  { text: "Rejoice in the Lord always and again I say rejoice", ref: "Phil 4:4" }, // 10 words
+  { text: "For God so loved the world that he gave", ref: "John 3:16" }, // 9 words
+  { text: "I can do all things through Christ who strengthens me", ref: "Phil 4:13" }, // 10 words
+  { text: "The joy of the Lord is your strength today", ref: "Neh 8:10" }, // 9 words
+  { text: "Be kind to one another tenderhearted forgiving each other", ref: "Eph 4:32" }, // 9 words
+  { text: "Cast all your anxiety on him because he cares for you", ref: "1 Peter 5:7" }, // 11 words
+  { text: "Create in me a clean heart O God and renew", ref: "Psalm 51:10" }, // 10 words
+  { text: "Children obey your parents in the Lord for this is right", ref: "Eph 6:1" }, // 11 words
+  { text: "Give thanks to the Lord for he is good", ref: "Psalm 107:1" }, // 9 words
 ];
 
 type GameState = 'cooldown' | 'intro' | 'ready' | 'playing' | 'game-over' | 'success' | 'claimed';
