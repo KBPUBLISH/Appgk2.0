@@ -319,7 +319,7 @@ const ListenPage: React.FC = () => {
             {/* Playlists Section */}
             {filteredPlaylists.length > 0 && (
               <div className="mb-8">
-                <div className="grid grid-cols-2 gap-4 max-w-4xl mx-auto">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
                   {filteredPlaylists.map(playlist => (
                     <div
                       key={playlist._id}
@@ -378,7 +378,7 @@ const ListenPage: React.FC = () => {
                 {filteredPlaylists.length > 0 && (
                   <h3 className="text-white/90 font-display text-lg mb-4 font-bold">Audio Books</h3>
                 )}
-                <div className="grid grid-cols-2 gap-4 max-w-4xl mx-auto">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
                   {filteredBooks.map(book => (
                     <BookCard
                       key={book.id}

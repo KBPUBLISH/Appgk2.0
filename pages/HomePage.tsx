@@ -70,8 +70,8 @@ const HomePage: React.FC = () => {
   // Category expansion state - tracks which categories are expanded
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
-  // Number of items to show when collapsed
-  const COLLAPSED_ITEM_COUNT = 4;
+  // Number of items to show when collapsed (shows 2 rows on mobile, adapts on larger screens)
+  const COLLAPSED_ITEM_COUNT = 6;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
@@ -651,7 +651,7 @@ const HomePage: React.FC = () => {
               icon="📖"
               color="#4CAF50"
             />
-            <div className="grid grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
               {recentlyReadBooks.slice(0, 6).map((book) => {
                 const isComplete = bookCompletionService.isBookCompleted(book.id || book._id);
                 return (
@@ -680,7 +680,7 @@ const HomePage: React.FC = () => {
               icon="🎵"
               color="#9C27B0"
             />
-            <div className="grid grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
               {recentlyPlayedPlaylists.slice(0, 6).map((playlist) => {
                 const playlistItem = {
                   id: playlist._id || playlist.id,
@@ -732,7 +732,7 @@ const HomePage: React.FC = () => {
                     icon={category.icon}
                     color={category.color}
                   />
-                  <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
                     {displayItems.map((item) => (
                       <BookCard
                         key={item.id || item._id}
