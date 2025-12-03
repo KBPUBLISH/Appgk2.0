@@ -616,64 +616,60 @@ const OnboardingPage: React.FC = () => {
                     <div className="inline-block bg-gradient-to-r from-[#FFD700] to-[#FFA500] px-4 py-1.5 rounded-full mb-3 animate-pulse">
                       <span className="text-[#3E1F07] font-extrabold text-sm">🎁 3-DAY FREE TRIAL</span>
                     </div>
-                    <h2 className="text-white font-display font-extrabold text-2xl leading-tight mb-2">
-                      Sunday School<br/>
-                      <span className="text-[#FFD700]">In Your Pocket</span>
+                    <h2 className="text-white font-display font-extrabold text-2xl leading-tight mb-3">
+                      Plant Seeds of Faith<br/>
+                      <span className="text-[#FFD700]">That Last a Lifetime</span>
                     </h2>
-                    <p className="text-[#eecaa0] text-sm">
-                      The #1 Christian app for kids. Trusted by thousands of families.
+                    <p className="text-[#eecaa0] text-sm italic px-4">
+                      "A must-have app for any Christian family"
                     </p>
                  </div>
                  
-                 {/* Value Proposition Cards */}
+                 {/* Benefits Cards - Focus on spiritual growth */}
                  <div className="space-y-3 mb-6">
-                    {/* Animated Books */}
+                    {/* Know Jesus */}
                     <div className="bg-gradient-to-r from-[#3E1F07] to-[#5c2e0b] rounded-xl p-4 border border-[#8B4513] flex items-start gap-3">
-                      <div className="text-3xl">📚</div>
+                      <div className="text-3xl">✝️</div>
                       <div>
-                        <h3 className="text-white font-bold text-sm">Interactive Animated Books</h3>
-                        <p className="text-[#eecaa0] text-xs">Choose from 10+ voice narrators, word-by-word highlighting, and beautiful video backgrounds</p>
+                        <h3 className="text-white font-bold text-sm">Help Your Kids Know Jesus</h3>
+                        <p className="text-[#eecaa0] text-xs">Stories and devotionals that bring your children closer to Christ and help them build a personal relationship with God</p>
                       </div>
                     </div>
                     
-                    {/* Games */}
+                    {/* Learn Scripture */}
                     <div className="bg-gradient-to-r from-[#3E1F07] to-[#5c2e0b] rounded-xl p-4 border border-[#8B4513] flex items-start gap-3">
-                      <div className="text-3xl">🎮</div>
+                      <div className="text-3xl">📖</div>
                       <div>
-                        <h3 className="text-white font-bold text-sm">Faith-Building Games</h3>
-                        <p className="text-[#eecaa0] text-xs">Memory games, daily challenges, and quizzes that make learning Scripture fun</p>
+                        <h3 className="text-white font-bold text-sm">Make Bible Learning Exciting</h3>
+                        <p className="text-[#eecaa0] text-xs">Turn Scripture into adventures your kids will actually want to explore - they'll memorize verses without even realizing it!</p>
                       </div>
                     </div>
                     
-                    {/* Gamification */}
+                    {/* Build Character */}
                     <div className="bg-gradient-to-r from-[#3E1F07] to-[#5c2e0b] rounded-xl p-4 border border-[#8B4513] flex items-start gap-3">
-                      <div className="text-3xl">⭐</div>
+                      <div className="text-3xl">🌱</div>
                       <div>
-                        <h3 className="text-white font-bold text-sm">Rewards & Achievements</h3>
-                        <p className="text-[#eecaa0] text-xs">Earn gold coins, unlock voices, customize avatars - kids stay motivated to learn!</p>
+                        <h3 className="text-white font-bold text-sm">Shape Their Character</h3>
+                        <p className="text-[#eecaa0] text-xs">Lessons on kindness, honesty, courage, and faith - helping your children grow into the person God created them to be</p>
                       </div>
                     </div>
                     
-                    {/* Audio */}
+                    {/* Foundation */}
                     <div className="bg-gradient-to-r from-[#3E1F07] to-[#5c2e0b] rounded-xl p-4 border border-[#8B4513] flex items-start gap-3">
-                      <div className="text-3xl">🎵</div>
+                      <div className="text-3xl">🏠</div>
                       <div>
-                        <h3 className="text-white font-bold text-sm">Screen-Free Listening</h3>
-                        <p className="text-[#eecaa0] text-xs">Worship music, audio adventures, and Bible stories for car rides & bedtime</p>
+                        <h3 className="text-white font-bold text-sm">Build a Strong Foundation</h3>
+                        <p className="text-[#eecaa0] text-xs">Give your kids the spiritual foundation they need to navigate life with faith, hope, and the love of Jesus in their hearts</p>
                       </div>
                     </div>
                  </div>
                  
-                 {/* Perfect For Section */}
-                 <div className="bg-[#FFD700]/10 rounded-xl p-4 mb-6 border border-[#FFD700]/30">
-                    <h3 className="text-[#FFD700] font-bold text-sm text-center mb-3">✨ Perfect For</h3>
-                    <div className="flex justify-center gap-2 flex-wrap">
-                      <span className="bg-white/10 text-white text-xs px-3 py-1 rounded-full">Homeschool Families</span>
-                      <span className="bg-white/10 text-white text-xs px-3 py-1 rounded-full">Christian Parents</span>
-                      <span className="bg-white/10 text-white text-xs px-3 py-1 rounded-full">Car Rides</span>
-                      <span className="bg-white/10 text-white text-xs px-3 py-1 rounded-full">Bedtime Stories</span>
-                      <span className="bg-white/10 text-white text-xs px-3 py-1 rounded-full">Screen Time Alternative</span>
-                    </div>
+                 {/* Testimonial Style Quote */}
+                 <div className="bg-[#FFD700]/10 rounded-xl p-4 mb-6 border border-[#FFD700]/30 text-center">
+                    <p className="text-white text-sm italic mb-2">
+                      "Train up a child in the way he should go; even when he is old he will not depart from it."
+                    </p>
+                    <p className="text-[#FFD700] text-xs font-bold">— Proverbs 22:6</p>
                  </div>
                  
                  {/* Main Card */}
