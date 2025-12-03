@@ -66,6 +66,9 @@ const HomePage: React.FC = () => {
   const [recentlyReadBooks, setRecentlyReadBooks] = useState<any[]>([]);
   const [recentlyPlayedPlaylists, setRecentlyPlayedPlaylists] = useState<any[]>([]);
   
+  // Top Rated content state
+  const [topRatedBooks, setTopRatedBooks] = useState<any[]>([]);
+  const [topRatedPlaylists, setTopRatedPlaylists] = useState<any[]>([]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
@@ -180,6 +183,7 @@ const HomePage: React.FC = () => {
     fetchExploreCategories();
     fetchPlaylists();
     fetchFeaturedContent();
+    fetchTopRatedContent();
   }, []);
 
   const fetchLessons = async () => {
@@ -297,6 +301,21 @@ const HomePage: React.FC = () => {
       console.error('❌ Error fetching featured content:', error);
     } finally {
       setFeaturedLoading(false);
+    }
+  };
+
+  // Fetch top-rated content (15%+ engagement ratio)
+  const fetchTopRatedContent = async () => {
+    try {
+      const [topBooks, topPlaylists] = await Promise.all([
+        ApiService.getTopRatedBooks(0.15),
+        ApiService.getTopRatedPlaylists(0.15),
+      ]);
+      console.log('🏆 Top rated books:', topBooks.length, 'playlists:', topPlaylists.length);
+      setTopRatedBooks(topBooks);
+      setTopRatedPlaylists(topPlaylists);
+    } catch (error) {
+      console.error('❌ Error fetching top-rated content:', error);
     }
   };
 
@@ -773,6 +792,75 @@ const HomePage: React.FC = () => {
                       />
                       <div className="absolute top-2 right-2 bg-purple-500 rounded-full p-1 shadow-lg">
                         <CheckCircle className="w-5 h-5 text-white" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Top Rated Books Section */}
+        {topRatedBooks.length > 0 && (
+          <section className="mt-6">
+            <SectionTitle 
+              title="Top Rated Books" 
+              icon="🏆"
+              color="#FFD700"
+            />
+            <div className="w-screen overflow-x-auto no-scrollbar pb-4 -mx-4">
+              <div className="flex space-x-3 px-4">
+                {topRatedBooks.map((book) => (
+                  <div 
+                    key={book.id || book._id} 
+                    className="relative flex-shrink-0 w-[140px] md:w-[160px]"
+                  >
+                    <BookCard
+                      book={book}
+                      onClick={() => handleBookClick(book.id || book._id)}
+                    />
+                    {/* Star badge for top rated */}
+                    <div className="absolute top-2 left-2 bg-[#FFD700] rounded-full p-1 shadow-lg">
+                      <span className="text-xs">⭐</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Top Rated Playlists Section */}
+        {topRatedPlaylists.length > 0 && (
+          <section className="mt-6">
+            <SectionTitle 
+              title="Top Rated Playlists" 
+              icon="🎵"
+              color="#FFD700"
+            />
+            <div className="w-screen overflow-x-auto no-scrollbar pb-4 -mx-4">
+              <div className="flex space-x-3 px-4">
+                {topRatedPlaylists.map((playlist) => {
+                  const playlistItem = {
+                    id: playlist._id || playlist.id,
+                    title: playlist.title,
+                    author: playlist.author || 'Kingdom Builders',
+                    coverUrl: playlist.coverImage,
+                    isAudio: true,
+                  };
+                  return (
+                    <div 
+                      key={playlist._id || playlist.id} 
+                      className="relative flex-shrink-0 w-[140px] md:w-[160px]"
+                    >
+                      <BookCard
+                        book={playlistItem}
+                        onClick={() => navigate(`/audio/playlist/${playlist._id || playlist.id}`)}
+                      />
+                      {/* Star badge for top rated */}
+                      <div className="absolute top-2 left-2 bg-[#FFD700] rounded-full p-1 shadow-lg">
+                        <span className="text-xs">⭐</span>
                       </div>
                     </div>
                   );

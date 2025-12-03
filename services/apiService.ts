@@ -495,6 +495,44 @@ export const ApiService = {
     }
   },
 
+  // Get top-rated books (15%+ likes/favorites to reads ratio)
+  getTopRatedBooks: async (minRatio: number = 0.15): Promise<Book[]> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetchWithTimeout(`${baseUrl}books/top-rated?minRatio=${minRatio}`, {
+        method: 'GET',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return transformBooks(Array.isArray(data) ? data : []);
+      }
+      return [];
+    } catch (error) {
+      console.warn("Failed to fetch top-rated books:", error);
+      return [];
+    }
+  },
+
+  // Get top-rated playlists (15%+ likes/favorites to plays ratio)
+  getTopRatedPlaylists: async (minRatio: number = 0.15): Promise<Playlist[]> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetchWithTimeout(`${baseUrl}playlists/top-rated?minRatio=${minRatio}`, {
+        method: 'GET',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      }
+      return [];
+    } catch (error) {
+      console.warn("Failed to fetch top-rated playlists:", error);
+      return [];
+    }
+  },
+
   login: async (provider: 'apple' | 'google' | 'email', credentials?: { email?: string; password?: string }): Promise<{ success: boolean; token?: string; user?: any; error?: string }> => {
     try {
       const baseUrl = getApiBaseUrl();
