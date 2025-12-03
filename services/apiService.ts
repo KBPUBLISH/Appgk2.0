@@ -1399,6 +1399,7 @@ export const ApiService = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookId, age: age || 6 }),
+        timeout: 60000, // 60 seconds - OpenAI quiz generation can take a while
       });
 
       if (response.ok) {
@@ -1424,6 +1425,7 @@ export const ApiService = {
       
       const response = await fetchWithTimeout(`${baseUrl}quiz/${bookId}${queryString}`, {
         method: 'GET',
+        timeout: 30000, // 30 seconds for fetching quiz
       });
 
       if (response.ok) {
