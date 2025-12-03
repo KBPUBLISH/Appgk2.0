@@ -1391,19 +1391,19 @@ export const ApiService = {
 
   // === BOOK QUIZ API ===
 
-  // Generate a quiz for a book using AI
-  generateBookQuiz: async (bookId: string): Promise<any | null> => {
+  // Generate a quiz for a book using AI (age-appropriate)
+  generateBookQuiz: async (bookId: string, age?: number): Promise<any | null> => {
     try {
       const baseUrl = getApiBaseUrl();
       const response = await fetchWithTimeout(`${baseUrl}quiz/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookId }),
+        body: JSON.stringify({ bookId, age: age || 6 }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        console.log(`📝 Quiz generated for book ${bookId}:`, data.cached ? 'from cache' : 'newly generated');
+        console.log(`📝 Quiz generated for book ${bookId} (age ${age || 6}):`, data.cached ? 'from cache' : 'newly generated');
         return data;
       }
       return null;
@@ -1413,12 +1413,16 @@ export const ApiService = {
     }
   },
 
-  // Get quiz for a book
-  getBookQuiz: async (bookId: string, userId?: string): Promise<any | null> => {
+  // Get quiz for a book (age-appropriate)
+  getBookQuiz: async (bookId: string, userId?: string, age?: number): Promise<any | null> => {
     try {
       const baseUrl = getApiBaseUrl();
-      const queryParam = userId ? `?userId=${userId}` : '';
-      const response = await fetchWithTimeout(`${baseUrl}quiz/${bookId}${queryParam}`, {
+      const params = new URLSearchParams();
+      if (userId) params.append('userId', userId);
+      if (age) params.append('age', age.toString());
+      const queryString = params.toString() ? `?${params.toString()}` : '';
+      
+      const response = await fetchWithTimeout(`${baseUrl}quiz/${bookId}${queryString}`, {
         method: 'GET',
       });
 
@@ -1432,14 +1436,14 @@ export const ApiService = {
     }
   },
 
-  // Submit quiz answers
-  submitBookQuiz: async (bookId: string, userId: string, answers: number[]): Promise<any | null> => {
+  // Submit quiz answers (with age for validation)
+  submitBookQuiz: async (bookId: string, userId: string, answers: number[], age?: number): Promise<any | null> => {
     try {
       const baseUrl = getApiBaseUrl();
       const response = await fetchWithTimeout(`${baseUrl}quiz/${bookId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, answers }),
+        body: JSON.stringify({ userId, answers, age: age || 6 }),
       });
 
       if (response.ok) {

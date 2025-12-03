@@ -75,7 +75,19 @@ const BookReaderPage: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { setGameMode, setMusicPaused, musicEnabled, toggleMusic } = useAudio();
-    const { isVoiceUnlocked, isSubscribed, addCoins } = useUser();
+    const { isVoiceUnlocked, isSubscribed, addCoins, kids, currentProfileId } = useUser();
+    
+    // Get current kid's age for age-appropriate quiz
+    const getCurrentKidAge = (): number => {
+        if (currentProfileId && kids.length > 0) {
+            const currentKid = kids.find(k => k.id === currentProfileId);
+            if (currentKid && currentKid.age) {
+                return currentKid.age;
+            }
+        }
+        return 6; // Default age if not found
+    };
+    const kidAge = getCurrentKidAge();
     const wasMusicEnabledRef = useRef<boolean>(false);
     const [pages, setPages] = useState<Page[]>([]);
     const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -1957,6 +1969,7 @@ const BookReaderPage: React.FC = () => {
                 bookTitle={bookTitle}
                 attemptCount={quizAttemptCount}
                 maxAttempts={2}
+                kidAge={kidAge}
                 onQuizComplete={(score, coinsEarned) => {
                     // Update attempt count
                     setQuizAttemptCount(prev => prev + 1);

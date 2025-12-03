@@ -20,8 +20,16 @@ interface BookQuizModalProps {
     bookTitle: string;
     attemptCount: number;
     maxAttempts: number;
+    kidAge?: number; // Age of the current kid profile
     onQuizComplete: (score: number, coinsEarned: number) => void;
 }
+
+// Helper to get age group label for display
+const getAgeGroupLabel = (age: number): string => {
+    if (age <= 5) return '3-5 years';
+    if (age <= 8) return '6-8 years';
+    return '9-12 years';
+};
 
 const BookQuizModal: React.FC<BookQuizModalProps> = ({
     isOpen,
@@ -30,6 +38,7 @@ const BookQuizModal: React.FC<BookQuizModalProps> = ({
     bookTitle,
     attemptCount,
     maxAttempts,
+    kidAge = 6, // Default to 6 if not provided
     onQuizComplete,
 }) => {
     const { addCoins } = useUser();
@@ -41,6 +50,7 @@ const BookQuizModal: React.FC<BookQuizModalProps> = ({
     const [results, setResults] = useState<any>(null);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [ageGroup, setAgeGroup] = useState<string>('');
 
     // Get user ID (using localStorage for now)
     const getUserId = () => {
@@ -56,19 +66,21 @@ const BookQuizModal: React.FC<BookQuizModalProps> = ({
         if (isOpen && bookId) {
             loadQuiz();
         }
-    }, [isOpen, bookId]);
+    }, [isOpen, bookId, kidAge]);
 
     const loadQuiz = async () => {
         setLoading(true);
         setError(null);
         try {
-            // First try to get existing quiz
-            let quizData = await ApiService.getBookQuiz(bookId, getUserId());
+            console.log(`📝 Loading quiz for age ${kidAge}...`);
             
-            // If no quiz exists, generate one
-            if (!quizData || !quizData.quiz) {
-                console.log('📝 No quiz found, generating...');
-                const generated = await ApiService.generateBookQuiz(bookId);
+            // First try to get existing quiz for this age group
+            let quizData = await ApiService.getBookQuiz(bookId, getUserId(), kidAge);
+            
+            // If no quiz exists for this age group, generate one
+            if (!quizData || !quizData.quiz || quizData.needsGeneration) {
+                console.log(`📝 No quiz found for age ${kidAge}, generating...`);
+                const generated = await ApiService.generateBookQuiz(bookId, kidAge);
                 if (generated && generated.quiz) {
                     quizData = { quiz: generated.quiz };
                 }
@@ -76,6 +88,7 @@ const BookQuizModal: React.FC<BookQuizModalProps> = ({
 
             if (quizData && quizData.quiz && quizData.quiz.questions) {
                 setQuestions(quizData.quiz.questions);
+                setAgeGroup(quizData.quiz.ageGroup || getAgeGroupLabel(kidAge));
             } else {
                 setError('Could not load quiz questions');
             }
@@ -117,7 +130,7 @@ const BookQuizModal: React.FC<BookQuizModalProps> = ({
                 selectedAnswers.get(i) ?? -1
             );
 
-            const result = await ApiService.submitBookQuiz(bookId, getUserId(), answersArray);
+            const result = await ApiService.submitBookQuiz(bookId, getUserId(), answersArray, kidAge);
             
             if (result) {
                 setResults(result);
@@ -166,9 +179,16 @@ const BookQuizModal: React.FC<BookQuizModalProps> = ({
                         }}
                     />
                     <div className="flex items-center justify-between relative z-10">
-                        <h2 className="text-[#FFD700] text-xl font-black font-display drop-shadow-lg">
-                            📚 Story Quiz
-                        </h2>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-[#FFD700] text-xl font-black font-display drop-shadow-lg">
+                                📚 Story Quiz
+                            </h2>
+                            {ageGroup && (
+                                <span className="bg-[#FFD700]/20 text-[#FFD700] text-xs px-2 py-0.5 rounded-full font-bold">
+                                    Ages {ageGroup}
+                                </span>
+                            )}
+                        </div>
                         <button
                             onClick={handleClose}
                             className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/10 transition"
@@ -190,7 +210,7 @@ const BookQuizModal: React.FC<BookQuizModalProps> = ({
                                 Preparing your quiz...
                             </p>
                             <p className="text-[#8B4513] text-sm mt-2">
-                                Our AI is creating questions just for you!
+                                Creating age-appropriate questions for {getAgeGroupLabel(kidAge)}!
                             </p>
                         </div>
                     ) : error ? (
