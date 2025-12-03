@@ -142,6 +142,11 @@ const BookReaderPage: React.FC = () => {
     const [isFavorite, setIsFavorite] = useState(false);
     const [isLiked, setIsLiked] = useState(false);
     
+    // Audio preloading cache - stores preloaded audio for upcoming pages
+    // Key: `${pageIndex}-${textBoxIndex}-${voiceId}`, Value: { audioUrl, alignment }
+    const audioPreloadCacheRef = useRef<Map<string, { audioUrl: string; alignment: any }>>(new Map());
+    const preloadingInProgressRef = useRef<Set<string>>(new Set());
+    
     // Quiz state
     const [showQuizModal, setShowQuizModal] = useState(false);
     const [quizAttemptCount, setQuizAttemptCount] = useState(0);
@@ -732,21 +737,13 @@ const BookReaderPage: React.FC = () => {
             e.stopPropagation();
         }
 
-        // If scroll is currently closed and user is opening it, turn to next page
-        if (!showScroll && currentPageIndex < pages.length - 1) {
-            // Turn to next page with scroll open
-            stopAudio();
-            // Set desired scroll state to open for next page
-            desiredScrollStateRef.current = true;
-            handleNext({ stopPropagation: () => { } } as React.MouseEvent);
-        } else {
-            // Just toggle scroll state (closing it or already on last page)
-            setShowScroll(prev => {
-                const newState = !prev;
-                showScrollRef.current = newState; // Update ref
-                return newState;
-            });
-        }
+        // Simply toggle scroll state - tapping should NEVER turn the page
+        // Only swipe or auto-play should turn pages
+        setShowScroll(prev => {
+            const newState = !prev;
+            showScrollRef.current = newState; // Update ref
+            return newState;
+        });
     };
 
     // Handle background tap - toggle scroll or turn page if auto-play is active
@@ -815,6 +812,67 @@ const BookReaderPage: React.FC = () => {
         }
     };
 
+    // Preload audio for upcoming pages (runs in background)
+    const preloadUpcomingAudio = async (startPageIndex: number) => {
+        const pagesToPreload = 3; // Preload next 3 pages
+        
+        for (let i = 0; i < pagesToPreload; i++) {
+            const pageIndex = startPageIndex + i;
+            if (pageIndex >= pages.length - 1) break; // Don't preload "The End" page
+            
+            const page = pages[pageIndex];
+            if (!page || !page.textBoxes) continue;
+            
+            // Preload each text box on the page
+            for (let textBoxIndex = 0; textBoxIndex < page.textBoxes.length; textBoxIndex++) {
+                const textBox = page.textBoxes[textBoxIndex];
+                if (!textBox.text) continue;
+                
+                const cacheKey = `${pageIndex}-${textBoxIndex}-${selectedVoiceId}`;
+                
+                // Skip if already cached or currently preloading
+                if (audioPreloadCacheRef.current.has(cacheKey) || preloadingInProgressRef.current.has(cacheKey)) {
+                    continue;
+                }
+                
+                // Mark as preloading
+                preloadingInProgressRef.current.add(cacheKey);
+                
+                // Preload in background (don't await to avoid blocking)
+                (async () => {
+                    try {
+                        const processedText = processTextWithEmotionalCues(textBox.text);
+                        const result = await ApiService.generateTTS(
+                            processedText.ttsText,
+                            selectedVoiceId,
+                            bookId || undefined
+                        );
+                        
+                        if (result && result.audioUrl) {
+                            audioPreloadCacheRef.current.set(cacheKey, {
+                                audioUrl: result.audioUrl,
+                                alignment: result.alignment
+                            });
+                            console.log(`🎵 Preloaded audio for page ${pageIndex + 1}, text box ${textBoxIndex + 1}`);
+                        }
+                    } catch (err) {
+                        console.warn(`Failed to preload audio for page ${pageIndex + 1}:`, err);
+                    } finally {
+                        preloadingInProgressRef.current.delete(cacheKey);
+                    }
+                })();
+            }
+        }
+    };
+
+    // Trigger preloading when page changes or voice changes
+    useEffect(() => {
+        if (pages.length > 0 && selectedVoiceId) {
+            // Start preloading from current page
+            preloadUpcomingAudio(currentPageIndex);
+        }
+    }, [currentPageIndex, selectedVoiceId, pages.length]);
+
     const handlePlayText = async (text: string, index: number, e: React.MouseEvent, isAutoPlay: boolean = false) => {
         e.stopPropagation();
 
@@ -843,7 +901,7 @@ const BookReaderPage: React.FC = () => {
             return;
         }
 
-        // Otherwise, generate/fetch new audio using WebSocket
+        // Otherwise, generate/fetch new audio
         setActiveTextBoxIndex(index);
         setLoadingAudio(true);
         setCurrentWordIndex(-1);
@@ -852,17 +910,23 @@ const BookReaderPage: React.FC = () => {
         alignmentWarningShownRef.current = false; // Reset warning flag for new audio
 
         try {
-            // Process text to extract emotional cues
-            const processedText = processTextWithEmotionalCues(text);
+            // Check preload cache first
+            const cacheKey = `${currentPageIndex}-${index}-${selectedVoiceId}`;
+            let result = audioPreloadCacheRef.current.get(cacheKey);
+            
+            if (result) {
+                console.log(`🎵 Using preloaded audio for page ${currentPageIndex + 1}, text box ${index + 1}`);
+            } else {
+                // Not in cache, generate now
+                const processedText = processTextWithEmotionalCues(text);
+                result = await ApiService.generateTTS(
+                    processedText.ttsText, // Send text with cues to ElevenLabs
+                    selectedVoiceId,
+                    bookId || undefined
+                ) || undefined;
+            }
 
-            // Use HTTP API for TTS with emotional cues preserved
-            const result = await ApiService.generateTTS(
-                processedText.ttsText, // Send text with cues to ElevenLabs
-                selectedVoiceId,
-                bookId || undefined
-            );
-
-            // Use final audio URL from WebSocket
+            // Use audio URL (from cache or freshly generated)
             if (result && result.audioUrl) {
                 const audio = new Audio(result.audioUrl);
 
