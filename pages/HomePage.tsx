@@ -10,7 +10,7 @@ import DailyRewardModal from '../components/features/DailyRewardModal';
 import ChallengeGameModal from '../components/features/ChallengeGameModal';
 import StrengthGameModal from '../components/features/StrengthGameModal';
 import PrayerGameModal from '../components/features/PrayerGameModal';
-import { BookOpen, Key, Brain, Dumbbell, Heart, Video, ChevronRight, Lock, Check, Play, CheckCircle } from 'lucide-react';
+import { BookOpen, Key, Brain, Dumbbell, Heart, Video, ChevronRight, Lock, Check, Play, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { ApiService } from '../services/apiService';
 import { isCompleted, isLocked, getWeekDays } from '../services/lessonService';
 import { readingProgressService } from '../services/readingProgressService';
@@ -66,6 +66,12 @@ const HomePage: React.FC = () => {
   // Recently Read/Played state
   const [recentlyReadBooks, setRecentlyReadBooks] = useState<any[]>([]);
   const [recentlyPlayedPlaylists, setRecentlyPlayedPlaylists] = useState<any[]>([]);
+  
+  // Category expansion state - tracks which categories are expanded
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  
+  // Number of items to show when collapsed
+  const COLLAPSED_ITEM_COUNT = 4;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
@@ -323,6 +329,19 @@ const HomePage: React.FC = () => {
       console.log('🎵 Recently played playlists:', recentPlaylists.length);
     }
   }, [playlists]);
+
+  // Toggle category expansion
+  const toggleCategoryExpansion = (categoryId: string) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
+  };
 
   // Group books and playlists by category
   const getBooksByCategory = (categoryName: string) => {
@@ -701,6 +720,11 @@ const HomePage: React.FC = () => {
               
               if (allItems.length === 0) return null;
               
+              const isExpanded = expandedCategories.has(category._id);
+              const hasMoreItems = allItems.length > COLLAPSED_ITEM_COUNT;
+              const displayItems = isExpanded ? allItems : allItems.slice(0, COLLAPSED_ITEM_COUNT);
+              const hiddenCount = allItems.length - COLLAPSED_ITEM_COUNT;
+              
               return (
                 <section key={category._id} className="mt-6">
                   <SectionTitle 
@@ -709,7 +733,7 @@ const HomePage: React.FC = () => {
                     color={category.color}
                   />
                   <div className="grid grid-cols-2 gap-4 mt-4">
-                    {allItems.map((item) => (
+                    {displayItems.map((item) => (
                       <BookCard
                         key={item.id || item._id}
                         book={item}
@@ -717,6 +741,30 @@ const HomePage: React.FC = () => {
                       />
                     ))}
                   </div>
+                  
+                  {/* Collapse/Expand Button */}
+                  {hasMoreItems && (
+                    <button
+                      onClick={() => toggleCategoryExpansion(category._id)}
+                      className="w-full mt-4 py-3 px-4 bg-gradient-to-r from-[#8B4513]/80 to-[#A0522D]/80 hover:from-[#8B4513] hover:to-[#A0522D] rounded-xl border-2 border-[#5c2e0b]/50 shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                    >
+                      {isExpanded ? (
+                        <>
+                          <ChevronUp className="w-5 h-5 text-[#FFD700]" />
+                          <span className="text-white font-display font-bold text-sm">
+                            Show Less
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-5 h-5 text-[#FFD700]" />
+                          <span className="text-white font-display font-bold text-sm">
+                            Show {hiddenCount} More
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </section>
               );
             })
