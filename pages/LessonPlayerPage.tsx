@@ -66,6 +66,7 @@ const LessonPlayerPage: React.FC = () => {
     const [isAudioPlaying, setIsAudioPlaying] = useState(false);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+    const [showGeneratingPopup, setShowGeneratingPopup] = useState(false);
     const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
     const [voices, setVoices] = useState<any[]>([]);
     const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
@@ -276,24 +277,29 @@ const LessonPlayerPage: React.FC = () => {
         if (!fullText.trim()) return;
 
         setIsGeneratingAudio(true);
+        setShowGeneratingPopup(true);
         try {
             const result = await ApiService.generateTTS(fullText, selectedVoiceId, lessonId);
             if (result && result.audioUrl) {
                 setAudioUrl(result.audioUrl);
+                setShowGeneratingPopup(false);
                 // Auto-play after generation
                 setTimeout(() => {
                     playAudio(result.audioUrl);
                 }, 100);
             } else {
                 console.error('Failed to generate audio');
+                setShowGeneratingPopup(false);
             }
         } catch (error: any) {
             // Handle AbortError gracefully (expected when navigating away or cancelling)
             if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
                 // Silently handle abort - this is expected behavior
+                setShowGeneratingPopup(false);
                 return;
             }
             console.error('Error generating audio:', error);
+            setShowGeneratingPopup(false);
         } finally {
             setIsGeneratingAudio(false);
         }
@@ -446,6 +452,45 @@ const LessonPlayerPage: React.FC = () => {
 
     return (
         <>
+            {/* Voice Generation Loading Popup */}
+            {showGeneratingPopup && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                    <div className="bg-[#5D4037] rounded-2xl p-8 mx-4 max-w-sm w-full shadow-2xl border-4 border-[#3E2723] text-center">
+                        {/* Animated Icon */}
+                        <div className="mb-6 relative">
+                            <div className="w-20 h-20 mx-auto bg-[#3E2723] rounded-full flex items-center justify-center">
+                                <Loader2 className="w-10 h-10 text-[#FFD700] animate-spin" />
+                            </div>
+                            <div className="absolute inset-0 w-20 h-20 mx-auto rounded-full border-4 border-[#FFD700]/30 animate-ping" />
+                        </div>
+                        
+                        {/* Title */}
+                        <h3 className="text-[#FFD700] text-xl font-bold font-display mb-3">
+                            Preparing Your Story
+                        </h3>
+                        
+                        {/* Message */}
+                        <p className="text-white/90 text-sm leading-relaxed mb-4">
+                            The voice is being generated in the background. This may take a minute or two.
+                        </p>
+                        
+                        {/* Sub-message */}
+                        <div className="bg-[#3E2723] rounded-lg p-3 border border-[#FFD700]/20">
+                            <p className="text-[#FFD700]/80 text-xs">
+                                ✨ It will start playing automatically when ready!
+                            </p>
+                        </div>
+                        
+                        {/* Progress dots animation */}
+                        <div className="flex justify-center gap-2 mt-6">
+                            <div className="w-2 h-2 bg-[#FFD700] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <div className="w-2 h-2 bg-[#FFD700] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <div className="w-2 h-2 bg-[#FFD700] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {currentScreen === 'video' ? (
                 <div className="fixed inset-0 z-50 bg-black overflow-hidden">
                     {/* Progress Bar - Only show on video screen at top */}
