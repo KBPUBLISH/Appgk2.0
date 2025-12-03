@@ -217,10 +217,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             // Try to play background music if it should be playing
             if (musicEnabled && !musicForcePaused) {
                 const bg = bgAudioRef.current;
-                if (bg && musicMode === 'bg' && bg.paused) {
+                // Only try to play if audio has a valid source
+                if (bg && musicMode === 'bg' && bg.paused && bg.src && bg.readyState >= 2) {
                     bg.play().then(() => {
-                        console.log('🎵 BG Music unlocked by user interaction');
-                    }).catch(e => console.warn('Unlock failed:', e));
+                        console.log('🎵 BG Music started after user interaction');
+                    }).catch(e => {
+                        // Silently ignore expected autoplay errors
+                        if (e.name !== 'NotAllowedError' && e.name !== 'NotSupportedError') {
+                            console.warn('Audio play error:', e);
+                        }
+                    });
                 }
             }
         };
@@ -344,7 +350,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     useEffect(() => {
         if (playlistAudioRef.current) {
             if (isPlaying) {
-                playlistAudioRef.current.play().catch(e => console.error("Play error:", e));
+                playlistAudioRef.current.play().catch(e => {
+                    // Silently ignore expected autoplay/abort errors
+                    if (e.name !== 'NotAllowedError' && e.name !== 'AbortError' && e.name !== 'NotSupportedError') {
+                        console.error("Play error:", e);
+                    }
+                });
             } else {
                 playlistAudioRef.current.pause();
             }
