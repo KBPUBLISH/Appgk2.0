@@ -34,12 +34,13 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
 
     // Resolve the background image URL when it changes
     useEffect(() => {
+        console.log('🎨 ColoringModal received backgroundImageUrl:', backgroundImageUrl);
         if (backgroundImageUrl) {
             const resolved = resolveMediaUrl(backgroundImageUrl);
-            console.log('🎨 Coloring page image:', { original: backgroundImageUrl, resolved });
+            console.log('🎨 Coloring page image resolved:', { original: backgroundImageUrl, resolved });
             setResolvedImageUrl(resolved);
         } else {
-            console.log('🎨 No coloring page image provided');
+            console.log('🎨 No coloring page image provided to ColoringModal');
             setResolvedImageUrl('');
         }
     }, [backgroundImageUrl]);

@@ -1800,6 +1800,8 @@ const BookReaderPage: React.FC = () => {
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
+                                            console.log('🎨 Opening coloring modal with page:', selectedColoringPage);
+                                            console.log('🎨 Background URL:', selectedColoringPage?.backgroundUrl || selectedColoringPage?.files?.background?.url);
                                             setShowColoringModal(true);
                                         }}
                                         className="bg-[#9C27B0] hover:bg-[#7B1FA2] text-white p-4 rounded-xl font-bold shadow-lg border-b-4 border-[#6A1B9A] active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 group"

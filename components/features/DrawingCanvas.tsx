@@ -32,6 +32,11 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
     const [isEraser, setIsEraser] = useState(false);
     const [isCompleted, setIsCompleted] = useState(false);
 
+    // Track if canvas has been initialized
+    const [canvasReady, setCanvasReady] = useState(false);
+    const [imageLoaded, setImageLoaded] = useState(false);
+
+    // Initialize canvas
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -53,31 +58,14 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
             // Set display size (CSS pixels)
             canvas.style.width = rect.width + 'px';
             canvas.style.height = rect.height + 'px';
+
+            // Fill with white background
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, rect.width, rect.height);
         };
 
         resizeCanvas();
-
-        // Set default background (in CSS pixels since context is scaled)
-        const dpr = window.devicePixelRatio || 1;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-
-        // Draw background image if provided
-        if (backgroundImageUrl) {
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            img.src = backgroundImageUrl;
-            img.onload = () => {
-                // Calculate aspect ratio to fit image within canvas
-                const canvasWidth = canvas.width / dpr;
-                const canvasHeight = canvas.height / dpr;
-                const scale = Math.min(canvasWidth / img.width, canvasHeight / img.height);
-                const x = (canvasWidth / 2) - (img.width / 2) * scale;
-                const y = (canvasHeight / 2) - (img.height / 2) * scale;
-
-                ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-            };
-        }
+        setCanvasReady(true);
 
         // Set line properties
         ctx.lineCap = 'round';
@@ -87,6 +75,50 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
         window.addEventListener('resize', resizeCanvas);
         return () => window.removeEventListener('resize', resizeCanvas);
     }, []);
+
+    // Load background image when URL changes or canvas is ready
+    useEffect(() => {
+        if (!canvasReady || !backgroundImageUrl) {
+            console.log('🎨 DrawingCanvas: Waiting for canvas or no image URL', { canvasReady, backgroundImageUrl });
+            return;
+        }
+
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        console.log('🎨 DrawingCanvas: Loading background image:', backgroundImageUrl);
+
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        
+        img.onload = () => {
+            console.log('🎨 DrawingCanvas: Image loaded successfully!', { width: img.width, height: img.height });
+            const dpr = window.devicePixelRatio || 1;
+            const canvasWidth = canvas.width / dpr;
+            const canvasHeight = canvas.height / dpr;
+            
+            // Clear canvas and redraw white background
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+            
+            // Calculate aspect ratio to fit image within canvas
+            const scale = Math.min(canvasWidth / img.width, canvasHeight / img.height);
+            const x = (canvasWidth / 2) - (img.width / 2) * scale;
+            const y = (canvasHeight / 2) - (img.height / 2) * scale;
+
+            ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+            setImageLoaded(true);
+        };
+
+        img.onerror = (err) => {
+            console.error('🎨 DrawingCanvas: Failed to load image:', backgroundImageUrl, err);
+        };
+
+        img.src = backgroundImageUrl;
+    }, [canvasReady, backgroundImageUrl]);
 
     // Add non-passive event listeners for touch to prevent scrolling while drawing
     useEffect(() => {
