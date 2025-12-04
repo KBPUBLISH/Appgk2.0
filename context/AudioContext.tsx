@@ -137,28 +137,60 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // --- Initialization of Background Audio ---
     useEffect(() => {
+        // Helper to create audio with error handling
+        const createAudio = (url: string, volume: number, name: string): HTMLAudioElement => {
+            const audio = new Audio();
+            audio.loop = true;
+            audio.volume = volume;
+            audio.preload = 'auto';
+            // Don't set crossOrigin - it can cause CORS issues with some hosts
+            
+            // Add comprehensive error handling
+            audio.onerror = (e) => {
+                console.error(`🔴 ${name} Audio Error:`, {
+                    error: audio.error,
+                    code: audio.error?.code,
+                    message: audio.error?.message,
+                    src: url
+                });
+            };
+            
+            audio.oncanplaythrough = () => {
+                console.log(`✅ ${name} Audio ready to play`);
+            };
+            
+            audio.onloadstart = () => {
+                console.log(`⏳ ${name} Audio loading...`);
+            };
+            
+            audio.onplay = () => {
+                console.log(`▶️ ${name} Audio playing`);
+            };
+            
+            audio.onpause = () => {
+                console.log(`⏸️ ${name} Audio paused`);
+            };
+            
+            // Set source last to trigger loading
+            audio.src = url;
+            
+            return audio;
+        };
+
         // BG Audio
-        bgAudioRef.current = new Audio(BG_MUSIC_URL);
-        bgAudioRef.current.loop = true;
-        bgAudioRef.current.volume = 0.15;
-        bgAudioRef.current.preload = 'auto';
-        bgAudioRef.current.crossOrigin = 'anonymous';
+        bgAudioRef.current = createAudio(BG_MUSIC_URL, 0.15, 'BG');
 
         // Game Audio
-        gameAudioRef.current = new Audio(GAME_MUSIC_URL);
-        gameAudioRef.current.loop = true;
-        gameAudioRef.current.volume = 0.25;
-        gameAudioRef.current.preload = 'auto';
-        gameAudioRef.current.crossOrigin = 'anonymous';
+        gameAudioRef.current = createAudio(GAME_MUSIC_URL, 0.25, 'Game');
 
         // Workout Audio
-        workoutAudioRef.current = new Audio(WORKOUT_MUSIC_URL);
-        workoutAudioRef.current.loop = true;
-        workoutAudioRef.current.volume = 0.3;
-        workoutAudioRef.current.preload = 'auto';
-        workoutAudioRef.current.crossOrigin = 'anonymous';
+        workoutAudioRef.current = createAudio(WORKOUT_MUSIC_URL, 0.3, 'Workout');
 
-        console.log('🎵 Audio System Initialized with hardcoded URLs');
+        console.log('🎵 Audio System Initialized with hardcoded URLs:', {
+            bg: BG_MUSIC_URL,
+            game: GAME_MUSIC_URL,
+            workout: WORKOUT_MUSIC_URL
+        });
 
         return () => {
             bgAudioRef.current?.pause();
@@ -174,65 +206,105 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const game = gameAudioRef.current;
         const workout = workoutAudioRef.current;
 
-        if (!bg || !game || !workout) return;
+        if (!bg || !game || !workout) {
+            console.log('🎵 Audio refs not ready yet');
+            return;
+        }
 
         const shouldPlay = musicEnabled && !musicForcePaused;
+        console.log('🎵 Music state:', { musicEnabled, musicForcePaused, shouldPlay, musicMode });
 
         if (!shouldPlay) {
             // Pause all if disabled or force paused
             bg.pause();
             game.pause();
             workout.pause();
+            console.log('🎵 All music paused (disabled or force paused)');
             return;
         }
 
         // Helper to play one and pause others
-        const playSelected = (toPlay: HTMLAudioElement, others: HTMLAudioElement[]) => {
+        const playSelected = async (toPlay: HTMLAudioElement, others: HTMLAudioElement[], name: string) => {
             others.forEach(a => a.pause());
             if (toPlay.paused) {
-                toPlay.play().catch(e => {
-                    // Auto-play might be blocked until user interaction
-                    // console.warn('Autoplay prevented:', e); 
+                console.log(`🎵 Attempting to play ${name}...`, {
+                    src: toPlay.src,
+                    readyState: toPlay.readyState,
+                    networkState: toPlay.networkState,
+                    paused: toPlay.paused,
+                    error: toPlay.error
                 });
+                
+                try {
+                    await toPlay.play();
+                    console.log(`🎵 ${name} music started successfully`);
+                } catch (e: any) {
+                    if (e.name === 'NotAllowedError') {
+                        console.log(`🎵 ${name} autoplay blocked - will play after user interaction`);
+                    } else if (e.name === 'NotSupportedError') {
+                        console.error(`🔴 ${name} audio format not supported or source invalid`);
+                    } else {
+                        console.error(`🔴 ${name} play error:`, e);
+                    }
+                }
             }
         };
 
         if (musicMode === 'bg') {
-            playSelected(bg, [game, workout]);
+            playSelected(bg, [game, workout], 'BG');
         } else if (musicMode === 'game') {
-            playSelected(game, [bg, workout]);
+            playSelected(game, [bg, workout], 'Game');
         } else if (musicMode === 'workout') {
-            playSelected(workout, [bg, game]);
+            playSelected(workout, [bg, game], 'Workout');
         }
 
     }, [musicEnabled, musicForcePaused, musicMode]);
 
     // --- User Interaction Unlock ---
     useEffect(() => {
-        const unlock = () => {
+        const unlock = async () => {
+            console.log('🎵 User interaction detected, attempting to unlock audio...');
+            
             // Resume AudioContext if suspended
             if (audioContextRef.current?.state === 'suspended') {
-                audioContextRef.current.resume();
+                await audioContextRef.current.resume();
+                console.log('🎵 AudioContext resumed');
             }
 
-            // Try to play background music if it should be playing
+            // Try to play the appropriate music based on mode
             if (musicEnabled && !musicForcePaused) {
-                const bg = bgAudioRef.current;
-                // Only try to play if audio has a valid source
-                if (bg && musicMode === 'bg' && bg.paused && bg.src && bg.readyState >= 2) {
-                    bg.play().then(() => {
-                        console.log('🎵 BG Music started after user interaction');
-                    }).catch(e => {
-                        // Silently ignore expected autoplay errors
-                        if (e.name !== 'NotAllowedError' && e.name !== 'NotSupportedError') {
-                            console.warn('Audio play error:', e);
-                        }
+                let audioToPlay: HTMLAudioElement | null = null;
+                let audioName = '';
+                
+                if (musicMode === 'bg') {
+                    audioToPlay = bgAudioRef.current;
+                    audioName = 'BG';
+                } else if (musicMode === 'game') {
+                    audioToPlay = gameAudioRef.current;
+                    audioName = 'Game';
+                } else if (musicMode === 'workout') {
+                    audioToPlay = workoutAudioRef.current;
+                    audioName = 'Workout';
+                }
+                
+                if (audioToPlay && audioToPlay.paused && audioToPlay.src) {
+                    console.log(`🎵 Trying to play ${audioName} after unlock...`, {
+                        readyState: audioToPlay.readyState,
+                        src: audioToPlay.src
                     });
+                    
+                    try {
+                        await audioToPlay.play();
+                        console.log(`🎵 ${audioName} Music started after user interaction`);
+                    } catch (e: any) {
+                        console.warn(`🎵 ${audioName} play failed after unlock:`, e.message);
+                    }
                 }
             }
         };
 
-        const events = ['click', 'touchstart', 'keydown'];
+        // Listen for multiple interaction types
+        const events = ['click', 'touchstart', 'touchend', 'keydown', 'pointerdown'];
         events.forEach(evt => window.addEventListener(evt, unlock, { once: true }));
 
         return () => {
