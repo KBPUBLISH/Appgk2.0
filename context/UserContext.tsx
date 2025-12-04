@@ -130,6 +130,7 @@ interface UserContextType {
   
   isSubscribed: boolean;
   subscribe: () => void;
+  setIsSubscribed: (value: boolean) => void; // Direct setter for subscription status
 
   resetUser: () => void; // New method to wipe data
   
@@ -192,6 +193,7 @@ const UserContext = createContext<UserContextType>({
   equipSavedCharacter: () => {},
   isSubscribed: false,
   subscribe: () => {},
+  setIsSubscribed: () => {},
   resetUser: () => {},
   getParentAvatar: () => 'head-toast',
 });
@@ -1019,6 +1021,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       equipSavedCharacter,
       isSubscribed,
       subscribe,
+      setIsSubscribed,
       resetUser,
       getParentAvatar
     }}>

@@ -1,10 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, X, Loader2, RefreshCw } from 'lucide-react';
+import { Check, X, Loader2, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import ParentGateModal from '../components/features/ParentGateModal';
+import { authService } from '../services/authService';
+import { getApiBaseUrl } from '../services/apiService';
 
 const PaywallPage: React.FC = () => {
   const navigate = useNavigate();
@@ -22,6 +24,10 @@ const PaywallPage: React.FC = () => {
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [migrationResult, setMigrationResult] = useState<{
+    type: 'success' | 'info';
+    message: string;
+  } | null>(null);
 
   // If user already has premium, redirect to home
   useEffect(() => {
@@ -64,20 +70,52 @@ const PaywallPage: React.FC = () => {
   const handleRestorePurchases = async () => {
     setIsRestoring(true);
     setError(null);
+    setMigrationResult(null);
 
     try {
+      // First, try native RevenueCat restore
       const result = await restorePurchases();
 
-      if (result.success) {
-        // isPremium state will be updated by the context
-        // If premium was restored, useEffect will redirect
-        if (!isPremium) {
-          setError('No previous purchases found');
-        }
-      } else if (result.error) {
-        setError(result.error);
+      if (result.success && isPremium) {
+        // Native restore worked!
+        return;
       }
+
+      // If native restore didn't find purchases, try migration API for old app users
+      const user = authService.getUser();
+      if (user?.email) {
+        const baseUrl = getApiBaseUrl();
+        const migrationResponse = await fetch(`${baseUrl}migration/restore-subscription`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: user.email }),
+        });
+
+        const migrationData = await migrationResponse.json();
+
+        if (migrationData.subscriptionRestored) {
+          // Successfully restored from old app!
+          subscribe();
+          setMigrationResult({
+            type: 'success',
+            message: 'Welcome back! Your subscription from the old app has been restored! 🎉',
+          });
+          // Redirect after a short delay to show message
+          setTimeout(() => navigate('/home'), 2000);
+          return;
+        } else if (migrationData.found) {
+          setMigrationResult({
+            type: 'info',
+            message: migrationData.message || 'Account found but subscription has expired.',
+          });
+          return;
+        }
+      }
+
+      // No purchases found from either source
+      setError('No previous purchases found');
     } catch (err: any) {
+      console.error('Restore error:', err);
       setError(err.message || 'Failed to restore purchases');
     } finally {
       setIsRestoring(false);
@@ -128,8 +166,25 @@ const PaywallPage: React.FC = () => {
 
                 {/* Error Message */}
                 {error && (
-                  <div className="w-full bg-red-100 border border-red-300 text-red-700 px-4 py-2 rounded-lg mb-4 text-sm">
+                  <div className="w-full bg-red-100 border border-red-300 text-red-700 px-4 py-2 rounded-lg mb-4 text-sm flex items-start gap-2">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
                     {error}
+                  </div>
+                )}
+
+                {/* Migration Result Message */}
+                {migrationResult && (
+                  <div className={`w-full px-4 py-2 rounded-lg mb-4 text-sm flex items-start gap-2 ${
+                    migrationResult.type === 'success' 
+                      ? 'bg-green-100 border border-green-300 text-green-700' 
+                      : 'bg-blue-100 border border-blue-300 text-blue-700'
+                  }`}>
+                    {migrationResult.type === 'success' ? (
+                      <CheckCircle size={16} className="shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                    )}
+                    {migrationResult.message}
                   </div>
                 )}
 

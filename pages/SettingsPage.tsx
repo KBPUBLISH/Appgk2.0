@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Volume2, Music, Bell, Shield, FileText, LogOut, Crown, HelpCircle, Mic, Trash2 } from 'lucide-react';
+import { ChevronLeft, Volume2, Music, Bell, Shield, FileText, LogOut, Crown, HelpCircle, Mic, Trash2, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import WoodButton from '../components/ui/WoodButton';
 import { useUser } from '../context/UserContext';
 import { useAudio } from '../context/AudioContext';
@@ -8,16 +8,25 @@ import { voiceCloningService, ClonedVoice } from '../services/voiceCloningServic
 import { ApiService } from '../services/apiService';
 import { getHiddenVoices, isVoiceHidden, toggleVoiceVisibility } from '../services/voiceManagementService';
 import { cleanVoiceDescription } from '../utils/voiceUtils';
+import { authService } from '../services/authService';
+import { getApiBaseUrl } from '../services/apiService';
 
 const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isSubscribed, isVoiceUnlocked } = useUser();
+  const { isSubscribed, isVoiceUnlocked, setIsSubscribed } = useUser();
   const { musicEnabled, sfxEnabled, musicVolume, toggleMusic, toggleSfx, setMusicVolume, playBack } = useAudio();
   const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
   const [deletingVoiceId, setDeletingVoiceId] = useState<string | null>(null);
   const [availableVoices, setAvailableVoices] = useState<any[]>([]);
   const [unlockedVoices, setUnlockedVoices] = useState<any[]>([]);
   const [loadingVoices, setLoadingVoices] = useState(false);
+  
+  // Restore purchases state
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreResult, setRestoreResult] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+  } | null>(null);
   
   // Load cloned voices
   useEffect(() => {
@@ -73,6 +82,68 @@ const SettingsPage: React.FC = () => {
       alert('Failed to delete voice. Please try again.');
     } finally {
       setDeletingVoiceId(null);
+    }
+  };
+
+  // Handle restore purchases from old Godly Kids app
+  const handleRestorePurchases = async () => {
+    setIsRestoring(true);
+    setRestoreResult(null);
+
+    try {
+      // Get user email from auth service
+      const user = authService.getUser();
+      if (!user?.email) {
+        setRestoreResult({
+          type: 'error',
+          message: 'Please sign in with the same email you used in the old app.',
+        });
+        return;
+      }
+
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}migration/restore-subscription`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: user.email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to restore purchases');
+      }
+
+      if (data.subscriptionRestored) {
+        // Successfully restored subscription
+        setIsSubscribed(true);
+        setRestoreResult({
+          type: 'success',
+          message: 'Your subscription has been restored! Welcome back! 🎉',
+        });
+      } else if (data.found && !data.subscriptionRestored) {
+        // Account found but subscription expired or not active
+        setRestoreResult({
+          type: 'info',
+          message: data.message || 'Account found but no active subscription.',
+        });
+      } else {
+        // No account found
+        setRestoreResult({
+          type: 'info',
+          message: 'No previous subscription found with this email.',
+        });
+      }
+    } catch (error: any) {
+      console.error('Restore purchases error:', error);
+      setRestoreResult({
+        type: 'error',
+        message: error.message || 'Unable to restore purchases. Please try again later.',
+      });
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -317,10 +388,33 @@ const SettingsPage: React.FC = () => {
                     </div>
                 )}
                 
-                <button className="w-full text-left px-3 py-3 text-[#5c2e0b] font-bold text-sm bg-white/40 hover:bg-white/80 rounded-lg border border-transparent hover:border-[#eecaa0] transition-all flex items-center justify-between group">
-                    <span>Restore Purchases</span>
+                {/* Restore Purchases Button with Status */}
+                <button 
+                    onClick={handleRestorePurchases}
+                    disabled={isRestoring}
+                    className="w-full text-left px-3 py-3 text-[#5c2e0b] font-bold text-sm bg-white/40 hover:bg-white/80 rounded-lg border border-transparent hover:border-[#eecaa0] transition-all flex items-center justify-between group disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <span className="flex items-center gap-2">
+                        {isRestoring && <RefreshCw size={16} className="animate-spin" />}
+                        {!isRestoring && "Restore Purchases"}
+                        {isRestoring && "Restoring..."}
+                    </span>
                     <ChevronLeft size={16} className="rotate-180 opacity-0 group-hover:opacity-50 transition-opacity" />
                 </button>
+                
+                {/* Restore Result Message */}
+                {restoreResult && (
+                    <div className={`mt-2 p-3 rounded-lg flex items-start gap-2 text-sm ${
+                        restoreResult.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' :
+                        restoreResult.type === 'error' ? 'bg-red-100 text-red-800 border border-red-200' :
+                        'bg-blue-100 text-blue-800 border border-blue-200'
+                    }`}>
+                        {restoreResult.type === 'success' && <CheckCircle size={18} className="shrink-0 mt-0.5" />}
+                        {restoreResult.type === 'error' && <AlertCircle size={18} className="shrink-0 mt-0.5" />}
+                        {restoreResult.type === 'info' && <AlertCircle size={18} className="shrink-0 mt-0.5" />}
+                        <span>{restoreResult.message}</span>
+                    </div>
+                )}
             </section>
 
             {/* Legal & Support */}

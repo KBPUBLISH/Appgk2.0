@@ -114,7 +114,14 @@ const BookReaderPage: React.FC = () => {
     const [flipState, setFlipState] = useState<{ direction: 'next' | 'prev', isFlipping: boolean } | null>(null);
     const touchStartX = useRef<number>(0);
     const touchEndX = useRef<number>(0);
+    const touchStartY = useRef<number>(0);
+    const touchEndY = useRef<number>(0);
+    const touchStartTime = useRef<number>(0);
     const swipeDetectedRef = useRef<boolean>(false);
+    
+    // Audio preloading cache refs
+    const audioPreloadCacheRef = useRef<Map<string, { audioUrl: string; alignment: any }>>(new Map());
+    const preloadingInProgressRef = useRef<Set<string>>(new Set());
     const desiredScrollStateRef = useRef<boolean | null>(null); // Track desired scroll state for next page turn
     const showScrollRef = useRef<boolean>(true); // Track scroll state to avoid closure issues
     const [bookMusicEnabled, setBookMusicEnabled] = useState(true); // Default to enabled
@@ -640,23 +647,43 @@ const BookReaderPage: React.FC = () => {
         }
     };
 
-    // Swipe gesture handlers
+    // Swipe gesture handlers - more sensitive to prevent accidental page turns
     const handleTouchStart = (e: React.TouchEvent) => {
         touchStartX.current = e.touches[0].clientX;
+        touchStartY.current = e.touches[0].clientY;
+        touchEndX.current = e.touches[0].clientX;
+        touchEndY.current = e.touches[0].clientY;
+        touchStartTime.current = Date.now();
         swipeDetectedRef.current = false; // Reset swipe detection
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
         touchEndX.current = e.touches[0].clientX;
+        touchEndY.current = e.touches[0].clientY;
     };
 
     const handleTouchEnd = () => {
-        const swipeThreshold = 50;
-        const diff = touchStartX.current - touchEndX.current;
+        const swipeThresholdX = 100; // Increased from 50 - require more deliberate horizontal swipe
+        const swipeThresholdY = 80; // Max vertical movement allowed (prevents diagonal swipes)
+        const minSwipeTime = 100; // Minimum time in ms for a valid swipe (prevents accidental taps)
+        const maxSwipeTime = 800; // Maximum time for swipe (too slow = not a swipe)
+        
+        const diffX = touchStartX.current - touchEndX.current;
+        const diffY = Math.abs(touchStartY.current - touchEndY.current);
+        const swipeTime = Date.now() - touchStartTime.current;
 
-        if (Math.abs(diff) > swipeThreshold) {
+        // Only trigger page turn if:
+        // 1. Horizontal swipe is significant (> threshold)
+        // 2. Vertical movement is minimal (primarily horizontal gesture)
+        // 3. Swipe duration is within valid range (not too fast/accidental, not too slow)
+        const isValidSwipe = Math.abs(diffX) > swipeThresholdX && 
+                             diffY < swipeThresholdY && 
+                             swipeTime > minSwipeTime && 
+                             swipeTime < maxSwipeTime;
+
+        if (isValidSwipe) {
             swipeDetectedRef.current = true; // Mark that a swipe was detected
-            if (diff > 0) {
+            if (diffX > 0) {
                 // Swipe left - next page
                 if (currentPageIndex < pages.length - 1) {
                     stopAudio();
@@ -674,7 +701,7 @@ const BookReaderPage: React.FC = () => {
                 swipeDetectedRef.current = false;
             }, 300);
         } else {
-            // Small movement - not a swipe, allow tap to proceed
+            // Not a valid swipe - allow tap/click to proceed
             swipeDetectedRef.current = false;
         }
     };
@@ -685,21 +712,13 @@ const BookReaderPage: React.FC = () => {
             e.stopPropagation();
         }
 
-        // If scroll is currently closed and user is opening it, turn to next page
-        if (!showScroll && currentPageIndex < pages.length - 1) {
-            // Turn to next page with scroll open
-            stopAudio();
-            // Set desired scroll state to open for next page
-            desiredScrollStateRef.current = true;
-            handleNext({ stopPropagation: () => { } } as React.MouseEvent);
-        } else {
-            // Just toggle scroll state (closing it or already on last page)
-            setShowScroll(prev => {
-                const newState = !prev;
-                showScrollRef.current = newState; // Update ref
-                return newState;
-            });
-        }
+        // Simply toggle scroll state - tapping should NEVER turn the page
+        // Only swipe or auto-play should turn pages
+        setShowScroll(prev => {
+            const newState = !prev;
+            showScrollRef.current = newState; // Update ref
+            return newState;
+        });
     };
 
     // Handle background tap - toggle scroll or turn page if auto-play is active
@@ -768,6 +787,67 @@ const BookReaderPage: React.FC = () => {
         }
     };
 
+    // Preload audio for upcoming pages (runs in background)
+    const preloadUpcomingAudio = async (startPageIndex: number) => {
+        const pagesToPreload = 3; // Preload next 3 pages
+        
+        for (let i = 0; i < pagesToPreload; i++) {
+            const pageIndex = startPageIndex + i;
+            if (pageIndex >= pages.length - 1) break; // Don't preload "The End" page
+            
+            const page = pages[pageIndex];
+            if (!page || !page.textBoxes) continue;
+            
+            // Preload each text box on the page
+            for (let textBoxIndex = 0; textBoxIndex < page.textBoxes.length; textBoxIndex++) {
+                const textBox = page.textBoxes[textBoxIndex];
+                if (!textBox.text) continue;
+                
+                const cacheKey = `${pageIndex}-${textBoxIndex}-${selectedVoiceId}`;
+                
+                // Skip if already cached or currently preloading
+                if (audioPreloadCacheRef.current.has(cacheKey) || preloadingInProgressRef.current.has(cacheKey)) {
+                    continue;
+                }
+                
+                // Mark as preloading
+                preloadingInProgressRef.current.add(cacheKey);
+                
+                // Preload in background (don't await to avoid blocking)
+                (async () => {
+                    try {
+                        const processedText = processTextWithEmotionalCues(textBox.text);
+                        const result = await ApiService.generateTTS(
+                            processedText.ttsText,
+                            selectedVoiceId,
+                            bookId || undefined
+                        );
+                        
+                        if (result && result.audioUrl) {
+                            audioPreloadCacheRef.current.set(cacheKey, {
+                                audioUrl: result.audioUrl,
+                                alignment: result.alignment
+                            });
+                            console.log(`🎵 Preloaded audio for page ${pageIndex + 1}, text box ${textBoxIndex + 1}`);
+                        }
+                    } catch (err) {
+                        console.warn(`Failed to preload audio for page ${pageIndex + 1}:`, err);
+                    } finally {
+                        preloadingInProgressRef.current.delete(cacheKey);
+                    }
+                })();
+            }
+        }
+    };
+
+    // Trigger preloading when page changes or voice changes
+    useEffect(() => {
+        if (pages.length > 0 && selectedVoiceId) {
+            // Start preloading from current page
+            preloadUpcomingAudio(currentPageIndex);
+        }
+    }, [currentPageIndex, selectedVoiceId, pages.length]);
+
     const handlePlayText = async (text: string, index: number, e: React.MouseEvent, isAutoPlay: boolean = false) => {
         e.stopPropagation();
 
@@ -796,7 +876,7 @@ const BookReaderPage: React.FC = () => {
             return;
         }
 
-        // Otherwise, generate/fetch new audio using WebSocket
+        // Otherwise, generate/fetch new audio
         setActiveTextBoxIndex(index);
         setLoadingAudio(true);
         setCurrentWordIndex(-1);
@@ -805,17 +885,24 @@ const BookReaderPage: React.FC = () => {
         alignmentWarningShownRef.current = false; // Reset warning flag for new audio
 
         try {
-            // Process text to extract emotional cues
-            const processedText = processTextWithEmotionalCues(text);
+            // Check preload cache first - use ref for accurate page index (state might be stale)
+            const actualPageIndex = currentPageIndexRef.current;
+            const cacheKey = `${actualPageIndex}-${index}-${selectedVoiceId}`;
+            let result = audioPreloadCacheRef.current.get(cacheKey);
+            
+            if (result) {
+                console.log(`🎵 Using preloaded audio for page ${actualPageIndex + 1}, text box ${index + 1}`);
+            } else {
+                // Not in cache, generate now
+                const processedText = processTextWithEmotionalCues(text);
+                result = await ApiService.generateTTS(
+                    processedText.ttsText, // Send text with cues to ElevenLabs
+                    selectedVoiceId,
+                    bookId || undefined
+                ) || undefined;
+            }
 
-            // Use HTTP API for TTS with emotional cues preserved
-            const result = await ApiService.generateTTS(
-                processedText.ttsText, // Send text with cues to ElevenLabs
-                selectedVoiceId,
-                bookId || undefined
-            );
-
-            // Use final audio URL from WebSocket
+            // Use audio URL (from cache or freshly generated)
             if (result && result.audioUrl) {
                 const audio = new Audio(result.audioUrl);
 
