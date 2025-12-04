@@ -41,14 +41,11 @@ export const BooksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Check if user is authenticated
       const isAuthenticated = authService.isAuthenticated();
       const isLocalBackend = API_BASE_URL.includes('localhost');
-      const isProductionBackend = API_BASE_URL.includes('render.com') || API_BASE_URL.includes('backendgk');
       console.log('🔑 BooksContext: User authenticated:', isAuthenticated);
       console.log('🏠 BooksContext: Using local backend:', isLocalBackend);
-      console.log('🌐 BooksContext: Using production backend:', isProductionBackend);
 
-      // Skip auth check for local development AND production backend (no auth required)
-      // Only require auth for external APIs that need it
-      if (!isAuthenticated && !isLocalBackend && !isProductionBackend) {
+      // Skip auth check for local development
+      if (!isAuthenticated && !isLocalBackend) {
         console.warn('⚠️ BooksContext: User not authenticated. Using mock data until login.');
         console.warn('💡 Please log in to see real data from the dev database.');
         setBooks(MOCK_BOOKS);
@@ -97,14 +94,8 @@ export const BooksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       hasLoadedRef.current = true;
     } catch (error) {
       console.error("❌ BooksContext: Failed to load books", error);
-      // On error, check if using local backend - if so, use empty array instead of mock data
-      if (isLocalBackend) {
-        console.error("❌ BooksContext: Failed to load books from local API, using empty array (no mock data)");
-        setBooks([]);
-      } else {
-        console.error("❌ BooksContext: Failed to load books, using mock data as fallback");
+      // On error, use mock data as fallback
       setBooks(MOCK_BOOKS);
-      }
     } finally {
       setLoading(false);
       isLoadingRef.current = false;
@@ -124,17 +115,13 @@ export const BooksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Check authentication before loading
     const isAuthenticated = authService.isAuthenticated();
     const isLocalBackend = API_BASE_URL.includes('localhost');
-    const isProductionBackend = API_BASE_URL.includes('render.com') || API_BASE_URL.includes('backendgk');
     console.log('📚 BooksContext: Initial load, authenticated:', isAuthenticated);
     console.log('📚 BooksContext: Using local backend:', isLocalBackend);
-    console.log('📚 BooksContext: Using production backend:', isProductionBackend);
 
-    // Always load from API for local or production backends (no auth required)
-    if (isAuthenticated || isLocalBackend || isProductionBackend) {
+    if (isAuthenticated || isLocalBackend) {
       loadData();
     } else {
-      // For external APIs that require auth, use mock data when not authenticated
-      console.log('📚 BooksContext: Not authenticated for external API, using mock data');
+      console.log('📚 BooksContext: Not authenticated, using mock data');
       setBooks(MOCK_BOOKS);
       setLoading(false);
     }
@@ -147,12 +134,10 @@ export const BooksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!isLandingPage && !hasLoadedRef.current) {
         const isAuthenticated = authService.isAuthenticated();
         const isLocalBackend = API_BASE_URL.includes('localhost');
-        const isProductionBackend = API_BASE_URL.includes('render.com') || API_BASE_URL.includes('backendgk');
         console.log('📚 BooksContext: Route changed, authenticated:', isAuthenticated);
         console.log('📚 BooksContext: Using local backend:', isLocalBackend);
-        console.log('📚 BooksContext: Using production backend:', isProductionBackend);
         if (!isLoadingRef.current) {
-          if (isAuthenticated || isLocalBackend || isProductionBackend) {
+          if (isAuthenticated || isLocalBackend) {
             console.log('📚 BooksContext: Reloading books after route change');
             loadData();
           } else {

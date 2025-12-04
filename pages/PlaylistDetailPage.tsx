@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Crown, Play, Pause, Music, Headphones, Heart, Bookmark, Eye, Hammer, Wrench } from 'lucide-react';
+import { ChevronLeft, Crown, Play, Pause, Music, Headphones, Heart, Bookmark, Hammer, Wrench } from 'lucide-react';
 import { getApiBaseUrl } from '../services/apiService';
 import { libraryService } from '../services/libraryService';
 import { useAudio } from '../context/AudioContext';
@@ -162,7 +162,7 @@ const PlaylistDetailPage: React.FC = () => {
     const [isLiked, setIsLiked] = useState(false);
     const [localLikeCount, setLocalLikeCount] = useState(0);
     const [isInLibrary, setIsInLibrary] = useState(false);
-    const [viewCount, setViewCount] = useState(0);
+    const [playCount, setPlayCount] = useState(0);
     
     // Dynamic gradient colors extracted from cover image
     const [gradientColors, setGradientColors] = useState({
@@ -189,21 +189,15 @@ const PlaylistDetailPage: React.FC = () => {
         }
     }, [playlistId]);
     
-    // Calculate total play count from all tracks in the playlist
+    // Get play count from playlist data (server-side count)
     useEffect(() => {
-        if (playlistId && playlist && playlist.items) {
-            let totalPlays = 0;
-            playlist.items.forEach((item) => {
-                const trackId = item._id || `${playlistId}_${item.order || 0}`;
-                const trackPlayCount = parseInt(
-                    localStorage.getItem(`playlist_track_play_count_${trackId}`) || '0',
-                    10
-                );
-                totalPlays += trackPlayCount;
-            });
-            setViewCount(totalPlays);
+        if (playlist) {
+            // Use the server-side playCount if available, otherwise sum from items
+            const serverPlayCount = playlist.playCount || 0;
+            const itemPlays = playlist.items?.reduce((sum, item) => sum + (item.playCount || 0), 0) || 0;
+            setPlayCount(serverPlayCount + itemPlays);
         }
-    }, [playlistId, playlist]);
+    }, [playlist]);
     
     // Extract colors from cover image when playlist loads
     useEffect(() => {
@@ -456,12 +450,12 @@ const PlaylistDetailPage: React.FC = () => {
                             </button>
 
                             {/* View Counter */}
-                            <button
+                            <button 
                                 onClick={(e) => e.stopPropagation()}
                                 className="flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#d4c5a0] bg-[#fdf6e3] text-[#8B4513] cursor-default"
                             >
-                                <Eye size={18} />
-                                <span className="text-sm font-bold">{viewCount}</span>
+                                <Headphones size={18} />
+                                <span className="text-sm font-bold">{playCount}</span>
                             </button>
                         </div>
                     </div>

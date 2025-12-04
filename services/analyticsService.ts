@@ -1,6 +1,6 @@
 // Analytics Service - Tracks user events and sends them to the backend
 
-import { getApiBaseUrl, fetchWithTimeout } from './apiService';
+import { getApiBaseUrl } from './apiService';
 
 // Generate or retrieve session ID
 const getSessionId = (): string => {
@@ -105,7 +105,7 @@ export const analyticsService = {
             };
 
             // Fire and forget - don't await or block on analytics
-            fetchWithTimeout(`${baseUrl}analytics/track`, {
+            fetch(`${baseUrl}analytics/track`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),

@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { ApiService } from '../services/apiService';
 import { playHistoryService } from '../services/playHistoryService';
+import { analyticsService } from '../services/analyticsService';
 
 // --- Interfaces ---
 export interface AudioItem {
@@ -378,6 +379,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             // Record in local play history for "Recently Played" section
             playHistoryService.recordPlay(playlistId, trackId);
             
+            // Track analytics
+            analyticsService.playlistPlay(playlistId, playlist.title);
+            if (track) {
+                analyticsService.audioPlay(trackId || `${playlistId}_${startIndex}`, track.title, playlistId);
+            }
+            
             if (trackId) {
                 ApiService.incrementItemPlayCount(playlistId, trackId);
             } else {
@@ -392,17 +399,45 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const nextTrack = useCallback(() => {
         if (currentPlaylist && currentTrackIndex < currentPlaylist.items.length - 1) {
-            setCurrentTrackIndex(prev => prev + 1);
+            const nextIndex = currentTrackIndex + 1;
+            setCurrentTrackIndex(nextIndex);
             setIsPlaying(true);
+            
+            // Track analytics for next track play
+            const playlistId = (currentPlaylist as any)._id || (currentPlaylist as any).id;
+            const track = currentPlaylist.items[nextIndex];
+            const trackId = (track as any)._id || (track as any).id;
+            
+            if (playlistId && track) {
+                analyticsService.audioPlay(trackId || `${playlistId}_${nextIndex}`, track.title, playlistId);
+                if (trackId) {
+                    ApiService.incrementItemPlayCount(playlistId, trackId);
+                }
+            }
         }
     }, [currentPlaylist, currentTrackIndex]);
 
     const prevTrack = useCallback(() => {
         if (currentTrackIndex > 0) {
-            setCurrentTrackIndex(prev => prev - 1);
+            const prevIndex = currentTrackIndex - 1;
+            setCurrentTrackIndex(prevIndex);
             setIsPlaying(true);
+            
+            // Track analytics for prev track play
+            if (currentPlaylist) {
+                const playlistId = (currentPlaylist as any)._id || (currentPlaylist as any).id;
+                const track = currentPlaylist.items[prevIndex];
+                const trackId = (track as any)._id || (track as any).id;
+                
+                if (playlistId && track) {
+                    analyticsService.audioPlay(trackId || `${playlistId}_${prevIndex}`, track.title, playlistId);
+                    if (trackId) {
+                        ApiService.incrementItemPlayCount(playlistId, trackId);
+                    }
+                }
+            }
         }
-    }, [currentTrackIndex]);
+    }, [currentTrackIndex, currentPlaylist]);
 
     const seek = useCallback((time: number) => {
         if (playlistAudioRef.current) {
