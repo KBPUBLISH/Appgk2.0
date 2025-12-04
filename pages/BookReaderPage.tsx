@@ -932,35 +932,85 @@ const BookReaderPage: React.FC = () => {
             if (result && result.audioUrl) {
                 const audio = new Audio(result.audioUrl);
 
-                // Wait for audio metadata to load so we can get the actual duration
+                // Wait for audio metadata to load, then process alignment
                 audio.addEventListener('loadedmetadata', () => {
                     const audioDuration = audio.duration;
+                    const alignment = result.alignment;
                     
-                    // Get the clean text (same as what's displayed) and split into words
+                    // Get the clean text (same as what's displayed) for reference
                     const cleanText = text.replace(/\[([^\]]+)\]/g, '').replace(/\s+/g, ' ').trim();
                     const displayWords = cleanText.split(/\s+/).filter(w => w.length > 0);
                     
-                    if (displayWords.length > 0) {
-                        // Create simple timing - spread words evenly across audio duration
-                        const wordDuration = audioDuration / displayWords.length;
-                        const simpleAlignment = {
-                            words: displayWords.map((word, idx) => ({
-                                word,
-                                start: idx * wordDuration,
-                                end: (idx + 1) * wordDuration
-                            }))
-                        };
+                    // Use real alignment from ElevenLabs if available
+                    if (alignment && alignment.words && alignment.words.length > 0 && !alignment.isEstimated) {
+                        // Filter out bracketed words (sound effects, emotions) from alignment
+                        // These exist in TTS but not in display
+                        const filteredWords: Array<{ word: string; start: number; end: number }> = [];
+                        let insideBracket = false;
                         
-                        console.log('📝 Word alignment (simple timing):', {
+                        for (const wordData of alignment.words) {
+                            const word = wordData.word || '';
+                            
+                            // Track bracket sequences
+                            if (word.startsWith('[')) {
+                                insideBracket = true;
+                            }
+                            
+                            // Skip bracketed content
+                            if (insideBracket || word.match(/^\[.*\]$/)) {
+                                if (word.endsWith(']')) {
+                                    insideBracket = false;
+                                }
+                                continue;
+                            }
+                            
+                            // Clean any partial brackets
+                            const cleanedWord = word.replace(/\[([^\]]*)\]?/g, '').replace(/\]$/g, '').trim();
+                            if (cleanedWord.length > 0) {
+                                filteredWords.push({
+                                    word: cleanedWord,
+                                    start: wordData.start,
+                                    end: wordData.end
+                                });
+                            }
+                        }
+                        
+                        console.log('📝 Using REAL ElevenLabs timestamps:', {
                             audioDuration: audioDuration.toFixed(2),
-                            wordCount: displayWords.length,
-                            wordDuration: wordDuration.toFixed(2)
+                            originalWords: alignment.words.length,
+                            filteredWords: filteredWords.length,
+                            displayWords: displayWords.length,
+                            firstWord: filteredWords[0],
+                            lastWord: filteredWords[filteredWords.length - 1]
                         });
                         
-                        setWordAlignment(simpleAlignment);
-                        wordAlignmentRef.current = simpleAlignment;
+                        // Use filtered alignment (real timestamps from ElevenLabs)
+                        const realAlignment = { words: filteredWords };
+                        setWordAlignment(realAlignment);
+                        wordAlignmentRef.current = realAlignment;
                     } else {
-                        console.warn('⚠️ No words found in text');
+                        // Fallback: spread words evenly across audio duration
+                        if (displayWords.length > 0) {
+                            const wordDuration = audioDuration / displayWords.length;
+                            const estimatedAlignment = {
+                                words: displayWords.map((word, idx) => ({
+                                    word,
+                                    start: idx * wordDuration,
+                                    end: (idx + 1) * wordDuration
+                                }))
+                            };
+                            
+                            console.log('📝 Using ESTIMATED timing (fallback):', {
+                                audioDuration: audioDuration.toFixed(2),
+                                wordCount: displayWords.length,
+                                wordDuration: wordDuration.toFixed(2)
+                            });
+                            
+                            setWordAlignment(estimatedAlignment);
+                            wordAlignmentRef.current = estimatedAlignment;
+                        } else {
+                            console.warn('⚠️ No words found in text');
+                        }
                     }
                 });
 
