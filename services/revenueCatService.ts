@@ -10,8 +10,8 @@ export const PREMIUM_ENTITLEMENT_ID = 'premium';
 
 // Product identifiers (these should match your RevenueCat product IDs)
 export const PRODUCT_IDS = {
-  ANNUAL: 'godlykids_annual',
-  MONTHLY: 'godlykids_monthly',
+  ANNUAL: 'kbpublish.godlykids.yearly',
+  MONTHLY: 'kbpublish.godlykids.monthly',
 };
 
 // DeSpia bridge interface (DeSpia injects this into window)
