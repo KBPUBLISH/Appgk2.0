@@ -969,39 +969,26 @@ const BookReaderPage: React.FC = () => {
                             }
                         });
 
-                        const actualDuration = audio.duration;
-                        const estimatedDuration = filteredWords.length * 0.4; // Our estimated duration
-
-                        // Scale word timings to match actual audio duration
-                        if (actualDuration > 0 && estimatedDuration > 0) {
-                            const scaleFactor = actualDuration / estimatedDuration;
-                            const scaledAlignment = {
-                                words: filteredWords.map((w) => ({
-                                    word: w.word,
-                                    start: w.start * scaleFactor,
-                                    end: w.end * scaleFactor
-                                }))
-                            };
-                            console.log('📝 Scaled alignment (with cues filtered):', {
-                                estimatedDuration: estimatedDuration.toFixed(2),
-                                actualDuration: actualDuration.toFixed(2),
-                                scaleFactor: scaleFactor.toFixed(2),
-                                words: scaledAlignment.words.length,
-                                originalWords: alignment.words.length
-                            });
-                            setWordAlignment(scaledAlignment);
-                            wordAlignmentRef.current = scaledAlignment;
-                        } else {
-                            const filteredAlignment = {
-                                words: filteredWords.map((w) => ({
-                                    word: w.word,
-                                    start: w.start,
-                                    end: w.end
-                                }))
-                            };
-                            setWordAlignment(filteredAlignment);
-                            wordAlignmentRef.current = filteredAlignment;
-                        }
+                        // Use original timing from ElevenLabs directly - don't scale
+                        // The API returns accurate word-level timestamps
+                        const filteredAlignment = {
+                            words: filteredWords.map((w) => ({
+                                word: w.word,
+                                start: w.start,
+                                end: w.end
+                            }))
+                        };
+                        
+                        console.log('📝 Word alignment (sound effects filtered):', {
+                            audioDuration: audio.duration.toFixed(2),
+                            filteredWords: filteredAlignment.words.length,
+                            originalWords: alignment.words.length,
+                            firstWord: filteredAlignment.words[0],
+                            lastWord: filteredAlignment.words[filteredAlignment.words.length - 1]
+                        });
+                        
+                        setWordAlignment(filteredAlignment);
+                        wordAlignmentRef.current = filteredAlignment;
                     } else {
                         console.warn('⚠️ No alignment data in result:', result);
                     }
