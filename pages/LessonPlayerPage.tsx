@@ -5,6 +5,7 @@ import { ApiService } from '../services/apiService';
 import { markCompleted, getCompletion } from '../services/lessonService';
 import { useUser } from '../context/UserContext';
 import { useAudio } from '../context/AudioContext';
+import { analyticsService } from '../services/analyticsService';
 import { voiceCloningService, ClonedVoice } from '../services/voiceCloningService';
 import DrawingCanvas from '../components/features/DrawingCanvas';
 import { filterVisibleVoices } from '../services/voiceManagementService';
@@ -189,6 +190,8 @@ const LessonPlayerPage: React.FC = () => {
             const data = await ApiService.getLesson(lessonId!);
             if (data) {
                 setLesson(data);
+                // Track lesson view analytics
+                analyticsService.lessonView(lessonId!, data.title);
                 // Check if already completed
                 const completion = getCompletion(lessonId!);
                 if (completion) {
@@ -417,6 +420,9 @@ const LessonPlayerPage: React.FC = () => {
 
         // Mark lesson as completed
         markCompleted(lessonId!, correct, coinsEarned);
+        
+        // Track lesson complete analytics
+        analyticsService.lessonComplete(lessonId!, lesson?.title);
 
         // Save to backend
         const userId = 'local-user'; // TODO: Get from auth context
@@ -1031,6 +1037,9 @@ const LessonPlayerPage: React.FC = () => {
                                             onComplete={() => {
                                                 setActivityCompleted(true);
                                                 markCompleted(lessonId!, 0, 0);
+                                                
+                                                // Track lesson complete analytics
+                                                analyticsService.lessonComplete(lessonId!, lesson?.title);
 
                                                 // Save to backend
                                                 const userId = 'local-user'; // TODO: Get from auth context

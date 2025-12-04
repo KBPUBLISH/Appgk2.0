@@ -11,6 +11,7 @@ import { useUser } from '../context/UserContext';
 import { readingProgressService } from '../services/readingProgressService';
 import { favoritesService } from '../services/favoritesService';
 import { readCountService } from '../services/readCountService';
+import { analyticsService } from '../services/analyticsService';
 import { BookPageRenderer } from '../components/features/BookPageRenderer';
 import { processTextWithEmotionalCues, removeEmotionalCues } from '../utils/textProcessing';
 
@@ -301,6 +302,8 @@ const BookReaderPage: React.FC = () => {
                 // Set book title
                 if (book?.title) {
                     setBookTitle(book.title);
+                    // Track book view analytics
+                    analyticsService.bookView(bookId, book.title);
                 }
                 
                 // Load quiz attempts from localStorage
@@ -563,6 +566,19 @@ const BookReaderPage: React.FC = () => {
         };
     }, [currentAudio]);
 
+    // Track reading progress on unmount
+    useEffect(() => {
+        return () => {
+            // Track reading progress analytics when user leaves the book
+            if (bookId && pages.length > 0) {
+                const pagesViewed = currentPageIndexRef.current + 1; // 1-indexed count
+                const totalPages = pages.length;
+                const currentPage = currentPageIndexRef.current + 1;
+                analyticsService.bookReadProgress(bookId, pagesViewed, totalPages, currentPage, bookTitle);
+            }
+        };
+    }, [bookId, pages.length, bookTitle]);
+
     // Helper to map page data to include soundEffectUrl
     const mapPage = (page: Page | undefined) => {
         if (!page) return null;
@@ -614,6 +630,8 @@ const BookReaderPage: React.FC = () => {
                     if (nextIndex >= pages.length - 1) {
                         // Increment read count when book is completed
                         readCountService.incrementReadCount(bookId);
+                        // Track book completion analytics
+                        analyticsService.bookReadComplete(bookId, bookTitle);
                     }
                 }
             }, 650); // Slightly after 0.6s animation completes
@@ -918,21 +936,36 @@ const BookReaderPage: React.FC = () => {
                 audio.addEventListener('loadedmetadata', () => {
                     const alignment = result.alignment || null;
                     if (alignment && alignment.words) {
-                        // Filter out emotional cue words from alignment and remap indices
+                        // Filter out emotional cue and sound effect words from alignment
+                        // Sound effects like [gentle wind breeze] may be split into multiple words by TTS
                         const filteredWords: Array<{ word: string; start: number; end: number; originalIndex: number }> = [];
+                        let insideBracket = false;
+                        
                         alignment.words.forEach((w: any, idx: number) => {
-                            // Skip words that are only emotional cues (like "[excited]")
-                            if (!w.word.match(/^\[.*\]$/)) {
-                                // Remove cues from word text but keep the word
-                                const cleanedWord = w.word.replace(/\[([^\]]+)\]/g, '').trim();
-                                if (cleanedWord.length > 0) {
-                                    filteredWords.push({
-                                        word: cleanedWord,
-                                        start: w.start,
-                                        end: w.end,
-                                        originalIndex: idx
-                                    });
+                            const word = w.word || '';
+                            
+                            // Check if word starts a bracket sequence
+                            if (word.startsWith('[')) {
+                                insideBracket = true;
+                            }
+                            
+                            // Skip if inside bracket or word is entirely bracketed
+                            if (insideBracket || word.match(/^\[.*\]$/)) {
+                                if (word.endsWith(']')) {
+                                    insideBracket = false;
                                 }
+                                return;
+                            }
+                            
+                            // Clean any partial brackets and add word
+                            const cleanedWord = word.replace(/\[([^\]]*)\]?/g, '').replace(/\]$/g, '').trim();
+                            if (cleanedWord.length > 0) {
+                                filteredWords.push({
+                                    word: cleanedWord,
+                                    start: w.start,
+                                    end: w.end,
+                                    originalIndex: idx
+                                });
                             }
                         });
 
@@ -1070,6 +1103,8 @@ const BookReaderPage: React.FC = () => {
                                 // Increment read count when book is completed
                                 if (bookId) {
                                     readCountService.incrementReadCount(bookId);
+                                    // Track book completion analytics
+                                    analyticsService.bookReadComplete(bookId, bookTitle);
                                 }
                             } else if (isAutoPlayingRef.current) {
                                 console.log('⏸️ Auto-play: Already processing, skipping');
@@ -1132,6 +1167,8 @@ const BookReaderPage: React.FC = () => {
                             // Increment read count when book is completed
                             if (bookId) {
                                 readCountService.incrementReadCount(bookId);
+                                // Track book completion analytics
+                                analyticsService.bookReadComplete(bookId, bookTitle);
                             }
                         } else if (isAutoPlayingRef.current) {
                             console.log('⏸️ Auto-play: Already processing, skipping');
@@ -1978,6 +2015,10 @@ const BookReaderPage: React.FC = () => {
                                         e.stopPropagation();
                                         if (quizAttemptCount < maxQuizAttempts) {
                                             setShowQuizModal(true);
+                                            // Track quiz start analytics
+                                            if (bookId) {
+                                                analyticsService.quizStart(bookId, bookTitle);
+                                            }
                                         }
                                     }}
                                     disabled={quizAttemptCount >= maxQuizAttempts}
@@ -2004,6 +2045,10 @@ const BookReaderPage: React.FC = () => {
                                             console.log('🎨 Opening coloring modal with page:', selectedColoringPage);
                                             console.log('🎨 Background URL:', selectedColoringPage?.backgroundUrl || selectedColoringPage?.files?.background?.url);
                                             setShowColoringModal(true);
+                                            // Track coloring start analytics
+                                            if (bookId) {
+                                                analyticsService.coloringStart(bookId, bookTitle);
+                                            }
                                         }}
                                         className="bg-[#9C27B0] hover:bg-[#7B1FA2] text-white p-4 rounded-xl font-bold shadow-lg border-b-4 border-[#6A1B9A] active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 group"
                                     >
@@ -2058,6 +2103,12 @@ const BookReaderPage: React.FC = () => {
                                         if (bookId) {
                                             const newFavoriteState = favoritesService.toggleFavorite(bookId);
                                             setIsFavorite(newFavoriteState);
+                                            // Track favorite/unfavorite analytics
+                                            if (newFavoriteState) {
+                                                analyticsService.bookFavorite(bookId, bookTitle);
+                                            } else {
+                                                analyticsService.bookUnfavorite(bookId, bookTitle);
+                                            }
                                         }
                                     }}
                                     className={`p-3 rounded-full shadow-md transition-transform active:scale-90 border-2 ${isFavorite
@@ -2073,6 +2124,12 @@ const BookReaderPage: React.FC = () => {
                                         if (bookId) {
                                             const newLikeState = favoritesService.toggleLike(bookId);
                                             setIsLiked(newLikeState);
+                                            // Track like/unlike analytics
+                                            if (newLikeState) {
+                                                analyticsService.bookLike(bookId, bookTitle);
+                                            } else {
+                                                analyticsService.bookUnlike(bookId, bookTitle);
+                                            }
                                         }
                                     }}
                                     className={`p-3 rounded-full shadow-md transition-transform active:scale-90 border-2 ${isLiked
@@ -2195,6 +2252,8 @@ const BookReaderPage: React.FC = () => {
                     // Save attempt count to localStorage
                     if (bookId) {
                         localStorage.setItem(`quiz_attempts_${bookId}`, String(quizAttemptCount + 1));
+                        // Track quiz complete analytics
+                        analyticsService.quizComplete(bookId, score, score, coinsEarned); // score is both score and totalQuestions since modal handles that
                     }
                 }}
             />

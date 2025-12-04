@@ -11,6 +11,7 @@ import { readCountService } from '../services/readCountService';
 import { bookCompletionService } from '../services/bookCompletionService';
 import { favoritesService } from '../services/favoritesService';
 import { libraryService } from '../services/libraryService';
+import { analyticsService } from '../services/analyticsService';
 import GameWebView from '../components/features/GameWebView';
 import ChallengeGameModal from '../components/features/ChallengeGameModal';
 import StrengthGameModal from '../components/features/StrengthGameModal';
@@ -109,6 +110,11 @@ const BookDetailPage: React.FC = () => {
     if (books.length > 0) {
       const found = books.find(b => b.id === id);
       setBook(found || null);
+
+      // Track book view analytics when book is loaded
+      if (found && id) {
+        analyticsService.bookView(id, found.title);
+      }
 
       // Load reading progress for this book
       if (id) {
@@ -219,6 +225,13 @@ const BookDetailPage: React.FC = () => {
     setIsFavorited(newFavoriteState);
     console.log('❤️ New favorite state:', newFavoriteState);
 
+    // Track favorite/unfavorite analytics
+    if (newFavoriteState) {
+      analyticsService.bookFavorite(id, book?.title);
+    } else {
+      analyticsService.bookUnfavorite(id, book?.title);
+    }
+
     // Update the displayed count
     const currentCount = parseInt(localStorage.getItem(`book_fav_count_${id}`) || '0', 10);
     const newCount = newFavoriteState ? currentCount + 1 : Math.max(0, currentCount - 1);
@@ -244,6 +257,10 @@ const BookDetailPage: React.FC = () => {
     if (newLibraryState && !isFavorited) {
       const favState = favoritesService.toggleFavorite(id);
       setIsFavorited(favState);
+      // Track favorite analytics
+      if (favState) {
+        analyticsService.bookFavorite(id, book?.title);
+      }
       const currentCount = parseInt(localStorage.getItem(`book_fav_count_${id}`) || '0', 10);
       const newCount = favState ? currentCount + 1 : currentCount;
       setFavoriteCount(newCount);
@@ -436,6 +453,9 @@ const BookDetailPage: React.FC = () => {
                           </div>
                           <button
                             onClick={() => {
+                              // Track game open analytics
+                              analyticsService.gameOpen(game.gameId, game.name, id);
+                              
                               if (game.gameType === 'webview' && game.url) {
                                 // Open webview game
                                 setSelectedGame({ title: game.name, url: game.url });
@@ -500,6 +520,8 @@ const BookDetailPage: React.FC = () => {
                           <button
                             onClick={() => {
                               if (isUnlocked) {
+                                // Track game open analytics
+                                analyticsService.gameOpen(game._id || `book_game_${index}`, game.title, id);
                                 setSelectedGame({ title: game.title, url: game.url });
                               } else {
                                 alert('Please complete reading this book to unlock this game!');
