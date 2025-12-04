@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Crown, Music } from 'lucide-react';
+import { Crown, Music, ClipboardList } from 'lucide-react';
 const ShopModal = lazy(() => import('../features/ShopModal'));
 import AvatarDetailModal from '../features/AvatarDetailModal';
 import CoinHistoryModal from '../features/CoinHistoryModal';
+import ReportCardModal from '../features/ReportCardModal';
 import { useUser } from '../../context/UserContext';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { useAudio } from '../../context/AudioContext';
@@ -23,6 +24,7 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
   const [isShopOpen, setIsShopOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isCoinHistoryOpen, setIsCoinHistoryOpen] = useState(false);
+  const [isReportCardOpen, setIsReportCardOpen] = useState(false);
 
   // Check if we're on book reader page - music should appear muted
   const isBookReader = location.pathname.startsWith('/read/');
@@ -170,30 +172,23 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
                 />
               </button>
 
-              {/* Gold Coins Display */}
+              {/* Report Card Button */}
               <button
-                onClick={() => setIsCoinHistoryOpen(true)}
-                className="bg-gradient-to-b from-[#FFD700] to-[#DAA520] px-2.5 py-1.5 rounded-lg border-2 border-[#B8860B] shadow-[0_3px_0_#8B6914,inset_0_1px_0_rgba(255,255,255,0.4)] active:translate-y-[2px] active:shadow-none transition-all flex items-center gap-1.5 group"
-                title="Your Gold Coins - Click to view history"
+                onClick={() => setIsReportCardOpen(true)}
+                className="bg-[#2E7D32] hover:bg-[#388E3C] px-2.5 py-1.5 rounded-lg border-2 border-[#1B5E20] shadow-[0_3px_0_#1B5E20] active:translate-y-[2px] active:shadow-none transition-all relative group flex items-center justify-center"
+                title="Report Card - View learning progress"
               >
-                {/* Coin Icon */}
-                <div className="relative">
-                  <div className="w-5 h-5 bg-gradient-to-br from-[#FFE55C] to-[#DAA520] rounded-full border border-[#B8860B] shadow-inner flex items-center justify-center">
-                    <span className="text-[#8B6914] font-black text-[10px]">G</span>
-                  </div>
-                  {/* Shine effect */}
-                  <div className="absolute top-0.5 left-0.5 w-1.5 h-1.5 bg-white/50 rounded-full"></div>
-                </div>
-                {/* Coin Count */}
-                <span className="text-[#5c2e0b] font-display font-black text-sm tracking-wide drop-shadow-[0_1px_0_rgba(255,255,255,0.3)] group-hover:text-[#3e1f07] transition-colors">
-                  {coins.toLocaleString()}
-                </span>
+                <ClipboardList
+                  size={18}
+                  className="text-white group-hover:text-[#C8E6C9] transition-colors"
+                />
               </button>
 
-              {/* Shop Sign Button */}
+              {/* Shop Button with Gold Coins Integrated */}
               <button
-                onClick={() => setIsShopOpen(true)}
-                className="bg-[#8B4513] hover:bg-[#A0522D] px-3 py-1.5 rounded-lg border-2 border-[#5c2e0b] shadow-[0_4px_0_#3e1f07] active:translate-y-[2px] active:shadow-none transition-all relative group flex items-center justify-center"
+                onClick={() => setIsCoinHistoryOpen(true)}
+                className="bg-[#8B4513] hover:bg-[#A0522D] pl-3 pr-2 py-1 rounded-lg border-2 border-[#5c2e0b] shadow-[0_4px_0_#3e1f07] active:translate-y-[2px] active:shadow-none transition-all relative group flex items-center gap-2"
+                title="Shop - Click to view coins & shop"
               >
                 {/* Wood Texture Overlay */}
                 <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] pointer-events-none rounded-md"></div>
@@ -201,12 +196,27 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
                 {/* Nails */}
                 <div className="absolute top-1 left-1 w-1 h-1 bg-[#2d1809] rounded-full opacity-60"></div>
                 <div className="absolute top-1 right-1 w-1 h-1 bg-[#2d1809] rounded-full opacity-60"></div>
-                <div className="absolute bottom-1 left-1 w-1 h-1 bg-[#2d1809] rounded-full opacity-60"></div>
-                <div className="absolute bottom-1 right-1 w-1 h-1 bg-[#2d1809] rounded-full opacity-60"></div>
 
+                {/* Shop Text */}
                 <span className="text-[#FFD700] font-display font-black text-sm tracking-wide drop-shadow-md uppercase group-hover:text-white transition-colors relative z-10">
                   Shop
                 </span>
+                
+                {/* Gold Coins Display (integrated) */}
+                <div className="flex items-center gap-1 bg-gradient-to-b from-[#FFD700] to-[#DAA520] px-1.5 py-0.5 rounded-md border border-[#B8860B] relative z-10">
+                  {/* Coin Icon */}
+                  <div className="relative">
+                    <div className="w-4 h-4 bg-gradient-to-br from-[#FFE55C] to-[#DAA520] rounded-full border border-[#B8860B] shadow-inner flex items-center justify-center">
+                      <span className="text-[#8B6914] font-black text-[8px]">G</span>
+                    </div>
+                    {/* Shine effect */}
+                    <div className="absolute top-0 left-0.5 w-1 h-1 bg-white/50 rounded-full"></div>
+                  </div>
+                  {/* Coin Count */}
+                  <span className="text-[#5c2e0b] font-display font-black text-xs tracking-wide drop-shadow-[0_1px_0_rgba(255,255,255,0.3)]">
+                    {coins.toLocaleString()}
+                  </span>
+                </div>
               </button>
             </div>
           </div>
@@ -230,6 +240,10 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
         isOpen={isCoinHistoryOpen} 
         onClose={() => setIsCoinHistoryOpen(false)} 
         onOpenShop={() => setIsShopOpen(true)}
+      />
+      <ReportCardModal
+        isOpen={isReportCardOpen}
+        onClose={() => setIsReportCardOpen(false)}
       />
       <AvatarDetailModal isOpen={isDetailOpen} onClose={() => setIsDetailOpen(false)} onEdit={() => setIsShopOpen(true)} />
     </>

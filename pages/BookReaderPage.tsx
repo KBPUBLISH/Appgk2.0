@@ -1195,13 +1195,24 @@ const BookReaderPage: React.FC = () => {
                                 isAutoPlayingRef.current = true; // Prevent multiple calls
                                 const nextPageIndex = currentPageIdx + 1;
                                 console.log('🔄 Auto-play: Moving to page', nextPageIndex + 1, `(from page ${currentPageIdx + 1})`);
+                                
+                                // Trigger page turn animation (same as manual swipe)
                                 setIsPageTurning(true);
+                                setFlipState({ direction: 'next', isFlipping: true });
+                                playPageTurnSound(); // Play page turn sound effect
+                                
+                                // Change page content at the halfway point (when page is perpendicular - 90deg)
                                 setTimeout(() => {
                                     setCurrentPageIndex(nextPageIndex);
                                     currentPageIndexRef.current = nextPageIndex; // Update ref
                                     // Preserve scroll state during page turns (both manual and auto-play)
                                     setShowScroll(showScrollRef.current);
+                                }, 300); // Halfway through 0.6s animation
+                                
+                                // End animation after full duration
+                                setTimeout(() => {
                                     setIsPageTurning(false);
+                                    setFlipState(null);
                                     // Save progress
                                     if (bookId) {
                                         readingProgressService.saveProgress(bookId, nextPageIndex);
@@ -1229,7 +1240,7 @@ const BookReaderPage: React.FC = () => {
                                             isAutoPlayingRef.current = false;
                                         }
                                     }, 300);
-                                }, 300);
+                                }, 600); // Full animation duration
                             } else if (autoPlayModeRef.current && currentPageIndexRef.current >= pages.length - 1) {
                                 // Reached end of book, stop auto-play
                                 console.log('🏁 Auto-play: Reached end of book, stopping');
@@ -1260,13 +1271,24 @@ const BookReaderPage: React.FC = () => {
                             isAutoPlayingRef.current = true; // Prevent multiple calls
                             const nextPageIndex = currentPageIdx + 1;
                             console.log('🔄 Auto-play: Moving to page', nextPageIndex + 1, `(from page ${currentPageIdx + 1})`);
+                            
+                            // Trigger page turn animation (same as manual swipe)
                             setIsPageTurning(true);
+                            setFlipState({ direction: 'next', isFlipping: true });
+                            playPageTurnSound(); // Play page turn sound effect
+                            
+                            // Change page content at the halfway point (when page is perpendicular - 90deg)
                             setTimeout(() => {
                                 setCurrentPageIndex(nextPageIndex);
                                 currentPageIndexRef.current = nextPageIndex; // Update ref
                                 // Preserve scroll state during page turns (both manual and auto-play)
                                 setShowScroll(showScrollRef.current);
+                            }, 300); // Halfway through 0.6s animation
+                            
+                            // End animation after full duration
+                            setTimeout(() => {
                                 setIsPageTurning(false);
+                                setFlipState(null);
                                 // Save progress
                                 if (bookId) {
                                     readingProgressService.saveProgress(bookId, nextPageIndex);
@@ -1293,7 +1315,7 @@ const BookReaderPage: React.FC = () => {
                                         isAutoPlayingRef.current = false;
                                     }
                                 }, 300);
-                            }, 300);
+                            }, 600); // Full animation duration
                         } else if (autoPlayModeRef.current && currentPageIndexRef.current >= pages.length - 1) {
                             // Reached end of book, stop auto-play
                             console.log('🏁 Auto-play: Reached end of book, stopping');

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Check, Plus, Trash2, UserCircle, Mic, X, ChevronDown, ChevronUp, BookOpen, Music, Sparkles, Users, Loader2 } from 'lucide-react';
+import { ChevronLeft, Check, Plus, Trash2, UserCircle, Mic, X, ChevronDown, ChevronUp, BookOpen, Music, Sparkles, Users, Loader2, Lock, Crown } from 'lucide-react';
 import WoodButton from '../components/ui/WoodButton';
 import { useUser } from '../context/UserContext';
 import { useAudio } from '../context/AudioContext';
@@ -275,11 +275,18 @@ const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
   const { setParentName, setEquippedAvatar, addKid, kids, removeKid, subscribe, resetUser, unlockVoice } = useUser();
   const { playClick, playSuccess } = useAudio();
-  const { purchase, isLoading: isSubscriptionLoading } = useSubscription();
+  const { purchase, isLoading: isSubscriptionLoading, isPremium } = useSubscription();
   
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1); // Steps: 1=Parent, 2=Family, 3=Voice Selection, 4=Unlock
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  
+  // Track if user subscribed during family step (to skip final paywall)
+  const [subscribedDuringOnboarding, setSubscribedDuringOnboarding] = useState(false);
+  // For inline family step purchase
+  const [showFamilyParentGate, setShowFamilyParentGate] = useState(false);
+  const [familyPurchaseError, setFamilyPurchaseError] = useState<string | null>(null);
+  const [isFamilyPurchasing, setIsFamilyPurchasing] = useState(false);
 
   // Step 1 State (Parent)
   const [pName, setPName] = useState('');
@@ -358,6 +365,40 @@ const OnboardingPage: React.FC = () => {
     setStep(3); // Go to voice selection step
   };
   
+  // Free tier allows only 1 kid account
+  const FREE_KID_LIMIT = 1;
+  const canAddMoreKids = isPremium || subscribedDuringOnboarding || kids.length < FREE_KID_LIMIT;
+  
+  // Handle inline subscribe from family step
+  const handleFamilyUnlockClick = () => {
+    setShowFamilyParentGate(true);
+  };
+  
+  const handleFamilyGateSuccess = async () => {
+    setShowFamilyParentGate(false);
+    setIsFamilyPurchasing(true);
+    setFamilyPurchaseError(null);
+    
+    try {
+      // Default to annual plan for family unlock
+      const result = await purchase('annual');
+      
+      if (result.success) {
+        playSuccess();
+        subscribe();
+        setSubscribedDuringOnboarding(true);
+        // Stay on Step 2 - user can now add more kids
+      } else {
+        setFamilyPurchaseError(result.error || 'Purchase was cancelled');
+      }
+    } catch (error: any) {
+      console.error('Family purchase error:', error);
+      setFamilyPurchaseError(error.message || 'An error occurred during purchase');
+    } finally {
+      setIsFamilyPurchasing(false);
+    }
+  };
+  
   // Load available voices for step 3
   useEffect(() => {
     if (step === 3) {
@@ -393,7 +434,14 @@ const OnboardingPage: React.FC = () => {
     localStorage.setItem('godlykids_default_voice', selectedVoiceId);
     unlockVoice(selectedVoiceId); // Unlock the selected voice for free
     console.log(`🎤 Onboarding: Unlocked voice ${selectedVoiceId}`);
-    setStep(4); // Go to unlock/paywall step
+    
+    // Skip paywall if already subscribed during family step
+    if (subscribedDuringOnboarding || isPremium) {
+      playSuccess();
+      navigate('/home');
+    } else {
+      setStep(4); // Go to unlock/paywall step
+    }
   };
   
   const handleVoiceClick = async (voiceId: string) => {
@@ -649,6 +697,11 @@ const OnboardingPage: React.FC = () => {
               <div className="text-center mb-6">
                  <h2 className="text-white font-display font-bold text-xl">Who is adventuring?</h2>
                  <p className="text-[#eecaa0] text-sm">Create profiles for your children.</p>
+                 {(isPremium || subscribedDuringOnboarding) && (
+                   <div className="inline-flex items-center gap-1 mt-2 px-3 py-1 bg-[#FFD700]/20 rounded-full text-[#FFD700] text-xs font-bold">
+                     <Crown size={12} /> Premium - Unlimited Kids
+                   </div>
+                 )}
               </div>
 
               {/* Added Kids List */}
@@ -671,47 +724,121 @@ const OnboardingPage: React.FC = () => {
                   ))}
               </div>
 
-              {/* Add Kid Form */}
-              <div className="bg-[#3E1F07] p-5 rounded-2xl border-2 border-[#5c2e0b] shadow-xl mb-6 relative overflow-hidden">
-                 <div className="absolute top-0 right-0 bg-[#FFD700] text-[#5c2e0b] text-[10px] font-bold px-2 py-1 rounded-bl-lg">NEW PROFILE</div>
-                 
-                 <div className="flex gap-4 mb-4">
-                    <div className="w-20 shrink-0 flex flex-col gap-2">
-                        <div 
-                           className="w-20 h-20 rounded-xl bg-[#f3e5ab] border-2 border-[#8B4513] overflow-hidden relative cursor-pointer hover:opacity-90 flex items-center justify-center p-2"
-                           onClick={() => setKidAvatar(FUNNY_HEADS[Math.floor(Math.random() * FUNNY_HEADS.length)])}
-                        >
-                             {renderAvatarAsset(kidAvatar)}
-                             <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-white text-[8px] text-center py-0.5">TAP</div>
-                        </div>
-                    </div>
-                    <div className="flex-1 space-y-3">
-                        <input 
-                            type="text" 
-                            placeholder="Child's Name"
-                            value={kidName}
-                            onChange={(e) => setKidName(e.target.value)}
-                            className="w-full bg-black/30 border border-[#8B4513] rounded-lg px-3 py-2 text-white font-display placeholder:text-white/30 focus:outline-none focus:border-[#FFD700]"
-                        />
-                        <input 
-                            type="number" 
-                            placeholder="Age"
-                            value={kidAge}
-                            onChange={(e) => setKidAge(e.target.value)}
-                            className="w-20 bg-black/30 border border-[#8B4513] rounded-lg px-3 py-2 text-white font-display placeholder:text-white/30 focus:outline-none focus:border-[#FFD700]"
-                        />
-                    </div>
-                 </div>
-                 
-                 <button 
-                    onClick={handleAddKid}
-                    disabled={!kidName.trim()}
-                    className={`w-full bg-[#5c2e0b] hover:bg-[#70380d] text-[#eecaa0] font-display font-bold py-3 rounded-xl border border-[#8B4513] flex items-center justify-center gap-2 transition-colors ${!kidName.trim() ? 'opacity-50' : ''}`}
-                 >
-                    <Plus size={18} />
-                    ADD CHILD
-                 </button>
-              </div>
+              {/* Add Kid Form - Only show if can add more kids */}
+              {canAddMoreKids ? (
+                <div className="bg-[#3E1F07] p-5 rounded-2xl border-2 border-[#5c2e0b] shadow-xl mb-6 relative overflow-hidden">
+                   <div className="absolute top-0 right-0 bg-[#FFD700] text-[#5c2e0b] text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                     {kids.length === 0 ? 'FREE PROFILE' : 'NEW PROFILE'}
+                   </div>
+                   
+                   <div className="flex gap-4 mb-4">
+                      <div className="w-20 shrink-0 flex flex-col gap-2">
+                          <div 
+                             className="w-20 h-20 rounded-xl bg-[#f3e5ab] border-2 border-[#8B4513] overflow-hidden relative cursor-pointer hover:opacity-90 flex items-center justify-center p-2"
+                             onClick={() => setKidAvatar(FUNNY_HEADS[Math.floor(Math.random() * FUNNY_HEADS.length)])}
+                          >
+                               {renderAvatarAsset(kidAvatar)}
+                               <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-white text-[8px] text-center py-0.5">TAP</div>
+                          </div>
+                      </div>
+                      <div className="flex-1 space-y-3">
+                          <input 
+                              type="text" 
+                              placeholder="Child's Name"
+                              value={kidName}
+                              onChange={(e) => setKidName(e.target.value)}
+                              className="w-full bg-black/30 border border-[#8B4513] rounded-lg px-3 py-2 text-white font-display placeholder:text-white/30 focus:outline-none focus:border-[#FFD700]"
+                          />
+                          <input 
+                              type="number" 
+                              placeholder="Age"
+                              value={kidAge}
+                              onChange={(e) => setKidAge(e.target.value)}
+                              className="w-20 bg-black/30 border border-[#8B4513] rounded-lg px-3 py-2 text-white font-display placeholder:text-white/30 focus:outline-none focus:border-[#FFD700]"
+                          />
+                      </div>
+                   </div>
+                   
+                   <button 
+                      onClick={handleAddKid}
+                      disabled={!kidName.trim()}
+                      className={`w-full bg-[#5c2e0b] hover:bg-[#70380d] text-[#eecaa0] font-display font-bold py-3 rounded-xl border border-[#8B4513] flex items-center justify-center gap-2 transition-colors ${!kidName.trim() ? 'opacity-50' : ''}`}
+                   >
+                      <Plus size={18} />
+                      ADD CHILD
+                   </button>
+                </div>
+              ) : (
+                /* Premium Upsell - Locked Additional Kids */
+                <div className="bg-gradient-to-br from-[#3E1F07] to-[#5c2e0b] p-5 rounded-2xl border-2 border-[#FFD700]/30 shadow-xl mb-6 relative overflow-hidden">
+                   {/* Premium Badge */}
+                   <div className="absolute top-0 right-0 bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-[#5c2e0b] text-[10px] font-bold px-3 py-1 rounded-bl-lg flex items-center gap-1">
+                     <Crown size={10} /> PREMIUM
+                   </div>
+                   
+                   {/* Locked Avatar Slots */}
+                   <div className="flex justify-center gap-3 mb-4 mt-2">
+                     {[1, 2, 3].map((i) => (
+                       <div key={i} className="w-16 h-16 rounded-xl bg-black/30 border-2 border-dashed border-[#FFD700]/30 flex items-center justify-center">
+                         <Lock size={20} className="text-[#FFD700]/50" />
+                       </div>
+                     ))}
+                   </div>
+                   
+                   <h3 className="text-white font-display font-bold text-lg text-center mb-2">
+                     🏠 Unlock Family Accounts
+                   </h3>
+                   <p className="text-[#eecaa0] text-sm text-center mb-4">
+                     Add your whole family! Each child gets their own progress, rewards & personalized experience.
+                   </p>
+                   
+                   {/* Benefits */}
+                   <div className="space-y-2 mb-4">
+                     <div className="flex items-center gap-2 text-white/90 text-sm">
+                       <Check size={16} className="text-[#FFD700] flex-shrink-0" />
+                       <span>Up to <strong className="text-[#FFD700]">5 kid profiles</strong></span>
+                     </div>
+                     <div className="flex items-center gap-2 text-white/90 text-sm">
+                       <Check size={16} className="text-[#FFD700] flex-shrink-0" />
+                       <span>Individual progress tracking</span>
+                     </div>
+                     <div className="flex items-center gap-2 text-white/90 text-sm">
+                       <Check size={16} className="text-[#FFD700] flex-shrink-0" />
+                       <span>All premium content unlocked</span>
+                     </div>
+                   </div>
+                   
+                   {/* Error Display */}
+                   {familyPurchaseError && (
+                     <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-lg mb-3 text-sm">
+                       {familyPurchaseError}
+                     </div>
+                   )}
+                   
+                   {/* Unlock Button */}
+                   <button 
+                      onClick={handleFamilyUnlockClick}
+                      disabled={isFamilyPurchasing}
+                      className="w-full bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#ffed4e] hover:to-[#FFD700] text-[#5c2e0b] font-display font-bold py-3 rounded-xl border-2 border-[#B8860B] flex items-center justify-center gap-2 transition-all shadow-lg disabled:opacity-50"
+                   >
+                      {isFamilyPurchasing ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Crown size={18} />
+                          UNLOCK FAMILY PLAN
+                        </>
+                      )}
+                   </button>
+                   
+                   <p className="text-[#eecaa0]/70 text-[10px] text-center mt-2">
+                     Start with 3-day free trial • Cancel anytime
+                   </p>
+                </div>
+              )}
 
               <div className="mt-auto">
                  <WoodButton 
@@ -893,13 +1020,18 @@ const OnboardingPage: React.FC = () => {
             />
         )}
 
-        {/* Make sure ParentGateModal is imported at the top of your file:
-            import ParentGateModal from '../components/ParentGateModal';
-        */}
+        {/* Parent Gate Modal for Step 4 Paywall */}
         <ParentGateModal 
             isOpen={showParentGate} 
             onClose={() => setShowParentGate(false)} 
             onSuccess={handleGateSuccess} 
+        />
+        
+        {/* Parent Gate Modal for Family Step Unlock */}
+        <ParentGateModal 
+            isOpen={showFamilyParentGate} 
+            onClose={() => setShowFamilyParentGate(false)} 
+            onSuccess={handleFamilyGateSuccess} 
         />
 
         {/* Voice Cloning Modal - Hidden */}
