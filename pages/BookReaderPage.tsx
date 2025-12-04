@@ -949,10 +949,10 @@ const BookReaderPage: React.FC = () => {
                     const cleanText = text.replace(/\[([^\]]+)\]/g, '').replace(/\s+/g, ' ').trim();
                     const displayWords = cleanText.split(/\s+/).filter(w => w.length > 0);
                     
-                    // Use ElevenLabs alignment if available
+                    // Use EXACT ElevenLabs timestamps if available
                     if (alignment && alignment.words && alignment.words.length > 0 && !alignment.isEstimated) {
-                        // Filter out bracketed words (sound effects, emotions)
-                        const filteredWords: Array<{ word: string; start: number; end: number; duration: number }> = [];
+                        // Filter out bracketed words but keep EXACT timestamps
+                        const filteredWords: Array<{ word: string; start: number; end: number }> = [];
                         let insideBracket = false;
                         
                         for (const wordData of alignment.words) {
@@ -974,49 +974,31 @@ const BookReaderPage: React.FC = () => {
                             // Clean any partial brackets
                             const cleanedWord = word.replace(/\[([^\]]*)\]?/g, '').replace(/\]$/g, '').trim();
                             if (cleanedWord.length > 0) {
-                                const duration = wordData.end - wordData.start;
+                                // Use EXACT timestamps from ElevenLabs - no modification
                                 filteredWords.push({
                                     word: cleanedWord,
                                     start: wordData.start,
-                                    end: wordData.end,
-                                    duration: duration > 0 ? duration : 0.1 // Minimum duration
+                                    end: wordData.end
                                 });
                             }
                         }
                         
-                        // REDISTRIBUTE TIMING to fill gaps
-                        // This keeps relative word speeds but eliminates gaps that cause freezing
                         if (filteredWords.length > 0) {
-                            const totalOriginalDuration = filteredWords.reduce((sum, w) => sum + w.duration, 0);
-                            const scaleFactor = audioDuration / totalOriginalDuration;
+                            const exactAlignment = { words: filteredWords };
                             
-                            let currentTime = 0;
-                            const redistributedAlignment = {
-                                words: filteredWords.map((w) => {
-                                    const scaledDuration = w.duration * scaleFactor;
-                                    const wordTiming = {
-                                        word: w.word,
-                                        start: currentTime,
-                                        end: currentTime + scaledDuration
-                                    };
-                                    currentTime += scaledDuration;
-                                    return wordTiming;
-                                })
-                            };
-                            
-                            console.log('📝 Word alignment (redistributed ElevenLabs):', {
+                            console.log('📝 Word alignment (EXACT ElevenLabs timestamps):', {
                                 audioDuration: audioDuration.toFixed(2),
                                 originalWords: alignment.words.length,
                                 filteredWords: filteredWords.length,
                                 displayWords: displayWords.length,
-                                scaleFactor: scaleFactor.toFixed(2),
-                                coverage: currentTime.toFixed(2)
+                                firstWord: filteredWords[0],
+                                lastWord: filteredWords[filteredWords.length - 1]
                             });
                             
-                            setWordAlignment(redistributedAlignment);
-                            wordAlignmentRef.current = redistributedAlignment;
+                            setWordAlignment(exactAlignment);
+                            wordAlignmentRef.current = exactAlignment;
                         } else {
-                            // Fallback to even distribution
+                            // Fallback to even distribution only if no words found
                             const wordDuration = audioDuration / displayWords.length;
                             const evenAlignment = {
                                 words: displayWords.map((word, idx) => ({
@@ -1040,7 +1022,7 @@ const BookReaderPage: React.FC = () => {
                                 }))
                             };
                             
-                            console.log('📝 Word alignment (even fallback):', {
+                            console.log('📝 Word alignment (even fallback - no ElevenLabs data):', {
                                 audioDuration: audioDuration.toFixed(2),
                                 wordCount: displayWords.length
                             });
@@ -1054,43 +1036,45 @@ const BookReaderPage: React.FC = () => {
                 });
 
                 // Track audio time for word highlighting
-                // Helper to find word index, handling gaps between words
-                const findWordIndex = (currentTime: number, words: Array<{ start: number; end: number }>) => {
-                    let wordIndex = -1;
-                    let lastWordBeforeTime = -1;
+                // Helper to find word index, handling gaps between words (sound effects, etc.)
+                const findWordIndex = (currentTime: number, words: Array<{ start: number; end: number; word?: string }>) => {
+                    if (!words || words.length === 0) return -1;
                     
+                    // First pass: look for exact match
                     for (let i = 0; i < words.length; i++) {
                         const w = words[i];
-                        
-                        // Exact match - current time is within word boundaries
                         if (currentTime >= w.start && currentTime < w.end) {
+                            return i; // Exact match
+                        }
+                    }
+                    
+                    // Second pass: we're in a gap, find the right word
+                    // Either we're before the first word, in a gap between words, or after the last word
+                    
+                    // Before first word
+                    if (currentTime < words[0].start) {
+                        return 0; // Show first word
+                    }
+                    
+                    // After last word
+                    if (currentTime >= words[words.length - 1].end) {
+                        return words.length - 1; // Stay on last word
+                    }
+                    
+                    // In a gap between words - find which gap
+                    for (let i = 0; i < words.length - 1; i++) {
+                        const currentWord = words[i];
+                        const nextWord = words[i + 1];
+                        
+                        // If we're between this word's end and next word's start
+                        if (currentTime >= currentWord.end && currentTime < nextWord.start) {
+                            // We're in a gap - stay on current word (the one that just finished)
                             return i;
                         }
-                        
-                        // Track the last word that ended before current time
-                        // (handles gaps - e.g., sound effects playing between words)
-                        if (currentTime >= w.end) {
-                            lastWordBeforeTime = i;
-                        }
-                        
-                        // If current time is before this word starts, and we have a previous word,
-                        // stay on the previous word (we're in a gap)
-                        if (currentTime < w.start && lastWordBeforeTime >= 0) {
-                            return lastWordBeforeTime;
-                        }
                     }
                     
-                    // If we're past all words, stay on the last word
-                    if (lastWordBeforeTime >= 0) {
-                        return lastWordBeforeTime;
-                    }
-                    
-                    // Before first word - return 0 to start highlighting
-                    if (words.length > 0 && currentTime < words[0].start) {
-                        return 0;
-                    }
-                    
-                    return wordIndex;
+                    // Fallback: return last word
+                    return words.length - 1;
                 };
                 
                 // Auto-scroll to keep highlighted word in view
