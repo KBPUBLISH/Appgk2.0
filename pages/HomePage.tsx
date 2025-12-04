@@ -257,25 +257,44 @@ const HomePage: React.FC = () => {
   const fetchExploreCategories = async () => {
     try {
       setCategoriesLoading(true);
+      // First fetch ALL categories to see what's available
+      const allCategories = await ApiService.getCategories(undefined, false);
+      console.log('📂 ALL categories from API:', allCategories.map(c => ({ 
+        name: c.name, 
+        showOnExplore: c.showOnExplore,
+        type: (c as any).type 
+      })));
+      
+      // Now fetch only explore categories
       const categories = await ApiService.getCategories(undefined, true); // Get categories with showOnExplore=true
+      console.log('🔍 Categories with explore=true param:', categories.map(c => ({ 
+        name: c.name, 
+        showOnExplore: c.showOnExplore 
+      })));
+      
       // Double-check: filter to only include categories with showOnExplore: true
       const exploreOnly = categories.filter(cat => cat.showOnExplore === true);
       setExploreCategories(exploreOnly);
-      console.log(`✅ Loaded ${exploreOnly.length} explore categories:`, exploreOnly.map(c => c.name));
+      console.log(`✅ Final explore categories (${exploreOnly.length}):`, exploreOnly.map(c => c.name));
       
-      // Debug: Log all books and their categories
-      console.log('📚 All books:', books.map(b => ({ 
-        title: b.title, 
-        category: (b as any).category, 
-        categories: (b as any).categories,
-        status: (b as any).status 
-      })));
     } catch (error) {
       console.error('❌ Error fetching explore categories:', error);
     } finally {
       setCategoriesLoading(false);
     }
   };
+  
+  // Log books whenever they change
+  useEffect(() => {
+    if (books.length > 0) {
+      console.log('📚 Books loaded:', books.map(b => ({ 
+        title: b.title, 
+        category: (b as any).category, 
+        categories: (b as any).categories,
+        status: (b as any).status 
+      })));
+    }
+  }, [books]);
 
   // Fetch playlists
   const fetchPlaylists = async () => {
@@ -352,20 +371,29 @@ const HomePage: React.FC = () => {
 
   const getBooksByCategory = (categoryName: string) => {
     const categoryId = getCategoryId(categoryName);
+    console.log(`🔎 Looking for books in category: "${categoryName}" (ID: ${categoryId || 'none'})`);
+    
     const matchedBooks = books.filter(book => {
       const bookCategories = (book as any).categories && Array.isArray((book as any).categories) 
         ? (book as any).categories 
-        : (book.category ? [book.category] : []);
+        : ((book as any).category ? [(book as any).category] : []);
+      
       // Match by name (case-insensitive) OR by category ID
-      const matches = bookCategories.some((cat: string) => 
-        cat.toLowerCase() === categoryName.toLowerCase() || 
-        (categoryId && cat === categoryId)
-      );
+      const matches = bookCategories.some((cat: string) => {
+        const nameMatch = cat.toLowerCase() === categoryName.toLowerCase();
+        const idMatch = categoryId && cat === categoryId;
+        return nameMatch || idMatch;
+      });
+      
+      // Debug: Log each book's category info
+      if (bookCategories.length > 0) {
+        console.log(`   📕 "${book.title}" has categories: [${bookCategories.join(', ')}] - Match: ${matches}`);
+      }
+      
       return matches;
     });
-    if (matchedBooks.length > 0) {
-      console.log(`📖 Books in category "${categoryName}":`, matchedBooks.map(b => b.title));
-    }
+    
+    console.log(`   ✅ Found ${matchedBooks.length} books in "${categoryName}"`);
     return matchedBooks;
   };
 
