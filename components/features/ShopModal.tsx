@@ -9,6 +9,7 @@ import AvatarCompositor from '../avatar/AvatarCompositor';
 import { AVATAR_ASSETS } from '../avatar/AvatarAssets';
 import { ApiService } from '../../services/apiService';
 import { filterVisibleVoices } from '../../services/voiceManagementService';
+import CoinHistoryModal from './CoinHistoryModal';
 
 interface ShopModalProps {
     isOpen: boolean;
@@ -179,6 +180,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
     const [selectedPart, setSelectedPart] = useState<'leftArm' | 'rightArm' | 'legs' | 'head' | 'body' | 'hat' | null>(null);
     const [isSavedFeedback, setIsSavedFeedback] = useState(false);
     const [showScrollHint, setShowScrollHint] = useState(false);
+    const [showCoinHistory, setShowCoinHistory] = useState(false);
     const tabsContainerRef = useRef<HTMLDivElement>(null);
 
     // Update tab when initialTab changes
@@ -705,10 +707,14 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-full border border-[#FFD700]/30 shadow-inner">
+                    <button 
+                        onClick={() => setShowCoinHistory(true)}
+                        className="flex items-center gap-2 bg-black/40 hover:bg-black/50 px-3 py-1.5 rounded-full border border-[#FFD700]/30 shadow-inner transition-colors cursor-pointer active:scale-95"
+                        title="View coin history & earn more"
+                    >
                         <div className="w-5 h-5 rounded-full bg-[#FFD700] border border-[#B8860B] flex items-center justify-center text-[#B8860B] font-bold text-[10px]">$</div>
                         <span className="text-[#FFD700] font-bold font-display text-lg">{coins}</span>
-                    </div>
+                    </button>
 
                     <button onClick={onClose} className="ml-2 text-[#eecaa0] hover:text-white active:scale-95 transition-transform">
                         <X size={24} />
@@ -998,7 +1004,19 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
         </div>
     );
 
-    return createPortal(content, document.body);
+    return (
+        <>
+            {createPortal(content, document.body)}
+            <CoinHistoryModal 
+                isOpen={showCoinHistory} 
+                onClose={() => setShowCoinHistory(false)}
+                onOpenShop={() => {
+                    setShowCoinHistory(false);
+                    // Already in shop, no need to do anything
+                }}
+            />
+        </>
+    );
 };
 
 export default ShopModal;

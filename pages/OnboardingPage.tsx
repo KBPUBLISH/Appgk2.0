@@ -387,12 +387,15 @@ const OnboardingPage: React.FC = () => {
   const handleStep2Continue = () => {
     playClick();
     // Voice selection (step 3) is disabled, go directly to paywall
-    // Skip paywall if already subscribed
-    if (subscribedDuringOnboarding || isPremium) {
+    // ONLY skip paywall if user subscribed during THIS onboarding session
+    // (NOT if they have premium from previous sessions - they wouldn't be onboarding again if so)
+    if (subscribedDuringOnboarding) {
+      console.log('✅ User subscribed during onboarding, skipping paywall');
       playSuccess();
       navigate('/home');
     } else {
-      setStep(4); // Go to unlock/paywall step
+      console.log('📋 Going to paywall step (isPremium from cache:', isPremium, ')');
+      setStep(4); // Always go to paywall for new users
     }
   };
   
@@ -468,8 +471,8 @@ const OnboardingPage: React.FC = () => {
     unlockVoice(selectedVoiceId); // Unlock the selected voice for free
     console.log(`🎤 Onboarding: Unlocked voice ${selectedVoiceId}`);
     
-    // Skip paywall if already subscribed during family step
-    if (subscribedDuringOnboarding || isPremium) {
+    // ONLY skip paywall if subscribed during THIS onboarding session
+    if (subscribedDuringOnboarding) {
       playSuccess();
       navigate('/home');
     } else {
@@ -730,7 +733,7 @@ const OnboardingPage: React.FC = () => {
               <div className="text-center mb-6">
                  <h2 className="text-white font-display font-bold text-xl">Who is adventuring?</h2>
                  <p className="text-[#eecaa0] text-sm">Create profiles for your children.</p>
-                 {(isPremium || subscribedDuringOnboarding) && (
+                 {subscribedDuringOnboarding && (
                    <div className="inline-flex items-center gap-1 mt-2 px-3 py-1 bg-[#FFD700]/20 rounded-full text-[#FFD700] text-xs font-bold">
                      <Crown size={12} /> Premium - Unlimited Kids
                    </div>
