@@ -994,39 +994,65 @@ const BookReaderPage: React.FC = () => {
                     }
                 });
 
-                // Track audio time for word highlighting
-                // Use ref to access latest alignment data (avoids closure issues)
-                audio.ontimeupdate = () => {
+                // Track audio time for word highlighting using requestAnimationFrame for smoother updates
+                // ontimeupdate only fires ~4 times/sec, RAF gives us ~60fps
+                let animationFrameId: number | null = null;
+                let lastWordIndex = -1;
+                
+                const updateHighlight = () => {
+                    if (audio.paused || audio.ended) {
+                        animationFrameId = null;
+                        return;
+                    }
+                    
                     const currentAlignment = wordAlignmentRef.current;
                     if (currentAlignment && currentAlignment.words && currentAlignment.words.length > 0) {
                         const currentTime = audio.currentTime;
-                        const wordIndex = currentAlignment.words.findIndex(
-                            (w: any) => currentTime >= w.start && currentTime < w.end
-                        );
-
-                        // Log every 10th update to avoid console spam
-                        if (Math.floor(currentTime * 10) % 10 === 0) {
-                            console.log('🕐 Audio time:', currentTime.toFixed(2), 'Word index:', wordIndex);
-                            if (wordIndex !== -1) {
-                                const word = currentAlignment.words[wordIndex];
-                                console.log('📍 Current word:', word.word, `[${word.start.toFixed(2)}s - ${word.end.toFixed(2)}s]`);
+                        
+                        // Find current word - use binary search style for efficiency
+                        let wordIndex = -1;
+                        for (let i = 0; i < currentAlignment.words.length; i++) {
+                            const w = currentAlignment.words[i];
+                            if (currentTime >= w.start && currentTime < w.end) {
+                                wordIndex = i;
+                                break;
+                            }
+                            // If we're past this word's end but before next word's start, stay on this word
+                            if (currentTime >= w.end && i === currentAlignment.words.length - 1) {
+                                wordIndex = i;
                             }
                         }
 
-                        if (wordIndex !== -1 && wordIndex !== currentWordIndex) {
-                            console.log('✨ Highlighting word', wordIndex, ':', currentAlignment.words[wordIndex].word);
+                        if (wordIndex !== -1 && wordIndex !== lastWordIndex) {
+                            lastWordIndex = wordIndex;
                             setCurrentWordIndex(wordIndex);
                         }
-                        // Don't reset highlighting when past last word - keep it on the last word
-                        // This ensures all words get highlighted even if timing is slightly off
-                    } else if (!currentAlignment && !alignmentWarningShownRef.current && loadingAudio) {
-                        // Only warn once while loading, not continuously
-                        alignmentWarningShownRef.current = true;
-                        console.warn('⚠️ No alignment data available for highlighting (still loading...)');
+                    }
+                    
+                    animationFrameId = requestAnimationFrame(updateHighlight);
+                };
+                
+                // Start tracking when audio plays
+                audio.onplay = () => {
+                    if (!animationFrameId) {
+                        animationFrameId = requestAnimationFrame(updateHighlight);
+                    }
+                };
+                
+                audio.onpause = () => {
+                    if (animationFrameId) {
+                        cancelAnimationFrame(animationFrameId);
+                        animationFrameId = null;
                     }
                 };
 
                 audio.onended = () => {
+                    // Cancel animation frame tracking
+                    if (animationFrameId) {
+                        cancelAnimationFrame(animationFrameId);
+                        animationFrameId = null;
+                    }
+                    
                     // Highlight the last word when audio ends
                     const currentAlignment = wordAlignmentRef.current;
                     if (currentAlignment && currentAlignment.words && currentAlignment.words.length > 0) {
