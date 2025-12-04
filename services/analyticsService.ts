@@ -172,6 +172,25 @@ export const analyticsService = {
     },
 
     /**
+     * Track book reading progress (when user exits book or navigates away)
+     * Used to calculate average completion rate
+     */
+    bookReadProgress: (bookId: string, pagesViewed: number, totalPages: number, currentPage: number, title?: string) => {
+        analyticsService.track({
+            eventType: 'book_read_progress',
+            targetType: 'book',
+            targetId: bookId,
+            targetTitle: title,
+            metadata: {
+                pagesViewed,
+                totalPages,
+                currentPage,
+                completionPercent: Math.round((currentPage / totalPages) * 100),
+            },
+        });
+    },
+
+    /**
      * Track book like
      */
     bookLike: (bookId: string, title?: string) => {
