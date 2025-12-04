@@ -586,10 +586,16 @@ const HomePage: React.FC = () => {
                         {lesson.type && (
                           <div className="absolute top-1 left-1">
                             <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${
-                              lesson.type === 'Bible' ? 'bg-purple-500 text-white' :
-                              lesson.type === 'Science' ? 'bg-green-500 text-white' :
-                              lesson.type === 'History' ? 'bg-amber-500 text-white' :
+                              lesson.type === 'Bible Study' || lesson.type === 'Bible' ? 'bg-purple-500 text-white' :
+                              lesson.type === 'Science' || lesson.type === 'Nature' ? 'bg-green-500 text-white' :
+                              lesson.type === 'History' || lesson.type === 'Social Studies' ? 'bg-amber-500 text-white' :
                               lesson.type === 'Math' ? 'bg-blue-500 text-white' :
+                              lesson.type === 'English' || lesson.type === 'Reading' ? 'bg-indigo-500 text-white' :
+                              lesson.type === 'Arts & Crafts' || lesson.type === 'Art' ? 'bg-pink-500 text-white' :
+                              lesson.type === 'Music' ? 'bg-rose-500 text-white' :
+                              lesson.type === 'Physical Education' ? 'bg-orange-500 text-white' :
+                              lesson.type === 'Life Skills' ? 'bg-teal-500 text-white' :
+                              lesson.type === 'Technology' ? 'bg-cyan-500 text-white' :
                               'bg-gray-500 text-white'
                             }`}>
                               {lesson.type}

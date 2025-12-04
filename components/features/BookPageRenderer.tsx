@@ -197,7 +197,7 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                         <div
                             key={idx}
                             ref={(el) => { textBoxRefs.current[idx] = el; }}
-                            className="absolute pointer-events-auto overflow-y-auto p-2 pt-6 group transition-all duration-500 ease-in-out"
+                            className="absolute pointer-events-auto overflow-y-auto p-2 pt-6 group"
                             style={{
                                 left: `${box.x}%`,
                                 top: page.scrollUrl 
@@ -214,9 +214,9 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                                 overflowY: 'auto',
                                 textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
                                 scrollBehavior: 'smooth',
-                                // Smooth hide/show without jarring layout shift
+                                // Only use opacity for smooth hide/show - no translateY to avoid layout jump
                                 opacity: shouldHideTextBoxes ? 0 : 1,
-                                transform: shouldHideTextBoxes ? 'translateY(20px)' : 'translateY(0)',
+                                transition: 'opacity 0.4s ease-in-out',
                                 pointerEvents: shouldHideTextBoxes ? 'none' : 'auto',
                             }}
                             onClick={(e) => onPlayText && onPlayText(box.text, idx, e)}
