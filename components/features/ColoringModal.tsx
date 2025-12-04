@@ -3,8 +3,6 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { X, Sparkles, Home, ShoppingBag, Star } from 'lucide-react';
 import DrawingCanvas from './DrawingCanvas';
-import { useUser } from '../../context/UserContext';
-
 interface ColoringModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -31,7 +29,6 @@ const resolveMediaUrl = (url?: string): string => {
 
 const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgroundImageUrl }) => {
     const navigate = useNavigate();
-    const { addCoins } = useUser();
     const [showReward, setShowReward] = useState(false);
     const [resolvedImageUrl, setResolvedImageUrl] = useState<string>('');
 
@@ -50,7 +47,7 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
     if (!isOpen) return null;
 
     const handleComplete = () => {
-        addCoins(50);
+        // No coins awarded for coloring - just show completion
         setShowReward(true);
     };
 
@@ -110,8 +107,8 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
                             <h3 className="font-display font-bold text-4xl text-white mb-2 animate-in zoom-in duration-300 delay-150">
                                 GREAT JOB!
                             </h3>
-                            <p className="text-[#FFD700] font-bold text-xl mb-8 animate-in slide-in-from-bottom-4 duration-500 delay-300">
-                                You earned 50 Coins!
+                            <p className="text-white/80 font-bold text-xl mb-8 animate-in slide-in-from-bottom-4 duration-500 delay-300">
+                                You finished coloring!
                             </p>
 
                             <div className="flex flex-col gap-4 w-full max-w-xs px-4 animate-in slide-in-from-bottom-8 duration-500 delay-500">
