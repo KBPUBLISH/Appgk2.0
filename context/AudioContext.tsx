@@ -227,9 +227,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             return;
         }
 
-        // Helper to play one and pause others
-        const playSelected = async (toPlay: HTMLAudioElement, others: HTMLAudioElement[], name: string) => {
+        // Helper to play one and pause others, applying current volume
+        const playSelected = async (toPlay: HTMLAudioElement, others: HTMLAudioElement[], name: string, volumeMultiplier: number) => {
             others.forEach(a => a.pause());
+            
+            // Apply current volume before playing
+            toPlay.volume = musicVolume * volumeMultiplier;
+            console.log(`🎵 ${name} volume applied:`, toPlay.volume);
+            
             if (toPlay.paused) {
                 console.log(`🎵 Attempting to play ${name}...`, {
                     src: toPlay.src,
@@ -255,14 +260,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
 
         if (musicMode === 'bg') {
-            playSelected(bg, [game, workout], 'BG');
+            playSelected(bg, [game, workout], 'BG', 0.5);
         } else if (musicMode === 'game') {
-            playSelected(game, [bg, workout], 'Game');
+            playSelected(game, [bg, workout], 'Game', 0.7);
         } else if (musicMode === 'workout') {
-            playSelected(workout, [bg, game], 'Workout');
+            playSelected(workout, [bg, game], 'Workout', 0.8);
         }
 
-    }, [musicEnabled, musicForcePaused, musicMode]);
+    }, [musicEnabled, musicForcePaused, musicMode, musicVolume]);
 
     // --- User Interaction Unlock ---
     useEffect(() => {
@@ -574,8 +579,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             workoutAudioRef.current.volume = clampedVolume * 0.8; // Workout at 80% max
             console.log('🎵 Workout volume set to:', workoutAudioRef.current.volume);
         }
-        if (workoutAudioRef.current) {
-            workoutAudioRef.current.volume = clampedVolume * 0.6; // Workout at 60%
+        if (playlistAudioRef.current) {
+            playlistAudioRef.current.volume = clampedVolume; // Playlist at full user volume
+            console.log('🎵 Playlist volume set to:', playlistAudioRef.current.volume);
         }
         console.log('🎵 Volume set to:', clampedVolume);
     }, []);

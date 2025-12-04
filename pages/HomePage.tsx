@@ -10,7 +10,7 @@ import DailyRewardModal from '../components/features/DailyRewardModal';
 import ChallengeGameModal from '../components/features/ChallengeGameModal';
 import StrengthGameModal from '../components/features/StrengthGameModal';
 import PrayerGameModal from '../components/features/PrayerGameModal';
-import { Key, Brain, Dumbbell, Heart, Video, Lock, Check, Play, CheckCircle } from 'lucide-react';
+import { Key, Brain, Dumbbell, Heart, Video, Lock, Check, Play, CheckCircle, Clock } from 'lucide-react';
 import { ApiService } from '../services/apiService';
 import { 
   isCompleted, 
@@ -538,13 +538,25 @@ const HomePage: React.FC = () => {
               <div className="grid grid-cols-3 gap-2">
                 {dayLessons.map((lesson: any) => {
                   const status = getLessonStatus(lesson);
-                  const isLessonLocked = isFutureDay || status === 'locked';
+                  const isLessonLocked = status === 'locked'; // Only lock based on status, not future day
+                  const canWatch = !isFutureDay && !isLessonLocked; // Can only watch if not future and not locked
 
                   return (
                     <div
                       key={lesson._id || lesson.id}
-                      className={`relative cursor-pointer transition-transform active:scale-95 ${isLessonLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      onClick={() => !isLessonLocked && handleLessonClick(lesson)}
+                      className={`relative cursor-pointer transition-transform active:scale-95 ${!canWatch && status !== 'completed' ? 'opacity-80' : ''}`}
+                      onClick={() => {
+                        if (isFutureDay) {
+                          // Show preview message for future lessons
+                          alert(`📅 Coming soon!\n\nThis lesson "${lesson.title}" will be available on ${
+                            ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
+                              getWeekDays()[selectedDayIndex]?.getDay() || 0
+                            ]
+                          }.`);
+                        } else if (canWatch) {
+                          handleLessonClick(lesson);
+                        }
+                      }}
                     >
                       {/* Thumbnail */}
                       <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-800/50 border border-white/10">
@@ -569,15 +581,23 @@ const HomePage: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Locked Overlay */}
-                        {isLessonLocked && status !== 'completed' && (
+                        {/* Coming Soon Overlay (for future days) */}
+                        {isFutureDay && status !== 'completed' && (
+                          <div className="absolute inset-0 bg-indigo-900/60 flex flex-col items-center justify-center">
+                            <Clock className="w-5 h-5 text-white/90 mb-1" />
+                            <span className="text-[10px] text-white font-bold">COMING SOON</span>
+                          </div>
+                        )}
+
+                        {/* Locked Overlay (for past locked lessons) */}
+                        {isLessonLocked && !isFutureDay && status !== 'completed' && (
                           <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                             <Lock className="w-5 h-5 text-white/70" />
                           </div>
                         )}
 
                         {/* Play Button (for available lessons) */}
-                        {!isLessonLocked && status !== 'completed' && (
+                        {canWatch && status !== 'completed' && (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="bg-white/20 backdrop-blur-sm rounded-full p-2">
                               <Play className="w-5 h-5 text-white" fill="white" />
@@ -645,11 +665,11 @@ const HomePage: React.FC = () => {
           </>
         )}
 
-        {/* Daily Tasks Section - Portrait Thumbnail Carousel Style */}
+        {/* Daily Tasks & IQ Games Section - Portrait Thumbnail Carousel Style */}
         <section className="mt-4">
           <SectionTitle 
-            title="Daily Tasks" 
-            icon="✅"
+            title="Daily Tasks & IQ Games" 
+            icon="🧠"
             color="#4CAF50"
           />
           <div className="w-screen overflow-x-auto no-scrollbar pb-4 -mx-4">
