@@ -2126,9 +2126,17 @@ const BookReaderPage: React.FC = () => {
                                         <button
                                             key={page.id || index}
                                             onClick={() => {
+                                                // Update both state AND ref so audio plays from correct page
                                                 setCurrentPageIndex(index);
+                                                currentPageIndexRef.current = index;
                                                 setShowPageSelector(false);
                                                 stopAudio();
+                                                // Reset audio state to ensure fresh play on new page
+                                                setPlaying(false);
+                                                setActiveTextBoxIndex(null);
+                                                setCurrentWordIndex(-1);
+                                                setWordAlignment(null);
+                                                wordAlignmentRef.current = null;
                                             }}
                                             className={`relative aspect-square rounded-xl transition-all active:scale-95 flex items-center justify-center ${
                                                 isCurrentPage 
