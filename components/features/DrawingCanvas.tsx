@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Eraser, RotateCcw, Download, Paintbrush, Highlighter, PenTool, Pencil } from 'lucide-react';
+import { Eraser, RotateCcw, Download, Paintbrush, Highlighter, PenTool, Pencil, Hand } from 'lucide-react';
 
 interface DrawingCanvasProps {
     prompt: string;
@@ -19,48 +19,60 @@ interface BrushConfig {
     opacity: number;
     texture: 'smooth' | 'soft' | 'rough' | 'fine';
     cursorImage: string;
+    // Offset from cursor to tip of the tool (in pixels)
+    // Positive Y means tip is below the cursor anchor point
+    tipOffsetX: number;
+    tipOffsetY: number;
 }
 
 const BRUSH_CONFIGS: Record<BrushType, BrushConfig> = {
     paintbrush: {
         name: 'Paintbrush',
         icon: <Paintbrush className="w-5 h-5" />,
-        minSize: 6,
-        maxSize: 30,
-        defaultSize: 12,
+        minSize: 8,
+        maxSize: 35,
+        defaultSize: 15,
         opacity: 0.9,
         texture: 'smooth',
         cursorImage: '🖌️',
+        tipOffsetX: -20,  // Tip is to the bottom-left
+        tipOffsetY: 35,
     },
     marker: {
         name: 'Marker',
         icon: <Highlighter className="w-5 h-5" />,
         minSize: 15,
-        maxSize: 40,
-        defaultSize: 25,
+        maxSize: 45,
+        defaultSize: 28,
         opacity: 0.5,
         texture: 'soft',
         cursorImage: '🖍️',
+        tipOffsetX: -18,
+        tipOffsetY: 38,
     },
     crayon: {
         name: 'Crayon',
         icon: <PenTool className="w-5 h-5" />,
-        minSize: 8,
-        maxSize: 25,
-        defaultSize: 15,
+        minSize: 10,
+        maxSize: 30,
+        defaultSize: 18,
         opacity: 0.85,
         texture: 'rough',
         cursorImage: '🖍️',
+        tipOffsetX: -18,
+        tipOffsetY: 38,
     },
     pencil: {
         name: 'Pencil',
         icon: <Pencil className="w-5 h-5" />,
-        minSize: 2,
-        maxSize: 8,
-        defaultSize: 4,
+        minSize: 4,
+        maxSize: 15,
+        defaultSize: 8,
         opacity: 1,
         texture: 'fine',
         cursorImage: '✏️',
+        tipOffsetX: -22,
+        tipOffsetY: 40,
     },
 };
 
@@ -90,6 +102,7 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
     const [brushSize, setBrushSize] = useState(BRUSH_CONFIGS.paintbrush.defaultSize);
     const [isEraser, setIsEraser] = useState(false);
     const [isCompleted, setIsCompleted] = useState(false);
+    const [isLeftHanded, setIsLeftHanded] = useState(false);
 
     // Visual cursor position
     const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
@@ -468,38 +481,156 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
                     onMouseLeave={handleMouseLeave}
                 />
 
-                {/* Visual Brush Cursor */}
+                {/* Visual Brush Cursor - Positioned so TIP is at drawing point */}
                 {showCursor && cursorPos && (
                     <div
-                        className="pointer-events-none absolute transform -translate-x-1/2 -translate-y-full z-10 transition-transform duration-75"
+                        className="pointer-events-none absolute z-50"
                         style={{
-                            left: cursorPos.x,
-                            top: cursorPos.y - 5,
+                            // Position the cursor container so the TOOL TIP is at cursorPos
+                            // For left-handed: mirror the X offset
+                            left: cursorPos.x - (isLeftHanded ? -currentBrush.tipOffsetX : currentBrush.tipOffsetX),
+                            top: cursorPos.y - currentBrush.tipOffsetY,
+                            transition: 'left 0.02s linear, top 0.02s linear',
                         }}
                     >
                         <div className="relative">
-                            {/* Brush emoji */}
-                            <span
-                                className="text-3xl md:text-4xl drop-shadow-lg"
+                            {/* Tool image with high visibility */}
+                            <div
+                                className="relative"
                                 style={{
-                                    filter: isEraser ? 'grayscale(1)' : 'none',
-                                    transform: isDrawing ? 'scale(1.1) rotate(-5deg)' : 'scale(1)',
+                                    // Mirror horizontally for left-handed users
+                                    transform: `${isLeftHanded ? 'scaleX(-1)' : ''} ${isDrawing ? 'scale(1.05) rotate(-3deg)' : 'scale(1)'}`,
                                     transition: 'transform 0.1s ease-out',
                                 }}
                             >
-                                {isEraser ? '🧽' : currentBrush.cursorImage}
-                            </span>
-                            {/* Color indicator dot */}
-                            {!isEraser && (
-                                <div
-                                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full border-2 border-white shadow-md"
-                                    style={{
-                                        width: Math.min(brushSize, 16),
-                                        height: Math.min(brushSize, 16),
-                                        backgroundColor: selectedColor,
-                                    }}
-                                />
-                            )}
+                                {/* Large visible brush/tool - SVG version for color control */}
+                                {isEraser ? (
+                                    <span
+                                        className="text-5xl md:text-6xl select-none"
+                                        style={{
+                                            filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.5))',
+                                            display: 'block',
+                                        }}
+                                    >
+                                        🧽
+                                    </span>
+                                ) : (
+                                    <div className="relative">
+                                        {/* Colored tool body */}
+                                        <svg
+                                            viewBox="0 0 64 64"
+                                            className="w-14 h-14 md:w-16 md:h-16"
+                                            style={{
+                                                filter: 'drop-shadow(3px 3px 6px rgba(0,0,0,0.5))',
+                                            }}
+                                        >
+                                            {brushType === 'paintbrush' && (
+                                                <>
+                                                    {/* Brush handle */}
+                                                    <rect x="28" y="4" width="8" height="30" rx="2" fill="#8B4513" />
+                                                    <rect x="30" y="4" width="2" height="30" fill="#A0522D" />
+                                                    {/* Ferrule (metal part) */}
+                                                    <rect x="26" y="32" width="12" height="6" rx="1" fill="#C0C0C0" />
+                                                    <rect x="26" y="33" width="12" height="2" fill="#E8E8E8" />
+                                                    {/* Bristles - colored */}
+                                                    <path
+                                                        d="M26 38 Q24 48 28 58 L32 60 L36 58 Q40 48 38 38 Z"
+                                                        fill={selectedColor}
+                                                    />
+                                                    <path
+                                                        d="M28 38 Q27 46 29 54 L32 56 L35 54 Q37 46 36 38 Z"
+                                                        fill={selectedColor}
+                                                        opacity="0.7"
+                                                    />
+                                                </>
+                                            )}
+                                            {brushType === 'marker' && (
+                                                <>
+                                                    {/* Marker body */}
+                                                    <rect x="24" y="4" width="16" height="36" rx="3" fill={selectedColor} />
+                                                    <rect x="26" y="4" width="4" height="36" fill="white" opacity="0.3" />
+                                                    {/* Cap ring */}
+                                                    <rect x="23" y="38" width="18" height="4" rx="1" fill="#333" />
+                                                    {/* Tip */}
+                                                    <path
+                                                        d="M26 42 L32 60 L38 42 Z"
+                                                        fill={selectedColor}
+                                                    />
+                                                    <path
+                                                        d="M29 42 L32 55 L35 42 Z"
+                                                        fill="white"
+                                                        opacity="0.2"
+                                                    />
+                                                </>
+                                            )}
+                                            {brushType === 'crayon' && (
+                                                <>
+                                                    {/* Crayon body */}
+                                                    <rect x="25" y="8" width="14" height="32" rx="2" fill={selectedColor} />
+                                                    {/* Paper wrapper */}
+                                                    <rect x="25" y="12" width="14" height="20" fill="#222" opacity="0.15" />
+                                                    <text x="32" y="25" textAnchor="middle" fill="white" fontSize="6" fontWeight="bold" opacity="0.8">
+                                                        ★
+                                                    </text>
+                                                    {/* Highlight */}
+                                                    <rect x="27" y="8" width="3" height="32" fill="white" opacity="0.25" />
+                                                    {/* Tip */}
+                                                    <path
+                                                        d="M25 40 L32 58 L39 40 Z"
+                                                        fill={selectedColor}
+                                                    />
+                                                    <path
+                                                        d="M28 40 L32 52 L36 40 Z"
+                                                        fill="white"
+                                                        opacity="0.2"
+                                                    />
+                                                </>
+                                            )}
+                                            {brushType === 'pencil' && (
+                                                <>
+                                                    {/* Pencil body */}
+                                                    <rect x="27" y="4" width="10" height="34" fill={selectedColor} />
+                                                    {/* Highlight stripe */}
+                                                    <rect x="29" y="4" width="3" height="34" fill="white" opacity="0.3" />
+                                                    {/* Wood tip */}
+                                                    <path
+                                                        d="M27 38 L32 54 L37 38 Z"
+                                                        fill="#DEB887"
+                                                    />
+                                                    {/* Graphite tip */}
+                                                    <path
+                                                        d="M30 48 L32 58 L34 48 Z"
+                                                        fill="#333"
+                                                    />
+                                                    {/* Eraser */}
+                                                    <rect x="27" y="2" width="10" height="5" rx="1" fill="#FFB6C1" />
+                                                    {/* Metal band */}
+                                                    <rect x="26" y="5" width="12" height="3" fill="#C0C0C0" />
+                                                </>
+                                            )}
+                                        </svg>
+                                    </div>
+                                )}
+                                
+                                {/* Colored glow at the tip to show where drawing happens */}
+                                {!isEraser && (
+                                    <div
+                                        className="absolute rounded-full animate-pulse"
+                                        style={{
+                                            // Position at the tip - adjusted for SVG size
+                                            left: isLeftHanded ? 'auto' : currentBrush.tipOffsetX + 28,
+                                            right: isLeftHanded ? currentBrush.tipOffsetX + 28 : 'auto',
+                                            top: currentBrush.tipOffsetY,
+                                            width: Math.max(10, brushSize * 0.7),
+                                            height: Math.max(10, brushSize * 0.7),
+                                            backgroundColor: selectedColor,
+                                            boxShadow: `0 0 ${brushSize}px ${selectedColor}, 0 0 ${brushSize * 2}px ${selectedColor}50`,
+                                            transform: 'translate(-50%, -50%)',
+                                            opacity: isDrawing ? 1 : 0.7,
+                                        }}
+                                    />
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
@@ -554,8 +685,25 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
 
             {/* Tools Row */}
             <div className="flex items-center justify-between gap-2 flex-wrap">
+                {/* Left/Right Hand Toggle */}
+                <button
+                    onClick={() => setIsLeftHanded(!isLeftHanded)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all text-xs font-medium ${
+                        isLeftHanded
+                            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
+                            : 'bg-white/15 text-white hover:bg-white/25'
+                    }`}
+                    title={isLeftHanded ? 'Left-handed mode' : 'Right-handed mode'}
+                >
+                    <Hand 
+                        className="w-4 h-4" 
+                        style={{ transform: isLeftHanded ? 'scaleX(-1)' : 'none' }}
+                    />
+                    <span>{isLeftHanded ? 'L' : 'R'}</span>
+                </button>
+
                 {/* Brush Size */}
-                <div className="flex items-center gap-2 flex-1 min-w-[100px]">
+                <div className="flex items-center gap-2 flex-1 min-w-[80px]">
                     <span className="text-white/70 text-xs">Size:</span>
                     <input
                         type="range"
@@ -566,10 +714,12 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
                         className="flex-1 accent-[#FFD700]"
                     />
                     <div
-                        className="rounded-full bg-white/50"
+                        className="rounded-full"
                         style={{
                             width: Math.max(8, brushSize / 2),
                             height: Math.max(8, brushSize / 2),
+                            backgroundColor: selectedColor,
+                            border: selectedColor === '#FFFFFF' ? '1px solid #ccc' : 'none',
                         }}
                     />
                 </div>
