@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Check, Plus, Trash2, UserCircle, Mic, X, ChevronDown, ChevronUp, BookOpen, Music, Sparkles, Users } from 'lucide-react';
+import { ChevronLeft, Check, Plus, Trash2, UserCircle, Mic, X, ChevronDown, ChevronUp, BookOpen, Music, Sparkles, Users, Loader2 } from 'lucide-react';
 import WoodButton from '../components/ui/WoodButton';
 import { useUser } from '../context/UserContext';
 import { useAudio } from '../context/AudioContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { AVATAR_ASSETS } from '../components/avatar/AvatarAssets';
 import ParentGateModal from '../components/features/ParentGateModal';
 import VoiceCloningModal from '../components/features/VoiceCloningModal';
@@ -57,7 +58,9 @@ const PaywallStep: React.FC<{
   setSelectedPlan: (plan: 'annual' | 'monthly') => void;
   onSubscribe: () => void;
   onSkip: () => void;
-}> = ({ selectedPlan, setSelectedPlan, onSubscribe, onSkip }) => {
+  isPurchasing?: boolean;
+  error?: string | null;
+}> = ({ selectedPlan, setSelectedPlan, onSubscribe, onSkip, isPurchasing = false, error = null }) => {
   const [showIncluded, setShowIncluded] = useState(false);
   const carouselRef = useRef<HTMLDivElement>(null);
   const [currentBenefit, setCurrentBenefit] = useState(0);
@@ -143,14 +146,29 @@ const PaywallStep: React.FC<{
           </div>
         </div>
 
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-lg mb-3 text-sm">
+            {error}
+          </div>
+        )}
+
         {/* CTA Button */}
         <WoodButton 
           fullWidth 
           variant="gold"
           onClick={onSubscribe}
-          className="py-4 text-lg shadow-xl mb-2 border-b-4 border-[#B8860B]"
+          disabled={isPurchasing}
+          className="py-4 text-lg shadow-xl mb-2 border-b-4 border-[#B8860B] disabled:opacity-50"
         >
-          🎁 START FREE TRIAL
+          {isPurchasing ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Processing...
+            </span>
+          ) : (
+            '🎁 START FREE TRIAL'
+          )}
         </WoodButton>
         
         <p className="text-[#5c2e0b] text-[10px] text-center opacity-70">
@@ -257,8 +275,11 @@ const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
   const { setParentName, setEquippedAvatar, addKid, kids, removeKid, subscribe, resetUser, unlockVoice } = useUser();
   const { playClick, playSuccess } = useAudio();
+  const { purchase, isLoading: isSubscriptionLoading } = useSubscription();
   
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1); // Steps: 1=Parent, 2=Family, 3=Voice Selection, 4=Unlock
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
 
   // Step 1 State (Parent)
   const [pName, setPName] = useState('');
@@ -456,10 +477,29 @@ const OnboardingPage: React.FC = () => {
     setStep(4); // Move to unlock/paywall step
   };
 
-  const handleGateSuccess = () => {
-    playSuccess();
-    subscribe();
-    navigate('/home');
+  const handleGateSuccess = async () => {
+    setShowParentGate(false);
+    setIsPurchasing(true);
+    setPurchaseError(null);
+    
+    try {
+      // Trigger actual RevenueCat/Apple in-app purchase
+      const result = await purchase(selectedPlan);
+      
+      if (result.success) {
+        playSuccess();
+        subscribe(); // Also update local state
+        navigate('/home');
+      } else {
+        // Purchase was cancelled or failed
+        setPurchaseError(result.error || 'Purchase was cancelled');
+        setIsPurchasing(false);
+      }
+    } catch (error: any) {
+      console.error('Purchase error:', error);
+      setPurchaseError(error.message || 'An error occurred during purchase');
+      setIsPurchasing(false);
+    }
   };
 
   const handleVoiceCloned = (voice: ClonedVoice) => {
@@ -848,6 +888,8 @@ const OnboardingPage: React.FC = () => {
               setSelectedPlan={setSelectedPlan}
               onSubscribe={handleSubscribeClick}
               onSkip={() => navigate('/home')}
+              isPurchasing={isPurchasing}
+              error={purchaseError}
             />
         )}
 
