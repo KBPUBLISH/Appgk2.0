@@ -934,63 +934,33 @@ const BookReaderPage: React.FC = () => {
 
                 // Wait for audio metadata to load so we can get the actual duration
                 audio.addEventListener('loadedmetadata', () => {
-                    const alignment = result.alignment || null;
-                    if (alignment && alignment.words) {
-                        // Filter out emotional cue and sound effect words from alignment
-                        // Sound effects like [gentle wind breeze] may be split into multiple words by TTS
-                        const filteredWords: Array<{ word: string; start: number; end: number; originalIndex: number }> = [];
-                        let insideBracket = false;
-                        
-                        alignment.words.forEach((w: any, idx: number) => {
-                            const word = w.word || '';
-                            
-                            // Check if word starts a bracket sequence
-                            if (word.startsWith('[')) {
-                                insideBracket = true;
-                            }
-                            
-                            // Skip if inside bracket or word is entirely bracketed
-                            if (insideBracket || word.match(/^\[.*\]$/)) {
-                                if (word.endsWith(']')) {
-                                    insideBracket = false;
-                                }
-                                return;
-                            }
-                            
-                            // Clean any partial brackets and add word
-                            const cleanedWord = word.replace(/\[([^\]]*)\]?/g, '').replace(/\]$/g, '').trim();
-                            if (cleanedWord.length > 0) {
-                                filteredWords.push({
-                                    word: cleanedWord,
-                                    start: w.start,
-                                    end: w.end,
-                                    originalIndex: idx
-                                });
-                            }
-                        });
-
-                        // Use original timing from ElevenLabs directly - don't scale
-                        // The API returns accurate word-level timestamps
-                        const filteredAlignment = {
-                            words: filteredWords.map((w) => ({
-                                word: w.word,
-                                start: w.start,
-                                end: w.end
+                    const audioDuration = audio.duration;
+                    
+                    // Get the clean text (same as what's displayed) and split into words
+                    const cleanText = text.replace(/\[([^\]]+)\]/g, '').replace(/\s+/g, ' ').trim();
+                    const displayWords = cleanText.split(/\s+/).filter(w => w.length > 0);
+                    
+                    if (displayWords.length > 0) {
+                        // Create simple timing - spread words evenly across audio duration
+                        const wordDuration = audioDuration / displayWords.length;
+                        const simpleAlignment = {
+                            words: displayWords.map((word, idx) => ({
+                                word,
+                                start: idx * wordDuration,
+                                end: (idx + 1) * wordDuration
                             }))
                         };
                         
-                        console.log('📝 Word alignment (sound effects filtered):', {
-                            audioDuration: audio.duration.toFixed(2),
-                            filteredWords: filteredAlignment.words.length,
-                            originalWords: alignment.words.length,
-                            firstWord: filteredAlignment.words[0],
-                            lastWord: filteredAlignment.words[filteredAlignment.words.length - 1]
+                        console.log('📝 Word alignment (simple timing):', {
+                            audioDuration: audioDuration.toFixed(2),
+                            wordCount: displayWords.length,
+                            wordDuration: wordDuration.toFixed(2)
                         });
                         
-                        setWordAlignment(filteredAlignment);
-                        wordAlignmentRef.current = filteredAlignment;
+                        setWordAlignment(simpleAlignment);
+                        wordAlignmentRef.current = simpleAlignment;
                     } else {
-                        console.warn('⚠️ No alignment data in result:', result);
+                        console.warn('⚠️ No words found in text');
                     }
                 });
 

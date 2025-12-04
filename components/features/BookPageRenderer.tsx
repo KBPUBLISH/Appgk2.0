@@ -229,30 +229,35 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                                 }
                             `}>
                                 <p className="leading-relaxed relative">
-                                    {isActive && wordAlignment ? (
-                                        // Highlighted text rendering - words are already filtered and cleaned
-                                        wordAlignment.words.map((wordObj, wIdx) => {
-                                            const isHighlighted = wIdx === highlightedWordIndex;
-                                            return (
-                                                <span
-                                                    key={wIdx}
-                                                    data-word-index={wIdx}
-                                                    className={`
-                                                        transition-all duration-200 rounded px-0.5
-                                                        ${isHighlighted
-                                                            ? 'bg-[#FFD700] text-black font-bold scale-110 inline-block shadow-sm'
-                                                            : ''
-                                                        }
-                                                    `}
-                                                >
-                                                    {wordObj.word}{' '}
-                                                </span>
-                                            );
-                                        })
-                                    ) : (
-                                        // Standard text rendering - remove emotional cues
-                                        removeEmotionalCues(box.text)
-                                    )}
+                                    {(() => {
+                                        // Always use the cleaned text from the original
+                                        const cleanedText = removeEmotionalCues(box.text);
+                                        const words = cleanedText.split(/\s+/).filter(w => w.length > 0);
+                                        
+                                        // If active with word alignment, show with highlighting
+                                        if (isActive && wordAlignment && highlightedWordIndex >= 0) {
+                                            return words.map((word, wIdx) => {
+                                                const isHighlighted = wIdx === highlightedWordIndex;
+                                                return (
+                                                    <span
+                                                        key={wIdx}
+                                                        className={`
+                                                            transition-all duration-150 rounded px-0.5
+                                                            ${isHighlighted
+                                                                ? 'bg-[#FFD700] text-black font-bold scale-110 inline-block shadow-sm'
+                                                                : ''
+                                                            }
+                                                        `}
+                                                    >
+                                                        {word}{' '}
+                                                    </span>
+                                                );
+                                            });
+                                        }
+                                        
+                                        // Standard rendering - just show text
+                                        return cleanedText;
+                                    })()}
                                 </p>
 
                                 {/* Play Icon Indicator */}
