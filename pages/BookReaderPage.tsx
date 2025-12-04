@@ -994,22 +994,14 @@ const BookReaderPage: React.FC = () => {
                     }
                 });
 
-                // Track audio time for word highlighting using requestAnimationFrame for smoother updates
-                // ontimeupdate only fires ~4 times/sec, RAF gives us ~60fps
-                let animationFrameId: number | null = null;
-                let lastWordIndex = -1;
-                
-                const updateHighlight = () => {
-                    if (audio.paused || audio.ended) {
-                        animationFrameId = null;
-                        return;
-                    }
-                    
+                // Track audio time for word highlighting
+                // Use ontimeupdate as primary method (reliable) with frequent polling
+                audio.ontimeupdate = () => {
                     const currentAlignment = wordAlignmentRef.current;
                     if (currentAlignment && currentAlignment.words && currentAlignment.words.length > 0) {
                         const currentTime = audio.currentTime;
                         
-                        // Find current word - use binary search style for efficiency
+                        // Find current word
                         let wordIndex = -1;
                         for (let i = 0; i < currentAlignment.words.length; i++) {
                             const w = currentAlignment.words[i];
@@ -1017,41 +1009,52 @@ const BookReaderPage: React.FC = () => {
                                 wordIndex = i;
                                 break;
                             }
-                            // If we're past this word's end but before next word's start, stay on this word
+                            // Stay on last word if past its end
                             if (currentTime >= w.end && i === currentAlignment.words.length - 1) {
                                 wordIndex = i;
                             }
                         }
 
-                        if (wordIndex !== -1 && wordIndex !== lastWordIndex) {
-                            lastWordIndex = wordIndex;
+                        if (wordIndex !== -1) {
                             setCurrentWordIndex(wordIndex);
                         }
                     }
+                };
+                
+                // Also use interval for more frequent updates (smoother highlighting)
+                const highlightInterval = setInterval(() => {
+                    if (audio.paused || audio.ended) return;
                     
-                    animationFrameId = requestAnimationFrame(updateHighlight);
-                };
-                
-                // Start tracking when audio plays
-                audio.onplay = () => {
-                    if (!animationFrameId) {
-                        animationFrameId = requestAnimationFrame(updateHighlight);
+                    const currentAlignment = wordAlignmentRef.current;
+                    if (currentAlignment && currentAlignment.words && currentAlignment.words.length > 0) {
+                        const currentTime = audio.currentTime;
+                        
+                        let wordIndex = -1;
+                        for (let i = 0; i < currentAlignment.words.length; i++) {
+                            const w = currentAlignment.words[i];
+                            if (currentTime >= w.start && currentTime < w.end) {
+                                wordIndex = i;
+                                break;
+                            }
+                            if (currentTime >= w.end && i === currentAlignment.words.length - 1) {
+                                wordIndex = i;
+                            }
+                        }
+
+                        if (wordIndex !== -1) {
+                            setCurrentWordIndex(wordIndex);
+                        }
                     }
-                };
+                }, 50); // 20 times per second
                 
+                // Clean up interval on pause/end
                 audio.onpause = () => {
-                    if (animationFrameId) {
-                        cancelAnimationFrame(animationFrameId);
-                        animationFrameId = null;
-                    }
+                    clearInterval(highlightInterval);
                 };
 
                 audio.onended = () => {
-                    // Cancel animation frame tracking
-                    if (animationFrameId) {
-                        cancelAnimationFrame(animationFrameId);
-                        animationFrameId = null;
-                    }
+                    // Clean up interval
+                    clearInterval(highlightInterval);
                     
                     // Highlight the last word when audio ends
                     const currentAlignment = wordAlignmentRef.current;
@@ -1919,9 +1922,9 @@ const BookReaderPage: React.FC = () => {
                             </button>
                         </div>
 
-                        {/* Page Grid */}
+                        {/* Page Grid - Simple page numbers, no image loading */}
                         <div className="p-4 overflow-y-auto max-h-[60vh]">
-                            <div className="grid grid-cols-4 gap-2">
+                            <div className="grid grid-cols-4 gap-3">
                                 {pages.map((page, index) => {
                                     const isCurrentPage = index === currentPageIndex;
                                     const isTheEnd = page.id === 'the-end';
@@ -1934,48 +1937,29 @@ const BookReaderPage: React.FC = () => {
                                                 setShowPageSelector(false);
                                                 stopAudio();
                                             }}
-                                            className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all active:scale-95 ${
+                                            className={`relative aspect-square rounded-xl transition-all active:scale-95 flex items-center justify-center ${
                                                 isCurrentPage 
-                                                    ? 'border-[#FFD700] ring-2 ring-[#FFD700] shadow-lg scale-105' 
-                                                    : 'border-[#8B4513]/30 hover:border-[#8B4513]'
+                                                    ? 'bg-[#FFD700] text-[#3E2723] shadow-lg scale-105 ring-2 ring-[#FFA000]' 
+                                                    : 'bg-[#8B4513]/20 text-[#5D4037] hover:bg-[#8B4513]/40'
                                             }`}
                                         >
-                                            {/* Page Thumbnail or Placeholder */}
                                             {isTheEnd ? (
-                                                <div className="w-full h-full bg-gradient-to-br from-[#FFD700] to-[#FFA000] flex items-center justify-center">
-                                                    <span className="text-[#3E2723] font-bold text-xs">END</span>
-                                                </div>
-                                            ) : page.backgroundUrl ? (
-                                                <img 
-                                                    src={page.backgroundUrl} 
-                                                    alt={`Page ${index + 1}`}
-                                                    className="w-full h-full object-cover"
-                                                />
+                                                <span className="font-bold text-sm">END</span>
                                             ) : (
-                                                <div className="w-full h-full bg-gradient-to-br from-[#fdf6e3] to-[#e8d5b7] flex items-center justify-center">
-                                                    <span className="text-[#8B4513] font-bold text-lg">{index + 1}</span>
-                                                </div>
+                                                <span className="font-bold text-xl">{index + 1}</span>
                                             )}
-
-                                            {/* Page Number Badge */}
-                                            <div className={`absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                                isCurrentPage 
-                                                    ? 'bg-[#FFD700] text-[#3E2723]' 
-                                                    : 'bg-black/50 text-white'
-                                            }`}>
-                                                {index + 1}
-                                            </div>
-
+                                            
                                             {/* Current Page Indicator */}
                                             {isCurrentPage && (
-                                                <div className="absolute top-1 left-1 bg-[#FFD700] rounded-full p-0.5">
-                                                    <Check className="w-3 h-3 text-[#3E2723]" />
+                                                <div className="absolute -top-1 -right-1 bg-[#4CAF50] rounded-full p-0.5 shadow">
+                                                    <Check className="w-3 h-3 text-white" />
                                                 </div>
                                             )}
                                         </button>
                                     );
                                 })}
                             </div>
+                            <p className="text-center text-[#8B4513]/70 text-sm mt-4">Tap a page to jump to it</p>
                         </div>
 
                         {/* Footer */}
