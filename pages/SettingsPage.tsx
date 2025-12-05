@@ -366,10 +366,30 @@ const SettingsPage: React.FC = () => {
                             </div>
                             <div>
                                 <div className="font-extrabold text-[#856404] text-sm font-display">Premium Active</div>
-                                <div className="text-xs text-[#856404]/70 font-bold">Renews Aug 24, 2025</div>
+                                <div className="text-xs text-[#856404]/70 font-bold">Manage in App Store</div>
                             </div>
                         </div>
-                        <button className="text-xs font-bold text-[#856404] bg-white/50 hover:bg-white px-3 py-1.5 rounded-lg border border-[#856404]/20 transition-colors">
+                        <button 
+                            onClick={() => {
+                                // Open subscription management
+                                // iOS: Opens App Store subscriptions page
+                                // Android: Opens Play Store subscriptions
+                                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                                const isAndroid = /Android/.test(navigator.userAgent);
+                                
+                                if (isIOS) {
+                                    // iOS App Store subscription management
+                                    window.location.href = 'itms-apps://apps.apple.com/account/subscriptions';
+                                } else if (isAndroid) {
+                                    // Google Play subscription management
+                                    window.location.href = 'https://play.google.com/store/account/subscriptions';
+                                } else {
+                                    // Web fallback - open Apple subscriptions page
+                                    window.open('https://apps.apple.com/account/subscriptions', '_blank');
+                                }
+                            }}
+                            className="text-xs font-bold text-[#856404] bg-white/50 hover:bg-white px-3 py-1.5 rounded-lg border border-[#856404]/20 transition-colors active:scale-95"
+                        >
                             Manage
                         </button>
                     </div>
