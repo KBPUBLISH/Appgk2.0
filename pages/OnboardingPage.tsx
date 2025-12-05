@@ -68,19 +68,25 @@ const PaywallStep: React.FC<{
   const carouselRef = useRef<HTMLDivElement>(null);
   const [currentBenefit, setCurrentBenefit] = useState(0);
   
-  // Account creation state
-  const [email, setEmail] = useState('');
+  // Check if user already has an account (email stored)
+  const existingEmail = localStorage.getItem('godlykids_user_email');
+  const hasExistingAccount = !!existingEmail;
+  
+  // Account creation state (only needed if no existing account)
+  const [email, setEmail] = useState(existingEmail || '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [showRestoreInput, setShowRestoreInput] = useState(false);
   const [restoreEmail, setRestoreEmail] = useState('');
 
-  const isValidEmail = (email: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isValidEmail = (emailStr: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr);
   };
 
+  // If user already has account, form is always valid (no password needed)
   const isFormValid = () => {
+    if (hasExistingAccount) return true;
     if (!email.trim() || !isValidEmail(email)) return false;
     if (!password || password.length < 6) return false;
     if (password !== confirmPassword) return false;
@@ -88,6 +94,7 @@ const PaywallStep: React.FC<{
   };
 
   const getFormError = () => {
+    if (hasExistingAccount) return null;
     if (!email.trim()) return null; // Don't show error if empty
     if (!isValidEmail(email)) return 'Please enter a valid email address';
     if (password && password.length < 6) return 'Password must be at least 6 characters';
@@ -198,49 +205,65 @@ const PaywallStep: React.FC<{
           </div>
         </div>
 
-        {/* Account Creation Section */}
+        {/* Account Section */}
         <div className="mb-4 space-y-3">
-          <h3 className="text-[#3E1F07] text-sm font-bold">Create Your Account</h3>
-          
-          {/* Email */}
-          <div>
-            <label className="text-[#5D4037] text-xs font-semibold mb-1 block">Email Address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); setFormError(null); }}
-              placeholder="your@email.com"
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
-            />
-          </div>
-          
-          {/* Password */}
-          <div>
-            <label className="text-[#5D4037] text-xs font-semibold mb-1 block">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); setFormError(null); }}
-              placeholder="At least 6 characters"
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
-            />
-          </div>
-          
-          {/* Confirm Password */}
-          <div>
-            <label className="text-[#5D4037] text-xs font-semibold mb-1 block">Confirm Password</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => { setConfirmPassword(e.target.value); setFormError(null); }}
-              placeholder="Re-enter password"
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
-            />
-          </div>
-          
-          {/* Form Error */}
-          {getFormError() && (
-            <p className="text-red-500 text-xs">{getFormError()}</p>
+          {hasExistingAccount ? (
+            /* User already has an account - just show their email */
+            <div className="bg-[#E8F5E9] border border-[#4CAF50] rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <Check className="w-5 h-5 text-[#4CAF50]" />
+                <div>
+                  <p className="text-[#2E7D32] text-sm font-semibold">Account Ready!</p>
+                  <p className="text-[#388E3C] text-xs">{existingEmail}</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* New user - show account creation form */
+            <>
+              <h3 className="text-[#3E1F07] text-sm font-bold">Create Your Account</h3>
+              
+              {/* Email */}
+              <div>
+                <label className="text-[#5D4037] text-xs font-semibold mb-1 block">Email Address</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setFormError(null); }}
+                  placeholder="your@email.com"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
+                />
+              </div>
+              
+              {/* Password */}
+              <div>
+                <label className="text-[#5D4037] text-xs font-semibold mb-1 block">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setFormError(null); }}
+                  placeholder="At least 6 characters"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
+                />
+              </div>
+              
+              {/* Confirm Password */}
+              <div>
+                <label className="text-[#5D4037] text-xs font-semibold mb-1 block">Confirm Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setFormError(null); }}
+                  placeholder="Re-enter password"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
+                />
+              </div>
+              
+              {/* Form Error */}
+              {getFormError() && (
+                <p className="text-red-500 text-xs">{getFormError()}</p>
+              )}
+            </>
           )}
         </div>
 
@@ -1109,9 +1132,11 @@ const OnboardingPage: React.FC = () => {
               onSkip={() => {
                 // User skipped without subscribing - limit to 1 kid account
                 if (kids.length > 1) {
-                  // Keep only the first kid, remove premium-only ones
-                  const firstKid = kids[0];
-                  setKids([firstKid]);
+                  // Remove all kids except the first one
+                  const kidsToRemove = kids.slice(1); // Get all kids after the first
+                  kidsToRemove.forEach(kid => {
+                    removeKid(kid.id);
+                  });
                   
                   // Also update localStorage to only have one kid
                   const savedProfiles = localStorage.getItem('godlykids_kid_profiles');
