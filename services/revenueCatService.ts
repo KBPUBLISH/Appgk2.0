@@ -140,8 +140,9 @@ export const RevenueCatService = {
   /**
    * Purchase a subscription using DeSpia URL scheme
    * @param productId - 'annual' or 'monthly'
+   * @param quickMode - if true, returns success quickly after triggering Apple sheet (optimistic)
    */
-  purchase: async (productId: 'annual' | 'monthly'): Promise<{ success: boolean; error?: string }> => {
+  purchase: async (productId: 'annual' | 'monthly', quickMode: boolean = true): Promise<{ success: boolean; error?: string }> => {
     const rcProductId = productId === 'annual' ? PRODUCT_IDS.ANNUAL : PRODUCT_IDS.MONTHLY;
     const userId = getUserId();
     
@@ -149,18 +150,13 @@ export const RevenueCatService = {
     console.log('   Product:', rcProductId);
     console.log('   User ID:', userId);
     console.log('   isNativeApp:', isNativeApp());
+    console.log('   quickMode:', quickMode);
 
     if (!isNativeApp()) {
       console.warn('⚠️ Not in native app - simulating purchase for web testing');
       localStorage.setItem('godlykids_premium', 'true');
       return { success: true };
     }
-
-    // IMPORTANT: Clear premium status before starting purchase
-    // This prevents false positives from previous test purchases
-    const previousPremiumStatus = localStorage.getItem('godlykids_premium');
-    console.log('   Previous premium status:', previousPremiumStatus);
-    localStorage.removeItem('godlykids_premium');
     
     // Trigger DeSpia purchase via URL scheme
     const purchaseUrl = `revenuecat://purchase?external_id=${encodeURIComponent(userId)}&product=${encodeURIComponent(rcProductId)}`;
@@ -168,7 +164,22 @@ export const RevenueCatService = {
     
     window.despia = purchaseUrl;
 
-    // Wait for DeSpia to process and user to complete purchase
+    // Quick mode: Give Apple a few seconds to show the purchase sheet,
+    // then return success. The actual purchase will be verified by webhooks.
+    // This provides a better UX - users can get into the app immediately.
+    if (quickMode) {
+      console.log('⚡ Quick mode: Returning success after triggering Apple sheet');
+      return new Promise((resolve) => {
+        // Wait 3 seconds to let Apple's sheet appear and user to interact
+        setTimeout(() => {
+          console.log('✅ Quick mode: Assuming purchase success, user will be let into app');
+          localStorage.setItem('godlykids_premium', 'true');
+          resolve({ success: true });
+        }, 3000);
+      });
+    }
+
+    // Legacy mode: Wait for DeSpia to process and user to complete purchase
     // DeSpia should fire 'despia-purchase-success' event or set localStorage
     return new Promise((resolve) => {
       purchaseResolve = resolve;

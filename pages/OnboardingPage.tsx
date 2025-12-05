@@ -291,7 +291,7 @@ const PaywallStep: React.FC<{
           {isPurchasing ? (
             <span className="flex items-center justify-center gap-2">
               <Loader2 className="w-5 h-5 animate-spin" />
-              Processing...
+              Opening Apple...
             </span>
           ) : (
             '🎁 START FREE TRIAL'
@@ -764,17 +764,19 @@ const OnboardingPage: React.FC = () => {
     
     try {
       // Trigger actual RevenueCat/Apple in-app purchase
-      // This will wait for the user to complete the purchase in the Apple sheet
+      // Quick mode: triggers Apple sheet and returns after 3s, letting user in immediately
       console.log('🛒 Starting purchase for plan:', selectedPlan);
       console.log('🛒 This will open the Apple subscription sheet...');
       
-      const result = await purchase(selectedPlan);
+      // Use quick mode - this triggers the Apple sheet and returns quickly
+      // User can complete the purchase while already in the app
+      const result = await purchase(selectedPlan, true);
       
       console.log('🛒 Purchase result:', result);
       
       if (result.success) {
-        // Purchase was confirmed by Apple!
-        console.log('✅ Purchase confirmed! Navigating to home...');
+        // Purchase sheet was triggered successfully!
+        console.log('✅ Apple sheet triggered! Letting user into app...');
         playSuccess();
         
         // Update state  
@@ -782,7 +784,7 @@ const OnboardingPage: React.FC = () => {
         setSubscribedDuringOnboarding(true);
         localStorage.setItem('godlykids_premium', 'true');
         
-        // NOW navigate to home (after successful purchase)
+        // Navigate to home immediately - purchase completes in background
         navigate('/home');
       } else {
         // Purchase was cancelled or failed
