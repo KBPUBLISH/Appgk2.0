@@ -11,14 +11,6 @@ const SignInPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  
-  // Sign-up form state
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [signUpEmail, setSignUpEmail] = useState('');
-  const [signUpPassword, setSignUpPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showSignUpPassword, setShowSignUpPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleLogin = async (provider: 'apple' | 'google' | 'email', emailValue?: string, passwordValue?: string) => {
     setLoading(provider);
@@ -100,51 +92,6 @@ const SignInPage: React.FC = () => {
     handleLogin('email', email, password);
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading('signup');
-    setError(null);
-
-    if (!signUpEmail || !signUpPassword || !confirmPassword) {
-      setError('Please fill in all fields.');
-      setLoading(null);
-      return;
-    }
-
-    if (signUpPassword !== confirmPassword) {
-      setError('Passwords do not match.');
-      setLoading(null);
-      return;
-    }
-
-    if (signUpPassword.length < 6) {
-      setError('Password must be at least 6 characters long.');
-      setLoading(null);
-      return;
-    }
-
-    // Attempt sign-up and wait for result before navigating
-    try {
-      // Don't send firstName - backend will generate unique username from email
-      const result = await ApiService.signUp(signUpEmail, signUpPassword);
-      
-      if (result.success) {
-        console.log('✅ SignInPage: Sign up successful!');
-        window.dispatchEvent(new Event('authTokenUpdated'));
-        // Navigate to onboarding after successful sign-up
-        navigate('/onboarding');
-      } else {
-        console.warn('⚠️ Sign-up failed:', result.error);
-        setError(result.error || 'Sign-up failed. Please try again.');
-        setLoading(null);
-      }
-    } catch (err) {
-      console.error('❌ SignInPage: Sign up exception', err);
-      setError('Network error during sign-up. Please try again.');
-      setLoading(null);
-    }
-  };
-
   return (
     <div className="flex flex-col h-full w-full relative overflow-y-auto no-scrollbar px-6 py-6">
       
@@ -163,7 +110,7 @@ const SignInPage: React.FC = () => {
              <div className="relative bg-[#CD853F] px-8 py-3 rounded-xl border-b-[6px] border-[#8B4513] shadow-xl">
                  <div className="absolute inset-0 opacity-20 rounded-xl pointer-events-none" style={{backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #3E1F07 10px, #3E1F07 12px)'}}></div>
                 <h1 className="relative font-display font-extrabold text-[#5c2e0b] text-xl tracking-widest drop-shadow-[0_1px_0_rgba(255,255,255,0.4)] uppercase">
-                  {isSignUp ? 'Create Account' : 'Sign In'}
+                  Sign In
                 </h1>
                 {/* Nails */}
                 <div className="absolute top-1/2 -translate-y-1/2 left-2 w-2 h-2 bg-[#3e1f07] rounded-full"></div>
@@ -205,175 +152,67 @@ const SignInPage: React.FC = () => {
               </div>
 
               {/* Sign In Form */}
-              {!isSignUp ? (
-                <>
-                  <form onSubmit={handleEmailFormSubmit} className="space-y-3">
-                    <div className="space-y-2">
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" size={18} />
-                        <input
-                          type="email"
-                          placeholder="Email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          disabled={loading !== null}
-                          className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-white/60 focus:outline-none focus:bg-white/15 focus:border-white/30 transition-colors"
-                          required
-                          autoComplete="email"
-                        />
-                      </div>
-                      
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" size={18} />
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="Password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          disabled={loading !== null}
-                          className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl py-3 pl-10 pr-10 text-white placeholder:text-white/60 focus:outline-none focus:bg-white/15 focus:border-white/30 transition-colors"
-                          required
-                          autoComplete="current-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white/80 transition-colors"
-                          tabIndex={-1}
-                        >
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <WoodButton 
-                      type="submit"
-                      fullWidth 
-                      variant="primary" 
-                      disabled={loading !== null || !email || !password}
-                    >
-                      {loading === 'email' ? 'Signing in...' : 'Sign In with Email'}
-                    </WoodButton>
-                  </form>
-
-                  <div className="relative py-2 flex items-center justify-center opacity-70 mt-4">
-                    <div className="h-px bg-white/40 w-full"></div>
-                    <span className="px-2 text-white text-xs font-bold uppercase">Or</span>
-                    <div className="h-px bg-white/40 w-full"></div>
+              <form onSubmit={handleEmailFormSubmit} className="space-y-3">
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" size={18} />
+                    <input
+                      type="email"
+                      placeholder="Email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={loading !== null}
+                      className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-white/60 focus:outline-none focus:bg-white/15 focus:border-white/30 transition-colors"
+                      required
+                      autoComplete="email"
+                    />
                   </div>
-
-                  <button
-                    onClick={() => setIsSignUp(true)}
-                    className="w-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30 text-white font-bold py-3 px-4 rounded-xl shadow-[0_4px_0_rgba(0,0,0,0.1)] active:translate-y-[2px] active:shadow-none transition-all"
-                  >
-                    Create New Account
-                  </button>
-
-                  <button
-                    onClick={() => navigate('/onboarding')}
-                    className="w-full text-white/60 hover:text-white text-sm mt-2 underline"
-                  >
-                    Or continue to full onboarding
-                  </button>
-                </>
-              ) : (
-                <>
-                  <form onSubmit={handleSignUp} className="space-y-3">
-                    <div className="space-y-2">
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" size={18} />
-                        <input
-                          type="email"
-                          placeholder="Email"
-                          value={signUpEmail}
-                          onChange={(e) => setSignUpEmail(e.target.value)}
-                          disabled={loading !== null}
-                          className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-white/60 focus:outline-none focus:bg-white/15 focus:border-white/30 transition-colors"
-                          required
-                          autoComplete="email"
-                        />
-                      </div>
-                      
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" size={18} />
-                        <input
-                          type={showSignUpPassword ? 'text' : 'password'}
-                          placeholder="Create Password"
-                          value={signUpPassword}
-                          onChange={(e) => setSignUpPassword(e.target.value)}
-                          disabled={loading !== null}
-                          className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl py-3 pl-10 pr-10 text-white placeholder:text-white/60 focus:outline-none focus:bg-white/15 focus:border-white/30 transition-colors"
-                          required
-                          autoComplete="new-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowSignUpPassword(!showSignUpPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white/80 transition-colors"
-                          tabIndex={-1}
-                        >
-                          {showSignUpPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" size={18} />
-                        <input
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          placeholder="Confirm Password"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          disabled={loading !== null}
-                          className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl py-3 pl-10 pr-10 text-white placeholder:text-white/60 focus:outline-none focus:bg-white/15 focus:border-white/30 transition-colors"
-                          required
-                          autoComplete="new-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white/80 transition-colors"
-                          tabIndex={-1}
-                        >
-                          {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <WoodButton 
-                      type="submit"
-                      fullWidth 
-                      variant="primary" 
-                      disabled={loading !== null || !signUpEmail || !signUpPassword || !confirmPassword}
+                  
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" size={18} />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={loading !== null}
+                      className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl py-3 pl-10 pr-10 text-white placeholder:text-white/60 focus:outline-none focus:bg-white/15 focus:border-white/30 transition-colors"
+                      required
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white/80 transition-colors"
+                      tabIndex={-1}
                     >
-                      {loading === 'signup' ? 'Creating Account...' : 'Create Account'}
-                    </WoodButton>
-                  </form>
-
-                  <div className="relative py-2 flex items-center justify-center opacity-70 mt-4">
-                    <div className="h-px bg-white/40 w-full"></div>
-                    <span className="px-2 text-white text-xs font-bold uppercase">Or</span>
-                    <div className="h-px bg-white/40 w-full"></div>
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
+                </div>
 
-                  <button
-                    onClick={() => {
-                      setLoading(null);
-                      navigate('/onboarding');
-                    }}
-                    disabled={loading === 'signup'}
-                    className="w-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30 text-white font-bold py-3 px-4 rounded-xl shadow-[0_4px_0_rgba(0,0,0,0.1)] active:translate-y-[2px] active:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading === 'signup' ? 'Skip to Onboarding' : 'Continue to Onboarding'}
-                  </button>
+                <WoodButton 
+                  type="submit"
+                  fullWidth 
+                  variant="primary" 
+                  disabled={loading !== null || !email || !password}
+                >
+                  {loading === 'email' ? 'Signing in...' : 'Sign In with Email'}
+                </WoodButton>
+              </form>
 
-                  <button
-                    onClick={() => setIsSignUp(false)}
-                    className="w-full text-white/60 hover:text-white text-sm mt-2 underline"
-                  >
-                    Already have an account? Sign in
-                  </button>
-                </>
-              )}
+              <div className="relative py-2 flex items-center justify-center opacity-70 mt-4">
+                <div className="h-px bg-white/40 w-full"></div>
+                <span className="px-2 text-white text-xs font-bold uppercase">New here?</span>
+                <div className="h-px bg-white/40 w-full"></div>
+              </div>
+
+              <button
+                onClick={() => navigate('/onboarding')}
+                className="w-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30 text-white font-bold py-3 px-4 rounded-xl shadow-[0_4px_0_rgba(0,0,0,0.1)] active:translate-y-[2px] active:shadow-none transition-all"
+              >
+                Get Started
+              </button>
 
               <p className="text-center text-white/60 text-xs mt-4">
                 By continuing you agree to our Terms & Conditions

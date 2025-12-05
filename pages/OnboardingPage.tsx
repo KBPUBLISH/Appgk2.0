@@ -56,7 +56,7 @@ const INCLUDED_ITEMS = [
 const PaywallStep: React.FC<{
   selectedPlan: 'annual' | 'monthly';
   setSelectedPlan: (plan: 'annual' | 'monthly') => void;
-  onSubscribe: (email: string) => void;
+  onSubscribe: (email: string, password: string) => void;
   onSkip: () => void;
   onRestore: (email?: string) => void;
   isPurchasing?: boolean;
@@ -284,7 +284,7 @@ const PaywallStep: React.FC<{
               setFormError(getFormError() || 'Please fill in all fields correctly');
               return;
             }
-            onSubscribe(email);
+            onSubscribe(email, password);
           }}
           disabled={isPurchasing || !isFormValid()}
           className="py-4 text-lg shadow-xl mb-2 border-b-4 border-[#B8860B] disabled:opacity-50"
@@ -696,8 +696,12 @@ const OnboardingPage: React.FC = () => {
     };
   }, [previewAudio]);
 
-  const handleSubscribeClick = (email: string) => {
+  // Store password temporarily for account creation after parent gate
+  const [userPassword, setUserPassword] = useState<string>('');
+  
+  const handleSubscribeClick = (email: string, password: string) => {
     setUserEmail(email);
+    setUserPassword(password);
     setShowParentGate(true);
   };
 
@@ -757,15 +761,42 @@ const OnboardingPage: React.FC = () => {
     setIsPurchasing(true);
     setPurchaseError(null);
     
-    // Store user email immediately (non-blocking)
-    if (userEmail) {
-      localStorage.setItem('godlykids_user_email', userEmail);
-      console.log('📧 Stored user email:', userEmail);
-    }
-    
     try {
-      // Trigger actual RevenueCat/Apple in-app purchase
-      // Quick mode: triggers Apple sheet and returns after 3s, letting user in immediately
+      // First, create the user account if we have email and password
+      if (userEmail && userPassword) {
+        console.log('📧 Creating user account:', userEmail);
+        
+        const signUpResult = await ApiService.signUp(userEmail, userPassword);
+        
+        if (signUpResult.success) {
+          console.log('✅ Account created successfully!');
+          localStorage.setItem('godlykids_user_email', userEmail);
+          // Dispatch event so other parts of app know user is authenticated
+          window.dispatchEvent(new Event('authTokenUpdated'));
+        } else {
+          // If account already exists, try logging in instead
+          if (signUpResult.error?.includes('exists') || signUpResult.error?.includes('duplicate')) {
+            console.log('📧 Account exists, attempting login...');
+            const loginResult = await ApiService.login('email', { email: userEmail, password: userPassword });
+            if (loginResult.success) {
+              console.log('✅ Logged in successfully!');
+              localStorage.setItem('godlykids_user_email', userEmail);
+              window.dispatchEvent(new Event('authTokenUpdated'));
+            } else {
+              setPurchaseError('Account exists but password is incorrect. Please use Sign In instead.');
+              setIsPurchasing(false);
+              return;
+            }
+          } else {
+            console.error('❌ Account creation failed:', signUpResult.error);
+            setPurchaseError(signUpResult.error || 'Failed to create account. Please try again.');
+            setIsPurchasing(false);
+            return;
+          }
+        }
+      }
+      
+      // Now proceed with the purchase
       console.log('🛒 Starting purchase for plan:', selectedPlan);
       console.log('🛒 This will open the Apple subscription sheet...');
       
