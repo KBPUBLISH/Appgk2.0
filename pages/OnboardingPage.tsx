@@ -57,15 +57,96 @@ const INCLUDED_ITEMS = [
 const PaywallStep: React.FC<{
   selectedPlan: 'annual' | 'monthly';
   setSelectedPlan: (plan: 'annual' | 'monthly') => void;
-  onSubscribe: () => void;
+  onSubscribe: (email: string) => void;
   onSkip: () => void;
+  onRestore: () => void;
   isPurchasing?: boolean;
+  isRestoring?: boolean;
   error?: string | null;
   kidsCount?: number; // Number of kids added during onboarding
-}> = ({ selectedPlan, setSelectedPlan, onSubscribe, onSkip, isPurchasing = false, error = null, kidsCount = 0 }) => {
-  const [showIncluded, setShowIncluded] = useState(false);
+}> = ({ selectedPlan, setSelectedPlan, onSubscribe, onSkip, onRestore, isPurchasing = false, isRestoring = false, error = null, kidsCount = 0 }) => {
+  const [showIncluded, setShowIncluded] = useState(true); // Open by default so users see features
   const carouselRef = useRef<HTMLDivElement>(null);
   const [currentBenefit, setCurrentBenefit] = useState(0);
+  
+  // Email verification state
+  const [email, setEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [sentCode, setSentCode] = useState('');
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [showVerification, setShowVerification] = useState(false);
+
+  const isValidEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const handleSendVerificationCode = async () => {
+    if (!isValidEmail(email)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+    
+    setIsSendingCode(true);
+    setEmailError(null);
+    
+    try {
+      // Generate a 6-digit code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setSentCode(code);
+      
+      // Send via OneSignal email
+      const response = await fetch('https://onesignal.com/api/v1/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${import.meta.env.VITE_ONESIGNAL_REST_API_KEY || 'NzRhMjJkYmYtNjIxNy00NDA0LWI0MTQtNzA1ODMwMDg2ZTEz'}`,
+        },
+        body: JSON.stringify({
+          app_id: import.meta.env.VITE_ONESIGNAL_APP_ID || 'b03af3a2-6096-4a56-a4b4-9ec9db7ff6fa',
+          include_email_tokens: [email],
+          email_subject: 'Godly Kids Academy - Verify Your Email',
+          email_body: `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+              <h2 style="color: #8B4513; text-align: center;">🌟 Godly Kids Academy</h2>
+              <p style="text-align: center; font-size: 18px;">Your verification code is:</p>
+              <div style="background: #FFD700; color: #3E1F07; font-size: 32px; font-weight: bold; text-align: center; padding: 20px; border-radius: 10px; letter-spacing: 5px;">
+                ${code}
+              </div>
+              <p style="text-align: center; color: #666; margin-top: 20px;">Enter this code in the app to continue.</p>
+            </div>
+          `,
+        }),
+      });
+      
+      if (response.ok) {
+        setShowVerification(true);
+        console.log('✅ Verification code sent to:', email);
+      } else {
+        // For testing, still show verification (OneSignal may fail without proper setup)
+        setShowVerification(true);
+        console.log('⚠️ OneSignal may have failed, but showing verification for testing. Code:', code);
+      }
+    } catch (err) {
+      console.error('Error sending verification:', err);
+      // Still show verification for testing
+      setShowVerification(true);
+      console.log('⚠️ Using test code:', sentCode);
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
+
+  const handleVerifyCode = () => {
+    if (verificationCode === sentCode) {
+      setIsEmailVerified(true);
+      setEmailError(null);
+      console.log('✅ Email verified:', email);
+    } else {
+      setEmailError('Invalid code. Please try again.');
+    }
+  };
 
   // Auto-scroll benefits carousel
   useEffect(() => {
@@ -170,6 +251,74 @@ const PaywallStep: React.FC<{
           </div>
         </div>
 
+        {/* Email Verification Section */}
+        <div className="mb-4">
+          {!isEmailVerified ? (
+            <div className="space-y-2">
+              <label className="text-[#3E1F07] text-xs font-semibold">Email Address</label>
+              {!showVerification ? (
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setEmailError(null); }}
+                    placeholder="your@email.com"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#FFD700] focus:ring-1 focus:ring-[#FFD700]"
+                  />
+                  <button
+                    onClick={handleSendVerificationCode}
+                    disabled={isSendingCode || !email.trim()}
+                    className="px-4 py-2 bg-[#8B4513] text-white text-sm font-semibold rounded-lg hover:bg-[#A0522D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isSendingCode ? '...' : 'Verify'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-[#4CAF50] text-xs">✓ Code sent to {email}</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={verificationCode}
+                      onChange={(e) => { setVerificationCode(e.target.value); setEmailError(null); }}
+                      placeholder="Enter 6-digit code"
+                      maxLength={6}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-center tracking-widest font-mono focus:outline-none focus:border-[#FFD700] focus:ring-1 focus:ring-[#FFD700]"
+                    />
+                    <button
+                      onClick={handleVerifyCode}
+                      disabled={verificationCode.length !== 6}
+                      className="px-4 py-2 bg-[#4CAF50] text-white text-sm font-semibold rounded-lg hover:bg-[#43A047] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Confirm
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => { setShowVerification(false); setSentCode(''); setVerificationCode(''); }}
+                    className="text-[#8B4513] text-xs underline"
+                  >
+                    Change email
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-[#E8F5E9] px-3 py-2 rounded-lg">
+              <Check className="w-4 h-4 text-[#4CAF50]" />
+              <span className="text-[#2E7D32] text-sm font-medium">{email}</span>
+              <button
+                onClick={() => { setIsEmailVerified(false); setShowVerification(false); setSentCode(''); setVerificationCode(''); }}
+                className="ml-auto text-[#8B4513] text-xs underline"
+              >
+                Change
+              </button>
+            </div>
+          )}
+          {emailError && (
+            <p className="text-red-500 text-xs mt-1">{emailError}</p>
+          )}
+        </div>
+
         {/* Error Display */}
         {error && (
           <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-lg mb-3 text-sm">
@@ -181,8 +330,8 @@ const PaywallStep: React.FC<{
         <WoodButton 
           fullWidth 
           variant="gold"
-          onClick={onSubscribe}
-          disabled={isPurchasing}
+          onClick={() => onSubscribe(email)}
+          disabled={isPurchasing || !isEmailVerified}
           className="py-4 text-lg shadow-xl mb-2 border-b-4 border-[#B8860B] disabled:opacity-50"
         >
           {isPurchasing ? (
@@ -190,6 +339,8 @@ const PaywallStep: React.FC<{
               <Loader2 className="w-5 h-5 animate-spin" />
               Processing...
             </span>
+          ) : !isEmailVerified ? (
+            '🔒 Verify Email First'
           ) : (
             '🎁 START FREE TRIAL'
           )}
@@ -198,6 +349,22 @@ const PaywallStep: React.FC<{
         <p className="text-[#5c2e0b] text-[10px] text-center opacity-70">
           No charge until trial ends
         </p>
+
+        {/* Restore Purchases */}
+        <button
+          onClick={onRestore}
+          disabled={isRestoring}
+          className="w-full mt-3 text-[#8B4513] text-sm font-medium py-2 hover:underline disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {isRestoring ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Checking...
+            </>
+          ) : (
+            'Already subscribed? Restore Purchases'
+          )}
+        </button>
       </div>
 
       {/* What's Included Accordion */}
@@ -303,7 +470,9 @@ const OnboardingPage: React.FC = () => {
   
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1); // Steps: 1=Parent, 2=Family, 3=Voice Selection, 4=Unlock
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState('');
   
   // Track if user subscribed during family step (to skip final paywall)
   const [subscribedDuringOnboarding, setSubscribedDuringOnboarding] = useState(false);
@@ -386,17 +555,8 @@ const OnboardingPage: React.FC = () => {
 
   const handleStep2Continue = () => {
     playClick();
-    // Voice selection (step 3) is disabled, go directly to paywall
-    // ONLY skip paywall if user subscribed during THIS onboarding session
-    // (NOT if they have premium from previous sessions - they wouldn't be onboarding again if so)
-    if (subscribedDuringOnboarding) {
-      console.log('✅ User subscribed during onboarding, skipping paywall');
-      playSuccess();
-      navigate('/home');
-    } else {
-      console.log('📋 Going to paywall step (isPremium from cache:', isPremium, ')');
-      setStep(4); // Always go to paywall for new users
-    }
+    // Go to voice selection step
+    setStep(3);
   };
   
   // Free tier allows only 1 kid account, but let users add all kids during onboarding
@@ -547,8 +707,32 @@ const OnboardingPage: React.FC = () => {
     };
   }, [previewAudio]);
 
-  const handleSubscribeClick = () => {
+  const handleSubscribeClick = (email: string) => {
+    setUserEmail(email);
     setShowParentGate(true);
+  };
+
+  const handleRestorePurchases = async () => {
+    setIsRestoring(true);
+    setPurchaseError(null);
+    
+    try {
+      const { restorePurchases } = await import('../services/revenueCatService').then(m => ({ restorePurchases: m.default.restorePurchases }));
+      const result = await restorePurchases();
+      
+      if (result.success && result.isPremium) {
+        playSuccess();
+        setSubscribedDuringOnboarding(true);
+        navigate('/home');
+      } else {
+        setPurchaseError('No active subscription found. Start a new subscription below.');
+      }
+    } catch (error: any) {
+      console.error('Restore error:', error);
+      setPurchaseError('Failed to restore purchases. Please try again.');
+    } finally {
+      setIsRestoring(false);
+    }
   };
 
   const handleSkipVoiceCloning = () => {
@@ -567,12 +751,21 @@ const OnboardingPage: React.FC = () => {
     setPurchaseError(null);
     
     try {
+      // Store user email for their account
+      if (userEmail) {
+        localStorage.setItem('godlykids_user_email', userEmail);
+        console.log('📧 Stored user email:', userEmail);
+      }
+      
       // Trigger actual RevenueCat/Apple in-app purchase
+      console.log('🛒 Starting purchase for plan:', selectedPlan);
       const result = await purchase(selectedPlan);
+      console.log('🛒 Purchase result:', result);
       
       if (result.success) {
         playSuccess();
         subscribe(); // Also update local state
+        setSubscribedDuringOnboarding(true);
         navigate('/home');
       } else {
         // Purchase was cancelled or failed
@@ -838,9 +1031,8 @@ const OnboardingPage: React.FC = () => {
            </div>
         )}
 
-        {/* --- STEP 3: VOICE CLONING (DISABLED - ElevenLabs Limit Reached) --- */}
-        {/* Voice cloning feature removed due to ElevenLabs 180 clone limit */}
-        {false && step === 3 && (
+        {/* --- STEP 3: VOICE SELECTION --- */}
+        {step === 3 && (
           <div className="w-full max-w-md px-6 animate-in slide-in-from-right-10 duration-500">
             {/* Header */}
             <div className="text-center mb-8">
@@ -1001,7 +1193,9 @@ const OnboardingPage: React.FC = () => {
               setSelectedPlan={setSelectedPlan}
               onSubscribe={handleSubscribeClick}
               onSkip={() => navigate('/home')}
+              onRestore={handleRestorePurchases}
               isPurchasing={isPurchasing}
+              isRestoring={isRestoring}
               error={purchaseError}
               kidsCount={kids.length}
             />
