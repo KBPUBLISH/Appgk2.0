@@ -81,6 +81,10 @@ const HomePage: React.FC = () => {
   // Top Rated content state
   const [topRatedBooks, setTopRatedBooks] = useState<any[]>([]);
   const [topRatedPlaylists, setTopRatedPlaylists] = useState<any[]>([]);
+  
+  // Dynamic games from backend
+  const [dynamicGames, setDynamicGames] = useState<any[]>([]);
+  const [gamesLoading, setGamesLoading] = useState(true);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
@@ -189,14 +193,29 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // Fetch lessons, categories, playlists, and featured content
+  // Fetch lessons, categories, playlists, featured content, and games
   useEffect(() => {
     fetchLessons();
     fetchExploreCategories();
     fetchPlaylists();
     fetchFeaturedContent();
     fetchTopRatedContent();
+    fetchDynamicGames();
   }, []);
+  
+  // Fetch dynamic games from backend
+  const fetchDynamicGames = async () => {
+    try {
+      console.log('🎮 Fetching dynamic games...');
+      const games = await ApiService.getDailyTaskGames();
+      console.log('🎮 Dynamic games received:', games.length, games);
+      setDynamicGames(games);
+    } catch (error) {
+      console.error('❌ Error fetching dynamic games:', error);
+    } finally {
+      setGamesLoading(false);
+    }
+  };
 
   const fetchLessons = async () => {
     try {
@@ -846,6 +865,45 @@ const HomePage: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {/* Dynamic Games from Backend */}
+              {dynamicGames.map((game) => (
+                <div
+                  key={game._id || game.gameId}
+                  className="relative w-[calc((100vw-48px-40px)/4)] flex-shrink-0 cursor-pointer"
+                  onClick={() => {
+                    // Handle game click - open webview if URL exists
+                    if (game.gameType === 'webview' && game.url) {
+                      window.open(game.url, '_blank');
+                    }
+                  }}
+                >
+                  <div className="relative aspect-[9/16] rounded-xl overflow-hidden transition-all border-2 border-[#4CAF50]">
+                    {/* Cover Image or Gradient Background */}
+                    {game.coverImage ? (
+                      <img 
+                        src={game.coverImage} 
+                        alt={game.name}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#4CAF50] to-[#2E7D32]" />
+                    )}
+                    
+                    {/* Overlay with game info */}
+                    <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-end pb-3">
+                      <span className="text-white text-sm font-bold font-display text-center px-2 drop-shadow-lg">
+                        {game.name}
+                      </span>
+                      {game.description && (
+                        <span className="text-white/80 text-[10px] text-center px-2 mt-1 drop-shadow">
+                          {game.description.substring(0, 30)}...
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
 
             </div>
           </div>

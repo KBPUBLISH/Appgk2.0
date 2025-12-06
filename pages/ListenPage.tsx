@@ -5,7 +5,8 @@ import BookCard from '../components/ui/BookCard';
 import Header from '../components/layout/Header';
 import SectionTitle from '../components/ui/SectionTitle';
 import { useBooks } from '../context/BooksContext';
-import { Search, Music, ChevronDown } from 'lucide-react';
+import { useUser } from '../context/UserContext';
+import { Search, Music, ChevronDown, Lock, Crown } from 'lucide-react';
 import { getApiBaseUrl, ApiService } from '../services/apiService';
 
 const ageOptions = ['All Ages', '3+', '4+', '5+', '6+', '7+', '8+', '9+', '10+'];
@@ -22,12 +23,14 @@ interface Playlist {
   status: 'draft' | 'published';
   minAge?: number;
   level?: string;
+  isMembersOnly?: boolean;
 }
 
 const ListenPage: React.FC = () => {
 
   const navigate = useNavigate();
   const { books, loading } = useBooks();
+  const { isSubscribed } = useUser();
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAge, setSelectedAge] = useState<string>('All Ages');
@@ -322,54 +325,81 @@ const ListenPage: React.FC = () => {
             {filteredPlaylists.length > 0 && (
               <div className="mb-8">
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
-                  {filteredPlaylists.map(playlist => (
-                    <div
-                      key={playlist._id}
-                      onClick={() => navigate(`/audio/playlist/${playlist._id}`)}
-                      className="bg-white/10 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg border-2 border-white/20 hover:shadow-2xl hover:scale-105 transition-all cursor-pointer group"
-                    >
-                      {/* Cover Image - Same structure as BookCard */}
-                      <div className="aspect-square bg-gradient-to-br from-indigo-500 to-purple-600 relative overflow-hidden">
-                        {playlist.coverImage ? (
-                          <img
-                            src={playlist.coverImage}
-                            alt={playlist.title}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Music className="w-24 h-24 text-white opacity-50" />
+                  {filteredPlaylists.map(playlist => {
+                    const isPlaylistLocked = playlist.isMembersOnly && !isSubscribed;
+                    
+                    return (
+                      <div
+                        key={playlist._id}
+                        onClick={() => {
+                          if (isPlaylistLocked) {
+                            console.log('🔒 Playlist is locked - subscription required');
+                            return;
+                          }
+                          navigate(`/audio/playlist/${playlist._id}`);
+                        }}
+                        className={`bg-white/10 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg border-2 border-white/20 hover:shadow-2xl hover:scale-105 transition-all cursor-pointer group ${isPlaylistLocked ? 'opacity-80' : ''}`}
+                      >
+                        {/* Cover Image - Same structure as BookCard */}
+                        <div className="aspect-square bg-gradient-to-br from-indigo-500 to-purple-600 relative overflow-hidden">
+                          {playlist.coverImage ? (
+                            <img
+                              src={playlist.coverImage}
+                              alt={playlist.title}
+                              className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-300 ${isPlaylistLocked ? 'filter brightness-75' : ''}`}
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Music className="w-24 h-24 text-white opacity-50" />
+                            </div>
+                          )}
+                          
+                          {/* Lock Overlay for Members Only Content */}
+                          {isPlaylistLocked && (
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
+                              <div className="bg-black/70 rounded-full p-3 border-2 border-[#FFD700]">
+                                <Lock size={24} className="text-[#FFD700]" />
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Members Only Badge */}
+                          {playlist.isMembersOnly && (
+                            <div className="absolute top-2 right-2 bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-[#5c2e0b] text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg z-20">
+                              <Crown size={10} />
+                              <span>PREMIUM</span>
+                            </div>
+                          )}
+                          
+                          {/* Gradient overlay at bottom */}
+                          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 to-transparent"></div>
+
+                          {/* Level Badge */}
+                          {playlist.level && (
+                            <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-md border border-white/20">
+                              {playlist.level}
+                            </div>
+                          )}
+
+                          {/* Type Icon */}
+                          <div className="absolute bottom-2 right-2 bg-white/90 text-blue-900 p-1.5 rounded-full shadow-md">
+                            <Music size={16} />
                           </div>
-                        )}
+                        </div>
                         
-                        {/* Gradient overlay at bottom */}
-                        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 to-transparent"></div>
-
-                        {/* Level Badge */}
-                        {playlist.level && (
-                          <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-md border border-white/20">
-                            {playlist.level}
-                          </div>
-                        )}
-
-                        {/* Type Icon */}
-                        <div className="absolute bottom-2 right-2 bg-white/90 text-blue-900 p-1.5 rounded-full shadow-md">
-                          <Music size={16} />
+                        {/* Info - Same structure as BookCard */}
+                        <div className="p-1.5">
+                          <h3 className="text-white text-xs font-bold mb-0.5 truncate font-display">
+                            {playlist.title}
+                          </h3>
+                          {playlist.author && (
+                            <p className="text-white/70 text-[10px]">{playlist.author}</p>
+                          )}
                         </div>
                       </div>
-                      
-                      {/* Info - Same structure as BookCard */}
-                      <div className="p-1.5">
-                        <h3 className="text-white text-xs font-bold mb-0.5 truncate font-display">
-                          {playlist.title}
-                        </h3>
-                        {playlist.author && (
-                          <p className="text-white/70 text-[10px]">{playlist.author}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

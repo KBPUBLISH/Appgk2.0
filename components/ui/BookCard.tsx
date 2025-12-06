@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Book } from '../../types';
-import { BookOpen, Headphones, Eye, Heart } from 'lucide-react';
+import { BookOpen, Headphones, Eye, Heart, Lock, Crown } from 'lucide-react';
+import { useUser } from '../../context/UserContext';
 
 interface BookCardProps {
   book: Book;
@@ -12,6 +13,11 @@ const DEFAULT_COVER = 'https://via.placeholder.com/400x400/8B4513/FFFFFF?text=Bo
 
 const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
   const [imageError, setImageError] = useState(false);
+  const { isSubscribed } = useUser();
+  
+  // Check if this content is locked (members only and user not subscribed)
+  const isMembersOnly = (book as any).isMembersOnly === true;
+  const isLocked = isMembersOnly && !isSubscribed;
 
   // Reset error state when book cover URL changes
   useEffect(() => {
@@ -34,18 +40,42 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
 
   return (
     <div 
-      onClick={() => onClick(book.id)}
-      className="bg-white/10 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg border-2 border-white/20 hover:shadow-2xl hover:scale-105 transition-all cursor-pointer group"
+      onClick={() => {
+        if (isLocked) {
+          // Could show a modal here to prompt subscription
+          console.log('🔒 Content is locked - subscription required');
+          return;
+        }
+        onClick(book.id);
+      }}
+      className={`bg-white/10 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg border-2 border-white/20 hover:shadow-2xl hover:scale-105 transition-all cursor-pointer group ${isLocked ? 'opacity-80' : ''}`}
     >
       {/* Cover Image - Same structure as AudioPage */}
       <div className="aspect-square bg-gradient-to-br from-indigo-500 to-purple-600 relative overflow-hidden">
         <img 
           src={getImageSrc()} 
           alt={book.title} 
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+          className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-300 ${isLocked ? 'filter brightness-75' : ''}`}
           loading="lazy"
           onError={handleImageError}
         />
+        
+        {/* Lock Overlay for Members Only Content */}
+        {isLocked && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
+            <div className="bg-black/70 rounded-full p-3 border-2 border-[#FFD700]">
+              <Lock size={24} className="text-[#FFD700]" />
+            </div>
+          </div>
+        )}
+        
+        {/* Members Only Badge */}
+        {isMembersOnly && (
+          <div className="absolute top-2 right-2 bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-[#5c2e0b] text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg z-20">
+            <Crown size={10} />
+            <span>PREMIUM</span>
+          </div>
+        )}
         
         {/* Gradient overlay at bottom */}
         <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 to-transparent"></div>

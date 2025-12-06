@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Crown, Music, ClipboardList } from 'lucide-react';
+import { Crown, ClipboardList } from 'lucide-react';
 const ShopModal = lazy(() => import('../features/ShopModal'));
 import AvatarDetailModal from '../features/AvatarDetailModal';
 import CoinHistoryModal from '../features/CoinHistoryModal';
@@ -20,61 +20,11 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { coins, equippedAvatar, equippedFrame, equippedHat, equippedBody, equippedLeftArm, equippedRightArm, equippedLegs, isSubscribed, headOffset } = useUser();
-  const { musicEnabled, toggleMusic, playClick } = useAudio();
+  const { playClick } = useAudio();
   const [isShopOpen, setIsShopOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isCoinHistoryOpen, setIsCoinHistoryOpen] = useState(false);
   const [isReportCardOpen, setIsReportCardOpen] = useState(false);
-
-  // Check if we're on book reader page - music should appear muted
-  const isBookReader = location.pathname.startsWith('/read/');
-  const displayMusicEnabled = isBookReader ? false : musicEnabled;
-
-  // Restore background music when returning from book reader
-  useEffect(() => {
-    // Only restore if we're not on the book reader page
-    const isBookReader = location.pathname.startsWith('/read/');
-    if (isBookReader) return;
-
-    // Check if music was enabled before entering book reader
-    const wasMusicEnabled = localStorage.getItem('godly_kids_music_was_enabled') === 'true';
-
-    // Restore music if it was enabled before entering book reader
-    const restoreMusic = setTimeout(() => {
-      if (wasMusicEnabled) {
-        console.log('🎵 Header: Restoring background music - music was enabled before book reader');
-
-        // First, ensure music is enabled in state
-        if (!musicEnabled) {
-          toggleMusic();
-        }
-
-        // Then programmatically click the music button to ensure audio context is unlocked and music plays
-        setTimeout(() => {
-          const musicButton = document.querySelector('button[title*="Music"]') as HTMLButtonElement;
-          if (musicButton) {
-            console.log('🎵 Header: Programmatically clicking music button to restore playback');
-            musicButton.click();
-          }
-        }, 50);
-
-        // Clear the flag
-        localStorage.removeItem('godly_kids_music_was_enabled');
-      } else if (musicEnabled) {
-        // Double-check: if music is enabled but audio is paused, click button to resume
-        const bgAudio = document.querySelector('audio[src*="Seaside_Adventure"]') as HTMLAudioElement;
-        if (bgAudio && bgAudio.paused) {
-          const musicButton = document.querySelector('button[title*="Music"]') as HTMLButtonElement;
-          if (musicButton) {
-            console.log('🎵 Header: Music enabled but paused - clicking button to resume');
-            musicButton.click();
-          }
-        }
-      }
-    }, 200); // Reduced delay for faster restoration
-
-    return () => clearTimeout(restoreMusic);
-  }, [location.pathname, musicEnabled, toggleMusic]); // React to pathname changes
 
   // Check for openShop in navigation state
   useEffect(() => {
@@ -150,28 +100,6 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
             {/* Center - Empty for now */}
             <div className="flex-1"></div>
             <div className="flex items-center gap-2">
-              {/* Music Toggle Button */}
-              <button
-                onClick={() => {
-                  if (isBookReader) {
-                    // Don't allow toggling music while in book reader
-                    return;
-                  }
-                  playClick();
-                  toggleMusic();
-                }}
-                className={`bg-black/30 hover:bg-black/40 rounded-full p-2 border transition-colors active:scale-95 ${displayMusicEnabled ? 'border-[#FFD700]/40' : 'border-white/20'
-                  } ${isBookReader ? 'opacity-60 cursor-not-allowed' : ''}`}
-                title={isBookReader ? "Music paused - Book has its own background music" : (musicEnabled ? "Music On - Click to turn off" : "Music Off - Click to turn on")}
-                disabled={isBookReader}
-              >
-                <Music
-                  size={18}
-                  className={displayMusicEnabled ? "text-[#FFD700]" : "text-white/50"}
-                  fill={displayMusicEnabled ? "#FFD700" : "none"}
-                />
-              </button>
-
               {/* Report Card Button */}
               <button
                 onClick={() => setIsReportCardOpen(true)}

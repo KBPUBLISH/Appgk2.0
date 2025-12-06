@@ -1415,6 +1415,29 @@ export const ApiService = {
     }
   },
 
+  // Games API - Get games for Daily Tasks & IQ Games section
+  getDailyTaskGames: async (): Promise<any[]> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      console.log('🎮 Fetching daily task games from:', `${baseUrl}games/daily-tasks`);
+      const response = await fetchWithTimeout(`${baseUrl}games/daily-tasks`, {
+        method: 'GET',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('🎮 Daily task games:', data);
+        return Array.isArray(data) ? data : [];
+      }
+
+      console.warn('⚠️ Failed to fetch daily task games:', response.status);
+      return [];
+    } catch (error) {
+      console.error('❌ Failed to fetch daily task games:', error);
+      return [];
+    }
+  },
+
   getLesson: async (lessonId: string): Promise<any | null> => {
     try {
       const baseUrl = getApiBaseUrl();
