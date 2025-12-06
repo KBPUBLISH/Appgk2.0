@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Circle } from 'lucide-react';
+import { Check, Circle, Moon } from 'lucide-react';
 
 interface WeeklyLessonTrackerProps {
   selectedDay: number; // 0-4 for Mon-Fri
@@ -8,7 +8,8 @@ interface WeeklyLessonTrackerProps {
   todayIndex: number; // 0-4 indicating which day is today (or -1 if weekend)
 }
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+// Full week including weekend for display
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const WeeklyLessonTracker: React.FC<WeeklyLessonTrackerProps> = ({
   selectedDay,
@@ -16,6 +17,11 @@ const WeeklyLessonTracker: React.FC<WeeklyLessonTrackerProps> = ({
   dayCompletions,
   todayIndex,
 }) => {
+  // Get current day of week (0 = Sunday, 6 = Saturday)
+  const today = new Date().getDay();
+  const isTodaySaturday = today === 6;
+  const isTodaySunday = today === 0;
+
   return (
     <div className="bg-gradient-to-r from-[#1a237e]/80 to-[#283593]/80 backdrop-blur-sm rounded-xl px-3 py-2.5 mb-3 border border-white/10">
       {/* Week Header */}
@@ -27,14 +33,46 @@ const WeeklyLessonTracker: React.FC<WeeklyLessonTrackerProps> = ({
       </div>
 
       {/* Day Circles */}
-      <div className="flex justify-between items-center gap-1">
+      <div className="flex justify-between items-center gap-0.5">
         {DAYS.map((day, index) => {
-          const isCompleted = dayCompletions[index];
-          const isToday = index === todayIndex;
-          const isSelected = index === selectedDay;
-          const isPast = index < todayIndex;
-          const isFuture = index > todayIndex;
+          const isWeekend = index >= 5; // Sat (5) or Sun (6)
+          const weekdayIndex = isWeekend ? -1 : index; // Only 0-4 are valid weekday indices
+          const isCompleted = !isWeekend && dayCompletions[weekdayIndex];
+          const isToday = isWeekend 
+            ? (index === 5 && isTodaySaturday) || (index === 6 && isTodaySunday)
+            : index === todayIndex;
+          const isSelected = !isWeekend && index === selectedDay;
+          const isFuture = !isWeekend && index > todayIndex && todayIndex !== -1;
 
+          // Weekend days - display only, not interactive
+          if (isWeekend) {
+            return (
+              <div
+                key={day}
+                className="flex flex-col items-center gap-0.5 opacity-50"
+              >
+                {/* Day Label */}
+                <span className={`text-[9px] font-bold uppercase tracking-wide ${
+                  isToday ? 'text-[#9C27B0]' : 'text-white/40'
+                }`}>
+                  {day}
+                </span>
+
+                {/* Rest Day Circle */}
+                <div className={`
+                  w-7 h-7 rounded-full flex items-center justify-center
+                  ${isToday 
+                    ? 'bg-[#9C27B0]/30 border border-[#9C27B0]/50' 
+                    : 'bg-white/5 border border-white/10'
+                  }
+                `}>
+                  <Moon className={`w-3 h-3 ${isToday ? 'text-[#9C27B0]' : 'text-white/30'}`} />
+                </div>
+              </div>
+            );
+          }
+
+          // Weekday buttons
           return (
             <button
               key={day}
@@ -62,7 +100,7 @@ const WeeklyLessonTracker: React.FC<WeeklyLessonTrackerProps> = ({
 
               {/* Circle/Checkmark */}
               <div className={`
-                w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200
+                w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200
                 ${isCompleted 
                   ? 'bg-gradient-to-br from-[#4CAF50] to-[#2E7D32] shadow-lg shadow-green-500/30' 
                   : isSelected
@@ -73,9 +111,9 @@ const WeeklyLessonTracker: React.FC<WeeklyLessonTrackerProps> = ({
                 }
               `}>
                 {isCompleted ? (
-                  <Check className="w-4 h-4 text-white" strokeWidth={3} />
+                  <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
                 ) : (
-                  <Circle className={`w-3 h-3 ${
+                  <Circle className={`w-2.5 h-2.5 ${
                     isSelected ? 'text-[#FFD700]' : 
                     isToday ? 'text-[#FFD700]/70' : 
                     'text-white/30'
@@ -93,9 +131,9 @@ const WeeklyLessonTracker: React.FC<WeeklyLessonTrackerProps> = ({
       </div>
 
       {/* Weekend Rest Message (shown if today is Saturday or Sunday) */}
-      {todayIndex === -1 && (
-        <div className="text-center mt-2 text-white/50 text-[10px]">
-          🌟 Weekend time! Enjoy reading stories with family!
+      {(isTodaySaturday || isTodaySunday) && (
+        <div className="text-center mt-2 text-[#9C27B0]/80 text-[10px]">
+          🌙 Rest day! Enjoy reading stories with family!
         </div>
       )}
     </div>
