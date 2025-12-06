@@ -282,32 +282,37 @@ export const ApiService = {
       console.log('📊 Full API Response (first 2000 chars):', JSON.stringify(data, null, 2).substring(0, 2000));
       console.log('📊 Full API Response (complete):', JSON.stringify(data, null, 2));
 
-      // Handle the /v3/books/by-categories response structure
-      // Response structure: { data: [{ _id, name, books: { data: [...] } }], total, pagesTotal, page, limit }
+      // Handle various API response structures
       let booksArray: any[] = [];
 
-      if (data.data && Array.isArray(data.data)) {
-        // Extract books from all categories
-        console.log('📂 Processing', data.data.length, 'categories...');
-        data.data.forEach((category: any, index: number) => {
-          console.log(`📂 Category ${index + 1}:`, category.name || category._id, '- Books:', category.books?.data?.length || 0);
-          if (category.books && category.books.data && Array.isArray(category.books.data)) {
-            booksArray = booksArray.concat(category.books.data);
-          }
-        });
-        console.log('📚 Extracted', booksArray.length, 'books from', data.data.length, 'categories');
-      } else if (Array.isArray(data)) {
-        // Fallback: if response is directly an array
+      if (Array.isArray(data)) {
+        // Direct array response
         console.log('📚 Response is direct array of books');
         booksArray = data;
+      } else if (data.data && Array.isArray(data.data)) {
+        // Check if data.data contains books directly (paginated response)
+        // or categories with nested books
+        const firstItem = data.data[0];
+        
+        if (firstItem && firstItem.books && firstItem.books.data) {
+          // It's categories with nested books: { data: [{ name, books: { data: [...] } }] }
+          console.log('📂 Processing', data.data.length, 'categories...');
+          data.data.forEach((category: any, index: number) => {
+            console.log(`📂 Category ${index + 1}:`, category.name || category._id, '- Books:', category.books?.data?.length || 0);
+            if (category.books && category.books.data && Array.isArray(category.books.data)) {
+              booksArray = booksArray.concat(category.books.data);
+            }
+          });
+          console.log('📚 Extracted', booksArray.length, 'books from', data.data.length, 'categories');
+        } else {
+          // It's a paginated response: { data: [...books...], pagination: {...} }
+          console.log('📚 Paginated response - extracting', data.data.length, 'books from data.data');
+          booksArray = data.data;
+        }
       } else if (data.books && Array.isArray(data.books)) {
-        // Fallback: if books is directly in response
+        // Books directly in response
         console.log('📚 Books found directly in response');
         booksArray = data.books;
-      } else if (data.data && Array.isArray(data.data) && data.data.length > 0 && !data.data[0].books) {
-        // Fallback: if data is directly an array of books (not categories)
-        console.log('📚 Data is direct array of books');
-        booksArray = data.data;
       }
 
       console.log('📚 Total books extracted:', booksArray.length, 'items');
