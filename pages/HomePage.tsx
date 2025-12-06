@@ -106,16 +106,33 @@ const HomePage: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
 
-  // Check if games have been engaged (per-profile)
+  // Check if games have been engaged today (per-profile) - resets daily
   useEffect(() => {
-    const memoryEngaged = localStorage.getItem(getEngagementKey('memory_game_engaged')) === 'true';
-    const dailyKeyEngaged = localStorage.getItem(getEngagementKey('daily_key_engaged')) === 'true';
-    const strengthEngaged = localStorage.getItem(getEngagementKey('strength_game_engaged')) === 'true';
-    const prayerEngaged = localStorage.getItem(getEngagementKey('prayer_game_engaged')) === 'true';
-    setHasEngagedMemory(memoryEngaged);
-    setHasEngagedDailyKey(dailyKeyEngaged);
-    setHasEngagedStrength(strengthEngaged);
-    setHasEngagedPrayer(prayerEngaged);
+    const today = new Date().toDateString();
+    const lastEngagementDate = localStorage.getItem(getEngagementKey('daily_games_date'));
+    
+    // If it's a new day, reset all daily game engagements
+    if (lastEngagementDate !== today) {
+      localStorage.setItem(getEngagementKey('daily_games_date'), today);
+      localStorage.removeItem(getEngagementKey('memory_game_engaged'));
+      localStorage.removeItem(getEngagementKey('daily_key_engaged'));
+      localStorage.removeItem(getEngagementKey('strength_game_engaged'));
+      localStorage.removeItem(getEngagementKey('prayer_game_engaged'));
+      setHasEngagedMemory(false);
+      setHasEngagedDailyKey(false);
+      setHasEngagedStrength(false);
+      setHasEngagedPrayer(false);
+    } else {
+      // Same day - check existing engagement flags
+      const memoryEngaged = localStorage.getItem(getEngagementKey('memory_game_engaged')) === 'true';
+      const dailyKeyEngaged = localStorage.getItem(getEngagementKey('daily_key_engaged')) === 'true';
+      const strengthEngaged = localStorage.getItem(getEngagementKey('strength_game_engaged')) === 'true';
+      const prayerEngaged = localStorage.getItem(getEngagementKey('prayer_game_engaged')) === 'true';
+      setHasEngagedMemory(memoryEngaged);
+      setHasEngagedDailyKey(dailyKeyEngaged);
+      setHasEngagedStrength(strengthEngaged);
+      setHasEngagedPrayer(prayerEngaged);
+    }
 
     // Safeguard: If no books are loaded and we're not loading, try to refresh
     if (!loading && books.length === 0) {
@@ -911,9 +928,16 @@ const HomePage: React.FC = () => {
                         return;
                       }
                       
-                      // Handle game click - open webview if URL exists
+                      // Game is unlocked - handle click
                       if (game.gameType === 'webview' && game.url) {
+                        // Open webview game in new tab
                         window.open(game.url, '_blank');
+                      } else if (game.url) {
+                        // Has URL but not marked as webview - still open it
+                        window.open(game.url, '_blank');
+                      } else {
+                        // No URL - show a message
+                        alert(`${game.name} is ready to play! Game content coming soon.`);
                       }
                     }}
                   >
