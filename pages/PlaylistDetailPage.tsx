@@ -191,15 +191,15 @@ const PlaylistDetailPage: React.FC = () => {
     
     // Get personal play count from local service
     useEffect(() => {
-        if (playlist && id) {
+        if (playlist && playlistId) {
             // Import and use personal play count service
             import('../services/playCountService').then(({ playCountService }) => {
                 // Get personal play count for this playlist
-                const personalCount = playCountService.getPlayCount(id);
+                const personalCount = playCountService.getPlayCount(playlistId);
                 setPlayCount(personalCount);
             });
         }
-    }, [playlist, id]);
+    }, [playlist, playlistId]);
     
     // Extract colors from cover image when playlist loads
     useEffect(() => {
