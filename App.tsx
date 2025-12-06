@@ -21,6 +21,7 @@ import PlaylistDetailPage from './pages/PlaylistDetailPage';
 import LessonsPage from './pages/LessonsPage';
 import LessonPlayerPage from './pages/LessonPlayerPage';
 import VideoLessonDemo from './pages/VideoLessonDemo';
+import GameWebViewPage from './pages/GameWebViewPage';
 import MiniPlayer from './components/audio/MiniPlayer';
 import BottomNavigation from './components/layout/BottomNavigation';
 import { BooksProvider } from './context/BooksContext';
@@ -215,6 +216,7 @@ const App: React.FC = () => {
                 <Route path="/paywall" element={<PaywallPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/demo/video-lesson" element={<VideoLessonDemo />} />
+                <Route path="/game" element={<GameWebViewPage />} />
               </Routes>
             </Layout>
           </HashRouter>

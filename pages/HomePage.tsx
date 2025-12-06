@@ -929,12 +929,9 @@ const HomePage: React.FC = () => {
                       }
                       
                       // Game is unlocked - handle click
-                      if (game.gameType === 'webview' && game.url) {
-                        // Open webview game in new tab
-                        window.open(game.url, '_blank');
-                      } else if (game.url) {
-                        // Has URL but not marked as webview - still open it
-                        window.open(game.url, '_blank');
+                      if (game.url) {
+                        // Navigate to in-app webview
+                        navigate(`/game?url=${encodeURIComponent(game.url)}&name=${encodeURIComponent(game.name)}`);
                       } else {
                         // No URL - show a message
                         alert(`${game.name} is ready to play! Game content coming soon.`);
