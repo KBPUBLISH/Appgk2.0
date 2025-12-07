@@ -106,7 +106,7 @@ const LibraryPage: React.FC = () => {
     .filter(Boolean) as typeof books;
 
   // Get recently played playlists (history)
-  const recentPlaylistIds = playHistoryService.getRecentlyPlayedPlaylistIds(10);
+  const recentPlaylistIds = playHistoryService.getRecentlyPlayedIds(10);
   const recentPlaylists = recentPlaylistIds
     .map(id => playlists.find(p => p._id === id))
     .filter(Boolean) as Playlist[];
