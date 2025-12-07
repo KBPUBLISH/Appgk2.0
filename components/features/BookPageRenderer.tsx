@@ -25,6 +25,8 @@ interface PageData {
     textBoxes: TextBox[];
     scrollUrl?: string;
     scrollHeight?: number;
+    scrollMidHeight?: number; // Mid scroll height % (default 30)
+    scrollMaxHeight?: number; // Max scroll height % (default 60)
     soundEffectUrl?: string;
 }
 
@@ -171,7 +173,7 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     return (
         <div
             className="w-full h-full relative bg-white overflow-hidden shadow-2xl"
-            onClick={onToggleScroll}
+            onClick={handleScrollClick}
         >
             {/* Background Layer */}
             <div className="absolute inset-0 bg-black overflow-hidden">
@@ -211,10 +213,10 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                         scrollState === 'hidden' ? 'translate-y-full' : 'translate-y-0'
                     }`}
                     style={{ 
-                        // Max height is 60% of screen, mid is the configured height or 30%
+                        // Use scrollMidHeight/scrollMaxHeight if set, otherwise fallback to defaults
                         height: scrollState === 'max' 
-                            ? '60%' 
-                            : (page.scrollHeight ? `${page.scrollHeight}px` : '30%')
+                            ? `${page.scrollMaxHeight || 60}%` 
+                            : `${page.scrollMidHeight || 30}%`
                     }}
                     onTouchStart={handleScrollTouchStart}
                     onTouchEnd={handleScrollTouchEnd}
@@ -246,10 +248,10 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                 }}
             >
                 {page.textBoxes?.map((box, idx) => {
-                    // Calculate scroll height based on state
+                    // Calculate scroll height based on state - use configured heights or defaults
                     const scrollHeightVal = scrollState === 'max' 
-                        ? '60%' 
-                        : (page.scrollHeight ? `${page.scrollHeight}px` : '30%');
+                        ? `${page.scrollMaxHeight || 60}%` 
+                        : `${page.scrollMidHeight || 30}%`;
                     const scrollTopVal = `calc(100% - ${scrollHeightVal})`;
                     const isActive = activeTextBoxIndex === idx;
                     // Text boxes should fade and slide with the scroll
@@ -287,11 +289,11 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                             <div className={`
                                 relative p-3 rounded-xl transition-all duration-300
                                 ${isActive
-                                    ? 'bg-white/90 shadow-[0_0_15px_rgba(255,215,0,0.6)] scale-105 ring-2 ring-[#FFD700]'
-                                    : 'bg-white/70 hover:bg-white/85 hover:scale-105 hover:shadow-lg cursor-pointer'
+                                    ? 'shadow-[0_0_15px_rgba(255,215,0,0.4)] scale-105'
+                                    : 'hover:scale-102 cursor-pointer'
                                 }
                             `}>
-                                <p className="leading-relaxed relative">
+                                <p className="leading-relaxed relative drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
                                     {(() => {
                                         // Always use the cleaned text from the original
                                         const cleanedText = removeEmotionalCues(box.text);
@@ -324,10 +326,10 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                                     })()}
                                 </p>
 
-                                {/* Play Icon Indicator */}
+                                {/* Play Icon Indicator - subtle tap hint */}
                                 {!isActive && (
-                                    <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-[#FFD700] text-black rounded-full p-1 shadow-md">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                                    <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-80 transition-opacity text-[#FFD700] drop-shadow-lg">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
                                             <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
                                         </svg>
                                     </div>
