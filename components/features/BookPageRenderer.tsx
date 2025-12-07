@@ -240,10 +240,22 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                     onTouchEnd={handleScrollTouchEnd}
                     onClick={handleScrollClick}
                 >
-                    {/* Swipe indicator at top of scroll */}
-                    <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-1 opacity-60 pointer-events-none">
-                        <div className="w-12 h-1 bg-white/70 rounded-full"></div>
-                        <span className="text-white/80 text-[10px] font-medium drop-shadow">
+                </div>
+            )}
+            
+            {/* Swipe Indicator - Positioned ABOVE the scroll */}
+            {page.scrollUrl && scrollState !== 'hidden' && (
+                <div 
+                    className="absolute left-1/2 transform -translate-x-1/2 z-30 pointer-events-none transition-all duration-500 ease-in-out"
+                    style={{
+                        bottom: scrollState === 'max' 
+                            ? `calc(${page.scrollMaxHeight || 60}% - 8px)` 
+                            : `calc(${page.scrollMidHeight || 30}% - 8px)`
+                    }}
+                >
+                    <div className="flex flex-col items-center gap-1 bg-black/40 backdrop-blur-sm px-4 py-2 rounded-full">
+                        <div className="w-10 h-1 bg-white/80 rounded-full"></div>
+                        <span className="text-white text-[10px] font-medium">
                             {scrollState === 'mid' ? '↑ Swipe for more' : '↓ Swipe to shrink'}
                         </span>
                     </div>
@@ -340,34 +352,6 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                     );
                 })}
             </div>
-            
-            {/* Floating Play Button - Above scroll, visible when text exists */}
-            {page.textBoxes && page.textBoxes.length > 0 && scrollState !== 'hidden' && activeTextBoxIndex === null && (
-                <div
-                    className="absolute z-30 pointer-events-auto"
-                    style={{
-                        bottom: scrollState === 'max' 
-                            ? `calc(${page.scrollMaxHeight || 60}% + 10px)` 
-                            : `calc(${page.scrollMidHeight || 30}% + 10px)`,
-                        right: '16px',
-                        transition: 'bottom 0.5s ease-in-out'
-                    }}
-                >
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (onPlayText && page.textBoxes && page.textBoxes.length > 0) {
-                                onPlayText(page.textBoxes[0].text, 0, e);
-                            }
-                        }}
-                        className="w-14 h-14 bg-gradient-to-br from-[#FFD700] to-[#FFA500] rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-transform duration-200 border-2 border-white/50"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-white ml-1">
-                            <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
-                        </svg>
-                    </button>
-                </div>
-            )}
 
             {/* Floating Sound Effect Bubble */}
             {page.soundEffectUrl && !bubblePopped && (
