@@ -172,13 +172,13 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
 
     return (
         <div
-            className="w-full h-full relative bg-white overflow-hidden shadow-2xl"
+            className="w-full h-full relative bg-gradient-to-b from-[#fdf6e3] to-[#e8d5b7] overflow-hidden shadow-2xl"
             onClick={handleScrollClick}
             onTouchStart={handleScrollTouchStart}
             onTouchEnd={handleScrollTouchEnd}
         >
-            {/* Background Layer */}
-            <div className="absolute inset-0 bg-black overflow-hidden">
+            {/* Background Layer - warm parchment gradient as fallback instead of black */}
+            <div className="absolute inset-0 bg-gradient-to-b from-[#fdf6e3] to-[#e8d5b7] overflow-hidden">
                 {page.backgroundType === 'video' ? (
                     <video
                         src={page.backgroundUrl}
@@ -187,6 +187,7 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                         loop
                         muted
                         playsInline
+                        preload="auto"
                         style={{
                             objectFit: 'cover',
                             width: '100%',
@@ -198,11 +199,9 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                         src={page.backgroundUrl}
                         alt={`Page ${page.pageNumber}`}
                         className="w-full h-full object-contain"
+                        loading="eager"
                     />
-                ) : (
-                    // Default gradient background for pages without background
-                    <div className="w-full h-full bg-gradient-to-b from-[#fdf6e3] to-[#e8d5b7]"></div>
-                )}
+                ) : null}
             </div>
 
             {/* Gradient Overlay for depth (spine shadow) */}

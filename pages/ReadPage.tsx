@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BookCard from '../components/ui/BookCard';
@@ -7,12 +6,14 @@ import SectionTitle from '../components/ui/SectionTitle';
 import { useBooks } from '../context/BooksContext';
 import { ApiService } from '../services/apiService';
 import { Search, ChevronDown } from 'lucide-react';
+import StormySeaError from '../components/ui/StormySeaError';
 
 const ageOptions = ['All Ages', '3+', '4+', '5+', '6+', '7+', '8+', '9+', '10+'];
 
 const ReadPage: React.FC = () => {
   const navigate = useNavigate();
-  const { books, loading } = useBooks();
+  const { books, loading, error, refreshBooks } = useBooks();
+  const [isRetrying, setIsRetrying] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAge, setSelectedAge] = useState<string>('All Ages');
@@ -234,6 +235,16 @@ const ReadPage: React.FC = () => {
         
         {loading ? (
            <div className="text-white font-display text-center mt-10">Loading library...</div>
+        ) : error ? (
+          <StormySeaError 
+            onRetry={async () => {
+              setIsRetrying(true);
+              await refreshBooks();
+              setIsRetrying(false);
+            }}
+            message="Something rocked the boat!"
+            isLoading={isRetrying}
+          />
         ) : (
           <>
             {filteredBooks.length === 0 ? (

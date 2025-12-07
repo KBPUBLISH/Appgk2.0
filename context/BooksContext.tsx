@@ -1,17 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Book } from '../types';
 import { ApiService } from '../services/apiService';
-import { MOCK_BOOKS } from '../constants';
 
 interface BooksContextType {
   books: Book[];
   loading: boolean;
+  error: string | null;
   refreshBooks: () => Promise<void>;
 }
 
 const BooksContext = createContext<BooksContextType>({
   books: [],
   loading: true,
+  error: null,
   refreshBooks: async () => { },
 });
 
@@ -20,6 +21,7 @@ export const useBooks = () => useContext(BooksContext);
 export const BooksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
     // Prevent infinite loops - don't load if already loading
@@ -29,6 +31,7 @@ export const BooksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     isLoadingRef.current = true;
+    setError(null); // Clear any previous error
 
     // Only show loading if we have no data to prevent flashing on manual refresh
     if (books.length === 0) setLoading(true);
@@ -40,14 +43,6 @@ export const BooksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const data = await ApiService.getBooks();
       console.log('📚 BooksContext: Received', data.length, 'books');
 
-      // Check if this is actually mock data by comparing structure
-      // Real API data will have different IDs/titles than mock
-      const isActuallyMockData = data.length === MOCK_BOOKS.length &&
-        data.every((book, index) => {
-          const mockBook = MOCK_BOOKS[index];
-          return mockBook && book.id === mockBook.id && book.title === mockBook.title;
-        });
-
       // Check for real cover URLs
       const hasRealCovers = data.some(book =>
         book.coverUrl &&
@@ -56,28 +51,22 @@ export const BooksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         book.coverUrl.length > 0
       );
 
-      if (isActuallyMockData) {
-        console.warn('⚠️ BooksContext: Received mock data (structure matches MOCK_BOOKS)');
-        console.warn('💡 This means API call failed and fell back to mock data');
-        console.warn('📊 Check console for API error messages above');
+      if (hasRealCovers) {
+        console.log('✅ BooksContext: Using REAL API data with real covers from database');
+        console.log('📊 Books with real covers:', data.filter(b => b.coverUrl && !b.coverUrl.includes('picsum')).length);
       } else {
-        // This is real API data - use it even if covers are placeholders
-        if (hasRealCovers) {
-          console.log('✅ BooksContext: Using REAL API data with real covers from dev database');
-          console.log('📊 Books with real covers:', data.filter(b => b.coverUrl && !b.coverUrl.includes('picsum')).length);
-        } else {
-          console.log('✅ BooksContext: Using REAL API data from dev database');
-          console.log('💡 Data structure differs from mock - this is real API data');
-          console.log('📊 Covers may be placeholders but data is from API');
-        }
+        console.log('✅ BooksContext: Using API data from database');
       }
 
       setBooks(data);
+      setError(null);
       hasLoadedRef.current = true;
-    } catch (error) {
-      console.error("❌ BooksContext: Failed to load books", error);
-      // On error, use mock data as fallback
-      setBooks(MOCK_BOOKS);
+    } catch (err) {
+      console.error("❌ BooksContext: Failed to load books", err);
+      // Set error state instead of showing mock data
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load books';
+      setError(errorMessage);
+      setBooks([]); // Clear books on error - don't show mock data
     } finally {
       setLoading(false);
       isLoadingRef.current = false;
@@ -160,7 +149,7 @@ export const BooksProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }
 
   return (
-    <BooksContext.Provider value={{ books, loading, refreshBooks: loadData }}>
+    <BooksContext.Provider value={{ books, loading, error, refreshBooks: loadData }}>
       {children}
     </BooksContext.Provider>
   );

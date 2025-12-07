@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SectionTitle from '../components/ui/SectionTitle';
@@ -7,6 +6,7 @@ import Header from '../components/layout/Header';
 import FeaturedCarousel from '../components/ui/FeaturedCarousel';
 import { useBooks } from '../context/BooksContext';
 import { useUser } from '../context/UserContext';
+import StormySeaError from '../components/ui/StormySeaError';
 import DailyRewardModal from '../components/features/DailyRewardModal';
 import ChallengeGameModal from '../components/features/ChallengeGameModal';
 import StrengthGameModal from '../components/features/StrengthGameModal';
@@ -62,8 +62,9 @@ const markGamePurchased = (gameId: string): void => {
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { books, loading, refreshBooks } = useBooks();
+  const { books, loading, error: booksError, refreshBooks } = useBooks();
   const { coins, spendCoins } = useUser();
+  const [isRetrying, setIsRetrying] = useState(false);
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [showDailyReward, setShowDailyReward] = useState(false);
@@ -706,8 +707,21 @@ const HomePage: React.FC = () => {
           })()}
         </section>
 
+        {/* Error State - Show when books fail to load */}
+        {booksError && !loading && (
+          <StormySeaError 
+            onRetry={async () => {
+              setIsRetrying(true);
+              await refreshBooks();
+              setIsRetrying(false);
+            }}
+            message="Something rocked the boat!"
+            isLoading={isRetrying}
+          />
+        )}
+
         {/* Featured Carousel */}
-        {!loading && featuredBooks.length > 0 && (
+        {!loading && !booksError && featuredBooks.length > 0 && (
           <>
             <SectionTitle 
               title="Featured Stories" 

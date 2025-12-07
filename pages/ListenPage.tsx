@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BookCard from '../components/ui/BookCard';
@@ -8,6 +7,7 @@ import { useBooks } from '../context/BooksContext';
 import { useUser } from '../context/UserContext';
 import { Search, Music, ChevronDown, Lock, Crown } from 'lucide-react';
 import { getApiBaseUrl, ApiService } from '../services/apiService';
+import StormySeaError from '../components/ui/StormySeaError';
 
 const ageOptions = ['All Ages', '3+', '4+', '5+', '6+', '7+', '8+', '9+', '10+'];
 
@@ -29,7 +29,7 @@ interface Playlist {
 const ListenPage: React.FC = () => {
 
   const navigate = useNavigate();
-  const { books, loading } = useBooks();
+  const { books, loading, error: booksError, refreshBooks } = useBooks();
   const { isSubscribed } = useUser();
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,6 +40,8 @@ const ListenPage: React.FC = () => {
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [playlistsLoading, setPlaylistsLoading] = useState(true);
+  const [playlistsError, setPlaylistsError] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
   const ageDropdownRef = useRef<HTMLDivElement>(null);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -63,42 +65,47 @@ const ListenPage: React.FC = () => {
     lastScrollY.current = currentScrollY;
   };
 
-  // Fetch playlists
-  useEffect(() => {
-    const fetchPlaylists = async () => {
-      try {
-        setPlaylistsLoading(true);
-        const baseUrl = getApiBaseUrl();
-        const endpoint = `${baseUrl}playlists?status=published`;
+  // Fetch playlists function
+  const fetchPlaylists = async () => {
+    try {
+      setPlaylistsLoading(true);
+      setPlaylistsError(null);
+      const baseUrl = getApiBaseUrl();
+      const endpoint = `${baseUrl}playlists?status=published`;
 
-        const response = await fetch(endpoint, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        // Handle both paginated response { data: [...] } and direct array response
+        const playlistsArray = Array.isArray(responseData) ? responseData : (responseData.data || []);
+        
+        const validPlaylists = playlistsArray.filter((p: any) => {
+          return p._id && p.title && p.status === 'published' && p.items && Array.isArray(p.items) && p.items.length > 0;
         });
 
-        if (response.ok) {
-          const responseData = await response.json();
-          // Handle both paginated response { data: [...] } and direct array response
-          const playlistsArray = Array.isArray(responseData) ? responseData : (responseData.data || []);
-          
-          const validPlaylists = playlistsArray.filter((p: any) => {
-            return p._id && p.title && p.status === 'published' && p.items && Array.isArray(p.items) && p.items.length > 0;
-          });
-
-          console.log('📻 Fetched playlists:', validPlaylists.length);
-          setPlaylists(validPlaylists);
-        } else {
-          console.error('Error fetching playlists:', response.status);
-        }
-      } catch (error) {
-        console.error('Error fetching playlists:', error);
-      } finally {
-        setPlaylistsLoading(false);
+        console.log('📻 Fetched playlists:', validPlaylists.length);
+        setPlaylists(validPlaylists);
+        setPlaylistsError(null);
+      } else {
+        console.error('Error fetching playlists:', response.status);
+        setPlaylistsError('Failed to load audio content');
       }
-    };
+    } catch (error) {
+      console.error('Error fetching playlists:', error);
+      setPlaylistsError(error instanceof Error ? error.message : 'Failed to load audio content');
+    } finally {
+      setPlaylistsLoading(false);
+    }
+  };
 
+  // Fetch playlists on mount
+  useEffect(() => {
     fetchPlaylists();
   }, []);
 
@@ -316,6 +323,16 @@ const ListenPage: React.FC = () => {
 
         {(loading || playlistsLoading) ? (
           <div className="text-white font-display text-center mt-10">Loading sounds...</div>
+        ) : (booksError || playlistsError) ? (
+          <StormySeaError 
+            onRetry={async () => {
+              setIsRetrying(true);
+              await Promise.all([refreshBooks(), fetchPlaylists()]);
+              setIsRetrying(false);
+            }}
+            message="The music got swept overboard!"
+            isLoading={isRetrying}
+          />
         ) : (filteredBooks.length === 0 && filteredPlaylists.length === 0) ? (
           <div className="text-white/80 font-display text-center mt-10 p-6 bg-black/20 rounded-xl backdrop-blur-sm">
             {searchQuery ? "No matching audio content found." : "No audio content found right now. Try the Explore tab!"}

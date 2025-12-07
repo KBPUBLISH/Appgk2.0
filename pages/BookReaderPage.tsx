@@ -130,6 +130,10 @@ const BookReaderPage: React.FC = () => {
     const audioPreloadCacheRef = useRef<Map<string, { audioUrl: string; alignment: any }>>(new Map());
     const preloadingInProgressRef = useRef<Set<string>>(new Set());
     const desiredScrollStateRef = useRef<ScrollState | null>(null); // Track desired scroll state for next page turn
+    
+    // Background preloading cache refs - prevents black flash between pages
+    const preloadedBackgroundsRef = useRef<Set<string>>(new Set());
+    
     const [bookMusicEnabled, setBookMusicEnabled] = useState(true); // Default to enabled
 
     // Use ref to track music enabled state for intervals/callbacks
@@ -915,13 +919,75 @@ const BookReaderPage: React.FC = () => {
         }
     };
 
-    // Trigger preloading when page changes or voice changes
+    // Trigger audio preloading when page changes or voice changes
     useEffect(() => {
         if (pages.length > 0 && selectedVoiceId) {
             // Start preloading from current page
             preloadUpcomingAudio(currentPageIndex);
         }
     }, [currentPageIndex, selectedVoiceId, pages.length]);
+
+    // Preload background images/videos for upcoming pages to prevent black flash
+    const preloadBackgrounds = (startPageIndex: number) => {
+        const PAGES_TO_PRELOAD = 3;
+        
+        for (let i = 1; i <= PAGES_TO_PRELOAD; i++) {
+            const pageIndex = startPageIndex + i;
+            if (pageIndex >= pages.length) break;
+            
+            const page = pages[pageIndex];
+            if (!page) continue;
+            
+            const backgroundUrl = page.backgroundUrl || page.files?.background?.url;
+            const backgroundType = page.backgroundType || page.files?.background?.type || 'image';
+            
+            if (!backgroundUrl || preloadedBackgroundsRef.current.has(backgroundUrl)) {
+                continue; // Skip if no URL or already preloaded
+            }
+            
+            // Mark as preloaded
+            preloadedBackgroundsRef.current.add(backgroundUrl);
+            
+            if (backgroundType === 'video') {
+                // Preload video
+                const video = document.createElement('video');
+                video.preload = 'auto';
+                video.muted = true;
+                video.src = backgroundUrl;
+                video.load();
+                console.log(`🎬 Preloading video for page ${pageIndex + 1}`);
+            } else {
+                // Preload image
+                const img = new Image();
+                img.src = backgroundUrl;
+                console.log(`🖼️ Preloading image for page ${pageIndex + 1}`);
+            }
+            
+            // Also preload scroll image if exists
+            const scrollUrl = page.scrollUrl || page.files?.scroll?.url;
+            if (scrollUrl && !preloadedBackgroundsRef.current.has(scrollUrl)) {
+                preloadedBackgroundsRef.current.add(scrollUrl);
+                const scrollImg = new Image();
+                scrollImg.src = scrollUrl;
+                console.log(`📜 Preloading scroll for page ${pageIndex + 1}`);
+            }
+        }
+    };
+
+    // Trigger background preloading when page changes
+    useEffect(() => {
+        if (pages.length > 0) {
+            preloadBackgrounds(currentPageIndex);
+        }
+    }, [currentPageIndex, pages.length]);
+
+    // Also preload when pages first load
+    useEffect(() => {
+        if (pages.length > 0) {
+            // Preload first few pages immediately
+            preloadBackgrounds(0);
+        }
+    }, [pages]);
 
     const handlePlayText = async (text: string, index: number, e: React.MouseEvent, isAutoPlay: boolean = false) => {
         e.stopPropagation();
