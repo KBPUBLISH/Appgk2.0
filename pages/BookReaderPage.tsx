@@ -12,7 +12,7 @@ import { readingProgressService } from '../services/readingProgressService';
 import { favoritesService } from '../services/favoritesService';
 import { readCountService } from '../services/readCountService';
 import { analyticsService } from '../services/analyticsService';
-import { BookPageRenderer } from '../components/features/BookPageRenderer';
+import { BookPageRenderer, ScrollState } from '../components/features/BookPageRenderer';
 import { processTextWithEmotionalCues, removeEmotionalCues } from '../utils/textProcessing';
 import { activityTrackingService } from '../services/activityTrackingService';
 
@@ -84,14 +84,15 @@ const BookReaderPage: React.FC = () => {
     const [pages, setPages] = useState<Page[]>([]);
     const [currentPageIndex, setCurrentPageIndex] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [showScroll, setShowScroll] = useState(true);
+    const [scrollState, setScrollState] = useState<ScrollState>('mid');
     const [bookTitle, setBookTitle] = useState<string>('Book');
     const [bookOrientation, setBookOrientation] = useState<'portrait' | 'landscape'>('portrait');
 
     // Keep ref in sync with state
+    const scrollStateRef = useRef<ScrollState>('mid');
     useEffect(() => {
-        showScrollRef.current = showScroll;
-    }, [showScroll]);
+        scrollStateRef.current = scrollState;
+    }, [scrollState]);
 
     // TTS State
     const [playing, setPlaying] = useState(false);
@@ -126,8 +127,7 @@ const BookReaderPage: React.FC = () => {
     // Audio preloading cache refs
     const audioPreloadCacheRef = useRef<Map<string, { audioUrl: string; alignment: any }>>(new Map());
     const preloadingInProgressRef = useRef<Set<string>>(new Set());
-    const desiredScrollStateRef = useRef<boolean | null>(null); // Track desired scroll state for next page turn
-    const showScrollRef = useRef<boolean>(true); // Track scroll state to avoid closure issues
+    const desiredScrollStateRef = useRef<ScrollState | null>(null); // Track desired scroll state for next page turn
     const [bookMusicEnabled, setBookMusicEnabled] = useState(true); // Default to enabled
 
     // Use ref to track music enabled state for intervals/callbacks
@@ -620,7 +620,7 @@ const BookReaderPage: React.FC = () => {
             // Use desired scroll state if set, otherwise preserve current state from ref
             const scrollStateToUse = desiredScrollStateRef.current !== null
                 ? desiredScrollStateRef.current
-                : showScrollRef.current; // Use ref to get latest value
+                : scrollStateRef.current; // Use ref to get latest value
             desiredScrollStateRef.current = null; // Reset after use
 
             setIsPageTurning(true);
@@ -637,8 +637,8 @@ const BookReaderPage: React.FC = () => {
                     activityTrackingService.trackPageRead(bookId, nextIndex);
                 }
                 // Use the determined scroll state
-                setShowScroll(scrollStateToUse);
-                showScrollRef.current = scrollStateToUse; // Update ref
+                setScrollState(scrollStateToUse);
+                scrollStateRef.current = scrollStateToUse; // Update ref
             }, 300); // Halfway through 0.6s animation
 
             // End the flip animation
@@ -668,7 +668,7 @@ const BookReaderPage: React.FC = () => {
         stopAudio();
         if (currentPageIndex > 0) {
             // Preserve scroll state when turning pages manually - use ref to get latest value
-            const currentScrollState = showScrollRef.current;
+            const currentScrollState = scrollStateRef.current;
 
             setIsPageTurning(true);
             setFlipState({ direction: 'prev', isFlipping: true });
@@ -680,8 +680,8 @@ const BookReaderPage: React.FC = () => {
                 setCurrentPageIndex(prevIndex);
                 currentPageIndexRef.current = prevIndex;
                 // Preserve the scroll state from previous page
-                setShowScroll(currentScrollState);
-                showScrollRef.current = currentScrollState; // Update ref
+                setScrollState(currentScrollState);
+                scrollStateRef.current = currentScrollState; // Update ref
             }, 300); // Halfway through 0.6s animation
 
             // End the flip animation
@@ -756,17 +756,39 @@ const BookReaderPage: React.FC = () => {
         }
     };
 
-    const toggleScroll = (e?: React.MouseEvent) => {
+    // Handle scroll state changes
+    const handleScrollStateChange = (newState: ScrollState) => {
+        setScrollState(newState);
+        scrollStateRef.current = newState;
+    };
+
+    // Cycle scroll state: mid -> hidden (tap to hide)
+    const toggleScrollVisibility = (e?: React.MouseEvent) => {
         // Stop propagation to prevent music unlock
         if (e) {
             e.stopPropagation();
         }
 
-        // Simply toggle scroll state - tapping should NEVER turn the page
-        // Only swipe or auto-play should turn pages
-        setShowScroll(prev => {
-            const newState = !prev;
-            showScrollRef.current = newState; // Update ref
+        // Tap to toggle between mid and hidden
+        setScrollState(prev => {
+            const newState: ScrollState = prev === 'hidden' ? 'mid' : 'hidden';
+            scrollStateRef.current = newState;
+            return newState;
+        });
+    };
+
+    // Handle vertical swipe on scroll area to change height
+    const handleScrollSwipe = (direction: 'up' | 'down') => {
+        setScrollState(prev => {
+            let newState: ScrollState;
+            if (direction === 'up') {
+                // Swipe up: hidden -> mid -> max
+                newState = prev === 'hidden' ? 'mid' : prev === 'mid' ? 'max' : 'max';
+            } else {
+                // Swipe down: max -> mid -> hidden
+                newState = prev === 'max' ? 'mid' : prev === 'mid' ? 'hidden' : 'hidden';
+            }
+            scrollStateRef.current = newState;
             return newState;
         });
     };
@@ -794,13 +816,14 @@ const BookReaderPage: React.FC = () => {
                 stopAudio();
                 handleNext({ stopPropagation: () => { } } as React.MouseEvent);
                 // Lower scroll (user preference from last page)
-                if (showScroll) {
-                    setShowScroll(false);
+                if (scrollState !== 'hidden') {
+                    setScrollState('hidden');
+                    scrollStateRef.current = 'hidden';
                 }
             }
         } else {
-            // Normal mode: just toggle scroll
-            toggleScroll(e);
+            // Normal mode: just toggle scroll visibility
+            toggleScrollVisibility(e);
         }
     };
 
@@ -1129,7 +1152,7 @@ const BookReaderPage: React.FC = () => {
                     if (wordIdx < 0) return;
                     
                     // Only scroll if the scroll UI is visible - respect user's preference
-                    if (!showScrollRef.current) return;
+                    if (scrollStateRef.current === 'hidden') return;
                     
                     // Find the highlighted word element
                     const wordElements = document.querySelectorAll('[data-word-index]');
@@ -1235,7 +1258,7 @@ const BookReaderPage: React.FC = () => {
                                     setCurrentPageIndex(nextPageIndex);
                                     currentPageIndexRef.current = nextPageIndex; // Update ref
                                     // Preserve scroll state during page turns (both manual and auto-play)
-                                    setShowScroll(showScrollRef.current);
+                                    setScrollState(scrollStateRef.current);
                                 }, 300); // Halfway through 0.6s animation
                                 
                                 // End animation after full duration
@@ -1311,7 +1334,7 @@ const BookReaderPage: React.FC = () => {
                                 setCurrentPageIndex(nextPageIndex);
                                 currentPageIndexRef.current = nextPageIndex; // Update ref
                                 // Preserve scroll state during page turns (both manual and auto-play)
-                                setShowScroll(showScrollRef.current);
+                                setScrollState(scrollStateRef.current);
                             }, 300); // Halfway through 0.6s animation
                             
                             // End animation after full duration
@@ -1926,8 +1949,8 @@ const BookReaderPage: React.FC = () => {
                         <BookPageRenderer
                             page={currentPage}
                             activeTextBoxIndex={activeTextBoxIndex}
-                            showScroll={showScroll}
-                            onToggleScroll={toggleScroll}
+                            scrollState={scrollState}
+                            onScrollStateChange={handleScrollStateChange}
                             onPlayText={handlePlayText}
                             highlightedWordIndex={currentWordIndex}
                             wordAlignment={wordAlignment}
@@ -2100,19 +2123,18 @@ const BookReaderPage: React.FC = () => {
                 {/* Navigation is now swipe-only - removed click zones */}
             </div>
 
-            {/* Wood Play Button - Positioned above the scroll */}
+            {/* Wood Play Button - Positioned above the scroll based on scroll state */}
             <div
-                className={`absolute left-4 z-40 transition-all duration-500 ${showScroll
-                    ? 'bottom-[calc(30%+1rem)]' // Position above scroll (30% height + 1rem spacing)
-                    : 'bottom-4' // When scroll is hidden, position at bottom
-                    }`}
+                className={`absolute left-4 z-40 transition-all duration-500`}
                 style={{
-                    // Use scrollHeight if available, otherwise default to 30%
-                    bottom: showScroll && currentPage.scrollHeight
-                        ? `calc(${currentPage.scrollHeight}px + 1rem)`
-                        : showScroll
-                            ? 'calc(30% + 1rem)'
-                            : '1rem'
+                    // Position based on scroll state: hidden = bottom, mid = above mid scroll, max = above max scroll
+                    bottom: scrollState === 'hidden' 
+                        ? '1rem' 
+                        : scrollState === 'max'
+                            ? 'calc(60% + 1rem)' // Above max scroll (60%)
+                            : currentPage.scrollHeight 
+                                ? `calc(${currentPage.scrollHeight}px + 1rem)` 
+                                : 'calc(30% + 1rem)' // Above mid scroll (30%)
                 }}
             >
                 <WoodButton

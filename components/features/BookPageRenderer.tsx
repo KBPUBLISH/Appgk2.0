@@ -28,11 +28,14 @@ interface PageData {
     soundEffectUrl?: string;
 }
 
+// Scroll state types
+export type ScrollState = 'hidden' | 'mid' | 'max';
+
 interface BookPageRendererProps {
     page: PageData;
     activeTextBoxIndex: number | null;
-    showScroll: boolean;
-    onToggleScroll?: (e: React.MouseEvent) => void;
+    scrollState: ScrollState;
+    onScrollStateChange?: (newState: ScrollState) => void;
     onPlayText?: (text: string, index: number, e: React.MouseEvent) => void;
     highlightedWordIndex?: number;
     wordAlignment?: { words: Array<{ word: string; start: number; end: number }> } | null;
@@ -41,17 +44,54 @@ interface BookPageRendererProps {
 export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     page,
     activeTextBoxIndex,
-    showScroll,
-    onToggleScroll,
+    scrollState,
+    onScrollStateChange,
     onPlayText,
     highlightedWordIndex,
     wordAlignment
 }) => {
+    // For backward compatibility
+    const showScroll = scrollState !== 'hidden';
     // Refs for text box containers to enable scrolling
     const textBoxRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
     const soundEffectRef = useRef<HTMLAudioElement | null>(null);
     const [bubblePopped, setBubblePopped] = useState(false);
     const [bubblePosition, setBubblePosition] = useState({ x: 75, y: 20 }); // Default position (top right area)
+    
+    // Swipe detection for scroll height changes
+    const touchStartY = useRef<number>(0);
+    const touchEndY = useRef<number>(0);
+    
+    const handleScrollTouchStart = (e: React.TouchEvent) => {
+        touchStartY.current = e.touches[0].clientY;
+    };
+    
+    const handleScrollTouchEnd = (e: React.TouchEvent) => {
+        touchEndY.current = e.changedTouches[0].clientY;
+        const deltaY = touchStartY.current - touchEndY.current;
+        const minSwipeDistance = 50; // Minimum distance for a swipe
+        
+        if (Math.abs(deltaY) > minSwipeDistance && onScrollStateChange) {
+            if (deltaY > 0) {
+                // Swipe up - increase scroll height
+                const newState: ScrollState = scrollState === 'hidden' ? 'mid' : scrollState === 'mid' ? 'max' : 'max';
+                onScrollStateChange(newState);
+            } else {
+                // Swipe down - decrease scroll height
+                const newState: ScrollState = scrollState === 'max' ? 'mid' : scrollState === 'mid' ? 'hidden' : 'hidden';
+                onScrollStateChange(newState);
+            }
+        }
+    };
+    
+    const handleScrollClick = (e: React.MouseEvent) => {
+        // Tap on scroll to toggle visibility (mid <-> hidden)
+        e.stopPropagation();
+        if (onScrollStateChange) {
+            const newState: ScrollState = scrollState === 'hidden' ? 'mid' : 'hidden';
+            onScrollStateChange(newState);
+        }
+    };
 
     // Auto-scroll to highlighted word - only when scroll is visible/open
     useEffect(() => {
@@ -164,17 +204,36 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
             {/* Gradient Overlay for depth (spine shadow) */}
             <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/20 to-transparent pointer-events-none z-10" />
 
-            {/* Scroll Image Layer */}
+            {/* Scroll Image Layer - Three states: hidden, mid, max */}
             {page.scrollUrl && (
                 <div
-                    className={`absolute bottom-0 left-0 right-0 transition-transform duration-500 ease-in-out z-15 ${showScroll ? 'translate-y-0' : 'translate-y-full'}`}
-                    style={{ height: page.scrollHeight ? `${page.scrollHeight}px` : '30%' }}
+                    className={`absolute bottom-0 left-0 right-0 transition-all duration-500 ease-in-out z-15 cursor-pointer ${
+                        scrollState === 'hidden' ? 'translate-y-full' : 'translate-y-0'
+                    }`}
+                    style={{ 
+                        // Max height is 60% of screen, mid is the configured height or 30%
+                        height: scrollState === 'max' 
+                            ? '60%' 
+                            : (page.scrollHeight ? `${page.scrollHeight}px` : '30%')
+                    }}
+                    onTouchStart={handleScrollTouchStart}
+                    onTouchEnd={handleScrollTouchEnd}
+                    onClick={handleScrollClick}
                 >
                     <img
                         src={page.scrollUrl}
                         alt="Scroll background"
-                        className="w-full h-full object-fill"
+                        className="w-full h-full object-fill pointer-events-none"
                     />
+                    {/* Swipe indicator */}
+                    {scrollState !== 'hidden' && (
+                        <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-1 opacity-50">
+                            <div className="w-12 h-1 bg-white/60 rounded-full"></div>
+                            <span className="text-white/60 text-[10px] font-medium">
+                                {scrollState === 'mid' ? '↑ Swipe for more' : '↓ Swipe to shrink'}
+                            </span>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -187,11 +246,14 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                 }}
             >
                 {page.textBoxes?.map((box, idx) => {
-                    const scrollHeightVal = page.scrollHeight ? `${page.scrollHeight}px` : '30%';
+                    // Calculate scroll height based on state
+                    const scrollHeightVal = scrollState === 'max' 
+                        ? '60%' 
+                        : (page.scrollHeight ? `${page.scrollHeight}px` : '30%');
                     const scrollTopVal = `calc(100% - ${scrollHeightVal})`;
                     const isActive = activeTextBoxIndex === idx;
                     // Text boxes should fade and slide with the scroll
-                    const shouldHideTextBoxes = page.scrollUrl && !showScroll;
+                    const shouldHideTextBoxes = page.scrollUrl && scrollState === 'hidden';
 
                     return (
                         <div
