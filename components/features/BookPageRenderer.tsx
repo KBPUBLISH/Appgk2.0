@@ -209,7 +209,7 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
             {/* Scroll Image Layer - Three states: hidden, mid, max */}
             {page.scrollUrl && (
                 <div
-                    className={`absolute bottom-0 left-0 right-0 transition-all duration-500 ease-in-out z-15 cursor-pointer ${
+                    className={`absolute bottom-0 left-0 right-0 transition-all duration-500 ease-in-out z-15 ${
                         scrollState === 'hidden' ? 'translate-y-full' : 'translate-y-0'
                     }`}
                     style={{ 
@@ -218,34 +218,41 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                             ? `${page.scrollMaxHeight || 60}%` 
                             : `${page.scrollMidHeight || 30}%`
                     }}
-                    onTouchStart={handleScrollTouchStart}
-                    onTouchEnd={handleScrollTouchEnd}
-                    onClick={handleScrollClick}
                 >
                     <img
                         src={page.scrollUrl}
                         alt="Scroll background"
                         className="w-full h-full object-fill pointer-events-none"
                     />
-                    {/* Swipe indicator */}
-                    {scrollState !== 'hidden' && (
-                        <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-1 opacity-50">
-                            <div className="w-12 h-1 bg-white/60 rounded-full"></div>
-                            <span className="text-white/60 text-[10px] font-medium">
-                                {scrollState === 'mid' ? '↑ Swipe for more' : '↓ Swipe to shrink'}
-                            </span>
-                        </div>
-                    )}
+                </div>
+            )}
+            
+            {/* Swipe Zone - Covers entire scroll area for swipe detection */}
+            {page.scrollUrl && scrollState !== 'hidden' && (
+                <div
+                    className="absolute bottom-0 left-0 right-0 z-25 cursor-pointer"
+                    style={{ 
+                        height: scrollState === 'max' 
+                            ? `${page.scrollMaxHeight || 60}%` 
+                            : `${page.scrollMidHeight || 30}%`
+                    }}
+                    onTouchStart={handleScrollTouchStart}
+                    onTouchEnd={handleScrollTouchEnd}
+                    onClick={handleScrollClick}
+                >
+                    {/* Swipe indicator at top of scroll */}
+                    <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-1 opacity-60 pointer-events-none">
+                        <div className="w-12 h-1 bg-white/70 rounded-full"></div>
+                        <span className="text-white/80 text-[10px] font-medium drop-shadow">
+                            {scrollState === 'mid' ? '↑ Swipe for more' : '↓ Swipe to shrink'}
+                        </span>
+                    </div>
                 </div>
             )}
 
-            {/* Text Boxes Layer */}
+            {/* Text Boxes Layer - Below swipe zone */}
             <div
                 className="absolute inset-0 pointer-events-none z-20"
-                style={{
-                    // Don't move the entire text layer - let text boxes stay in place
-                    // Only the scroll image should animate in/out
-                }}
             >
                 {page.textBoxes?.map((box, idx) => {
                     // Calculate scroll height based on state - use configured heights or defaults
@@ -262,11 +269,11 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                             key={idx}
                             ref={(el) => { textBoxRefs.current[idx] = el; }}
                             data-scroll-container="true"
-                            className="absolute pointer-events-auto overflow-y-auto p-2 pt-6 group"
+                            className="absolute pointer-events-auto overflow-y-auto p-2 pt-8 group"
                             style={{
                                 left: `${box.x}%`,
                                 top: page.scrollUrl 
-                                    ? `max(${box.y}%, calc(${scrollTopVal} + 8px))` 
+                                    ? `max(${box.y}%, calc(${scrollTopVal} + 12px))` 
                                     : `${box.y}%`,
                                 width: `${box.width || 30}%`,
                                 textAlign: box.alignment || 'left',
@@ -274,17 +281,20 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                                 fontFamily: box.fontFamily || 'Comic Sans MS',
                                 fontSize: `${box.fontSize || 24}px`,
                                 maxHeight: page.scrollUrl
-                                    ? `calc(100% - max(${box.y}%, ${scrollTopVal}) - 60px)`
+                                    ? `calc(100% - max(${box.y}%, ${scrollTopVal}) - 70px)`
                                     : `calc(100% - ${box.y}% - 60px)`,
                                 overflowY: 'auto',
                                 textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
                                 scrollBehavior: 'smooth',
                                 // Only use opacity for smooth hide/show - no translateY to avoid layout jump
                                 opacity: shouldHideTextBoxes ? 0 : 1,
-                                transition: 'opacity 0.4s ease-in-out',
+                                transition: 'opacity 0.4s ease-in-out, top 0.5s ease-in-out',
                                 pointerEvents: shouldHideTextBoxes ? 'none' : 'auto',
                             }}
-                            onClick={(e) => onPlayText && onPlayText(box.text, idx, e)}
+                            onClick={(e) => {
+                                e.stopPropagation(); // Prevent scroll toggle when tapping text
+                                onPlayText && onPlayText(box.text, idx, e);
+                            }}
                         >
                             <div className={`
                                 relative p-3 rounded-xl transition-all duration-300
@@ -325,20 +335,39 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                                         return cleanedText;
                                     })()}
                                 </p>
-
-                                {/* Play Icon Indicator - subtle tap hint */}
-                                {!isActive && (
-                                    <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-80 transition-opacity text-[#FFD700] drop-shadow-lg">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                                            <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
-                                        </svg>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     );
                 })}
             </div>
+            
+            {/* Floating Play Button - Above scroll, visible when text exists */}
+            {page.textBoxes && page.textBoxes.length > 0 && scrollState !== 'hidden' && activeTextBoxIndex === null && (
+                <div
+                    className="absolute z-30 pointer-events-auto"
+                    style={{
+                        bottom: scrollState === 'max' 
+                            ? `calc(${page.scrollMaxHeight || 60}% + 10px)` 
+                            : `calc(${page.scrollMidHeight || 30}% + 10px)`,
+                        right: '16px',
+                        transition: 'bottom 0.5s ease-in-out'
+                    }}
+                >
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (onPlayText && page.textBoxes && page.textBoxes.length > 0) {
+                                onPlayText(page.textBoxes[0].text, 0, e);
+                            }
+                        }}
+                        className="w-14 h-14 bg-gradient-to-br from-[#FFD700] to-[#FFA500] rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-transform duration-200 border-2 border-white/50"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-white ml-1">
+                            <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+            )}
 
             {/* Floating Sound Effect Bubble */}
             {page.soundEffectUrl && !bubblePopped && (
