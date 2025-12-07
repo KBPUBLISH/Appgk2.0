@@ -1,9 +1,58 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WoodButton from '../components/ui/WoodButton';
 
+const STORAGE_KEY = 'godly_kids_data_v6';
+
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
+  const [isChecking, setIsChecking] = useState(true);
+
+  // Check if user has already completed onboarding
+  useEffect(() => {
+    try {
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        const userData = JSON.parse(savedData);
+        // User has completed onboarding if they have:
+        // - A parent name set (not the default 'Parent')
+        // - Or have kids added
+        // - Or have a subscription
+        const hasCompletedOnboarding = 
+          (userData.parentName && userData.parentName !== 'Parent' && userData.parentName !== '') ||
+          (userData.kids && userData.kids.length > 0) ||
+          userData.isSubscribed;
+        
+        if (hasCompletedOnboarding) {
+          console.log('👤 User already signed in, redirecting to home...');
+          navigate('/home', { replace: true });
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Error checking user data:', e);
+    }
+    setIsChecking(false);
+  }, [navigate]);
+
+  // Show loading while checking
+  if (isChecking) {
+    return (
+      <div className="relative h-full w-full overflow-hidden flex items-center justify-center">
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <img 
+            src="/assets/images/ship.jpg" 
+            alt="Godly Kids Ship" 
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+          <p className="text-white mt-4 font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-full w-full overflow-hidden">
