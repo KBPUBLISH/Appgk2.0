@@ -96,7 +96,6 @@ const HomePage: React.FC = () => {
   const [showWelcomeVideo, setShowWelcomeVideo] = useState(() => {
     // Check if this is a fresh session (no welcome video shown yet)
     const hasShownThisSession = sessionStorage.getItem('godlykids_welcome_shown');
-    console.log('🎬 Welcome video init:', { hasShownThisSession, shouldShow: !hasShownThisSession });
     return !hasShownThisSession;
   });
   const welcomeVideoRef = useRef<HTMLVideoElement>(null);
@@ -351,19 +350,15 @@ const HomePage: React.FC = () => {
 
   // Handle welcome video end - mark as shown and hide video
   const handleWelcomeVideoEnd = () => {
-    console.log('🎬 Welcome video ended/closed');
     sessionStorage.setItem('godlykids_welcome_shown', 'true');
     setShowWelcomeVideo(false);
   };
 
   // Auto-play welcome video when component mounts
   useEffect(() => {
-    console.log('🎬 Welcome video effect:', { showWelcomeVideo, hasRef: !!welcomeVideoRef.current });
     if (showWelcomeVideo && welcomeVideoRef.current) {
-      console.log('🎬 Attempting to play welcome video...');
-      welcomeVideoRef.current.play().catch((err) => {
+      welcomeVideoRef.current.play().catch(() => {
         // If autoplay fails (browser policy), skip the video
-        console.log('🎬 Autoplay failed:', err);
         handleWelcomeVideoEnd();
       });
     }
@@ -589,7 +584,7 @@ const HomePage: React.FC = () => {
         {/* Welcome Video - Plays once per session above Week's Progress */}
         {showWelcomeVideo && (
           <div className="flex justify-center mb-4">
-            <div className="relative aspect-[9/16] w-[calc((100%-16px)/3)] rounded-lg overflow-hidden bg-gray-800">
+            <div className="relative aspect-[9/16] w-[calc((100%-16px)/3)] rounded-lg overflow-hidden">
               <video
                 ref={welcomeVideoRef}
                 src="/assets/videos/welcome.mp4"
@@ -597,17 +592,8 @@ const HomePage: React.FC = () => {
                 autoPlay
                 muted
                 playsInline
-                onLoadStart={() => console.log('🎬 Video load started')}
-                onCanPlay={() => console.log('🎬 Video can play')}
-                onPlay={() => console.log('🎬 Video playing')}
-                onEnded={() => {
-                  console.log('🎬 Video ended naturally');
-                  handleWelcomeVideoEnd();
-                }}
-                onError={(e) => {
-                  console.error('🎬 Welcome video error:', e);
-                  handleWelcomeVideoEnd();
-                }}
+                onEnded={handleWelcomeVideoEnd}
+                onError={handleWelcomeVideoEnd}
               />
             </div>
           </div>
