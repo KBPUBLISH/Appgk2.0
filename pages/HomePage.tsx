@@ -92,6 +92,15 @@ const HomePage: React.FC = () => {
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(getSelectedDay());
   const todayIndex = getTodayIndex();
   
+  // Welcome video state - plays once per app session when returning to home
+  const [showWelcomeVideo, setShowWelcomeVideo] = useState(() => {
+    // Check if this is a fresh session (no welcome video shown yet)
+    const hasShownThisSession = sessionStorage.getItem('godlykids_welcome_shown');
+    console.log('🎬 Welcome video init:', { hasShownThisSession, shouldShow: !hasShownThisSession });
+    return !hasShownThisSession;
+  });
+  const welcomeVideoRef = useRef<HTMLVideoElement>(null);
+  
   // Explore categories state
   const [exploreCategories, setExploreCategories] = useState<any[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
@@ -340,6 +349,26 @@ const HomePage: React.FC = () => {
     navigate(`/lesson/${lesson._id}`);
   };
 
+  // Handle welcome video end - mark as shown and hide video
+  const handleWelcomeVideoEnd = () => {
+    console.log('🎬 Welcome video ended/closed');
+    sessionStorage.setItem('godlykids_welcome_shown', 'true');
+    setShowWelcomeVideo(false);
+  };
+
+  // Auto-play welcome video when component mounts
+  useEffect(() => {
+    console.log('🎬 Welcome video effect:', { showWelcomeVideo, hasRef: !!welcomeVideoRef.current });
+    if (showWelcomeVideo && welcomeVideoRef.current) {
+      console.log('🎬 Attempting to play welcome video...');
+      welcomeVideoRef.current.play().catch((err) => {
+        // If autoplay fails (browser policy), skip the video
+        console.log('🎬 Autoplay failed:', err);
+        handleWelcomeVideoEnd();
+      });
+    }
+  }, [showWelcomeVideo]);
+
   // Fetch explore categories
   const fetchExploreCategories = async () => {
     try {
@@ -556,6 +585,33 @@ const HomePage: React.FC = () => {
       />
 
       <div className="px-4 pt-28 space-y-2 pb-52">
+
+        {/* Welcome Video - Plays once per session above Week's Progress */}
+        {showWelcomeVideo && (
+          <div className="flex justify-center mb-4">
+            <div className="relative aspect-[9/16] w-[calc((100%-16px)/3)] rounded-lg overflow-hidden bg-gray-800">
+              <video
+                ref={welcomeVideoRef}
+                src="/assets/videos/welcome.mp4"
+                className="w-full h-full object-contain"
+                autoPlay
+                muted
+                playsInline
+                onLoadStart={() => console.log('🎬 Video load started')}
+                onCanPlay={() => console.log('🎬 Video can play')}
+                onPlay={() => console.log('🎬 Video playing')}
+                onEnded={() => {
+                  console.log('🎬 Video ended naturally');
+                  handleWelcomeVideoEnd();
+                }}
+                onError={(e) => {
+                  console.error('🎬 Welcome video error:', e);
+                  handleWelcomeVideoEnd();
+                }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Weekly Progress Tracker + Daily Lessons Section */}
         <section className="pb-2">
