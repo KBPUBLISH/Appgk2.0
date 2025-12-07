@@ -1,9 +1,15 @@
-// Favorites Service - Manages user's favorite books
+// Favorites Service - Manages user's favorite books and playlists
 const FAVORITES_KEY = 'godlykids_favorites';
 const LIKES_KEY = 'godlykids_likes';
+const PLAYLIST_FAVORITES_KEY = 'godlykids_playlist_favorites';
 
 export interface FavoriteBook {
   bookId: string;
+  addedAt: number; // timestamp
+}
+
+export interface FavoritePlaylist {
+  playlistId: string;
   addedAt: number; // timestamp
 }
 
@@ -107,6 +113,70 @@ class FavoritesService {
     } catch (error) {
       console.error('Error toggling like:', error);
       return false;
+    }
+  }
+
+  // ============ PLAYLIST FAVORITES ============
+
+  // Get all favorite playlist IDs
+  getPlaylistFavorites(): string[] {
+    try {
+      const stored = localStorage.getItem(PLAYLIST_FAVORITES_KEY);
+      if (!stored) return [];
+      const favorites: FavoritePlaylist[] = JSON.parse(stored);
+      return favorites.map(fav => fav.playlistId);
+    } catch (error) {
+      console.error('Error reading playlist favorites:', error);
+      return [];
+    }
+  }
+
+  // Check if a playlist is favorited
+  isPlaylistFavorite(playlistId: string): boolean {
+    const favorites = this.getPlaylistFavorites();
+    return favorites.includes(playlistId);
+  }
+
+  // Add playlist to favorites
+  addPlaylistFavorite(playlistId: string): void {
+    try {
+      const stored = localStorage.getItem(PLAYLIST_FAVORITES_KEY);
+      const favorites: FavoritePlaylist[] = stored ? JSON.parse(stored) : [];
+      
+      // Check if already favorited
+      if (favorites.some(fav => fav.playlistId === playlistId)) {
+        return; // Already favorited
+      }
+      
+      favorites.push({ playlistId, addedAt: Date.now() });
+      localStorage.setItem(PLAYLIST_FAVORITES_KEY, JSON.stringify(favorites));
+    } catch (error) {
+      console.error('Error saving playlist favorite:', error);
+    }
+  }
+
+  // Remove playlist from favorites
+  removePlaylistFavorite(playlistId: string): void {
+    try {
+      const stored = localStorage.getItem(PLAYLIST_FAVORITES_KEY);
+      if (!stored) return;
+      
+      const favorites: FavoritePlaylist[] = JSON.parse(stored);
+      const updated = favorites.filter(fav => fav.playlistId !== playlistId);
+      localStorage.setItem(PLAYLIST_FAVORITES_KEY, JSON.stringify(updated));
+    } catch (error) {
+      console.error('Error removing playlist favorite:', error);
+    }
+  }
+
+  // Toggle playlist favorite status
+  togglePlaylistFavorite(playlistId: string): boolean {
+    if (this.isPlaylistFavorite(playlistId)) {
+      this.removePlaylistFavorite(playlistId);
+      return false;
+    } else {
+      this.addPlaylistFavorite(playlistId);
+      return true;
     }
   }
 }

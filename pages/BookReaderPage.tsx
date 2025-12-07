@@ -645,7 +645,7 @@ const BookReaderPage: React.FC = () => {
                 // Use the determined scroll state
                 setScrollState(scrollStateToUse);
                 scrollStateRef.current = scrollStateToUse; // Update ref
-            }, 300); // Halfway through 0.6s animation
+            }, 400); // Halfway through 0.8s animation
 
             // End the flip animation
             setTimeout(() => {
@@ -664,7 +664,7 @@ const BookReaderPage: React.FC = () => {
                         analyticsService.bookReadComplete(bookId, bookTitle);
                     }
                 }
-            }, 650); // Slightly after 0.6s animation completes
+            }, 850); // Slightly after 0.8s animation completes
         }
     };
 
@@ -688,7 +688,7 @@ const BookReaderPage: React.FC = () => {
                 // Preserve the scroll state from previous page
                 setScrollState(currentScrollState);
                 scrollStateRef.current = currentScrollState; // Update ref
-            }, 300); // Halfway through 0.6s animation
+            }, 400); // Halfway through 0.8s animation
 
             // End the flip animation
             setTimeout(() => {
@@ -699,7 +699,7 @@ const BookReaderPage: React.FC = () => {
                 if (bookId) {
                     readingProgressService.saveProgress(bookId, prevIndex);
                 }
-            }, 650); // Slightly after 0.6s animation completes
+            }, 850); // Slightly after 0.8s animation completes
         }
     };
 
@@ -1327,7 +1327,7 @@ const BookReaderPage: React.FC = () => {
                                     currentPageIndexRef.current = nextPageIndex; // Update ref
                                     // Preserve scroll state during page turns (both manual and auto-play)
                                     setScrollState(scrollStateRef.current);
-                                }, 300); // Halfway through 0.6s animation
+                                }, 400); // Halfway through 0.8s animation
                                 
                                 // End animation after full duration
                                 setTimeout(() => {
@@ -1360,7 +1360,7 @@ const BookReaderPage: React.FC = () => {
                                             isAutoPlayingRef.current = false;
                                         }
                                     }, 300);
-                                }, 600); // Full animation duration
+                                }, 800); // Full animation duration
                             } else if (autoPlayModeRef.current && currentPageIndexRef.current >= pages.length - 1) {
                                 // Reached end of book, stop auto-play
                                 console.log('🏁 Auto-play: Reached end of book, stopping');
@@ -1403,7 +1403,7 @@ const BookReaderPage: React.FC = () => {
                                 currentPageIndexRef.current = nextPageIndex; // Update ref
                                 // Preserve scroll state during page turns (both manual and auto-play)
                                 setScrollState(scrollStateRef.current);
-                            }, 300); // Halfway through 0.6s animation
+                            }, 400); // Halfway through 0.8s animation
                             
                             // End animation after full duration
                             setTimeout(() => {
@@ -1435,7 +1435,7 @@ const BookReaderPage: React.FC = () => {
                                         isAutoPlayingRef.current = false;
                                     }
                                 }, 300);
-                            }, 600); // Full animation duration
+                            }, 800); // Full animation duration
                         } else if (autoPlayModeRef.current && currentPageIndexRef.current >= pages.length - 1) {
                             // Reached end of book, stop auto-play
                             console.log('🏁 Auto-play: Reached end of book, stopping');
@@ -1551,7 +1551,13 @@ const BookReaderPage: React.FC = () => {
     return (
         <div
             className={`relative bg-gray-900 overflow-hidden flex flex-col ${isLandscape ? '' : 'w-full h-screen'}`}
-            style={landscapeContainerStyle}
+            style={{
+                ...landscapeContainerStyle,
+                // Prevent iOS overscroll/bounce that reveals background
+                overscrollBehavior: 'none',
+                WebkitOverflowScrolling: 'auto', // Disable momentum scrolling
+                touchAction: 'pan-x pinch-zoom', // Allow horizontal swipes and pinch zoom, block vertical overscroll
+            }}
             onTouchStart={(e) => {
                 // Block any music from playing on touch
                 e.stopPropagation();
@@ -1777,9 +1783,9 @@ const BookReaderPage: React.FC = () => {
                                                     key={v.voice_id}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        // Navigate to shop to unlock
+                                                        // Navigate to profile page with shop modal open to voices tab
                                                         setShowVoiceDropdown(false);
-                                                        navigate('/shop?tab=voices');
+                                                        navigate('/profile', { state: { openShop: true, shopTab: 'voices' } });
                                                     }}
                                                     className="w-full text-left px-4 py-2 text-sm text-white/50 hover:bg-white/5 transition-colors flex items-center gap-2"
                                                 >
@@ -1825,6 +1831,11 @@ const BookReaderPage: React.FC = () => {
             {/* Main Reading Area */}
             <div
                 className="flex-1 w-full h-full relative overflow-hidden bg-gray-900"
+                style={{
+                    // Lock background in place - prevent overscroll/bounce
+                    overscrollBehavior: 'none',
+                    touchAction: 'pan-x', // Only allow horizontal swipes for page turns
+                }}
                 onClick={handleBackgroundTap}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
@@ -1968,35 +1979,35 @@ const BookReaderPage: React.FC = () => {
                     }
                     
                     .page-curl-next {
-                        animation: pageCurlNext 0.6s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+                        animation: pageCurlNext 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
                         transform-origin: left center;
                         transform-style: preserve-3d;
                     }
                     
                     .page-curl-prev {
-                        animation: pageCurlPrev 0.6s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+                        animation: pageCurlPrev 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
                         transform-origin: right center;
                         transform-style: preserve-3d;
                     }
                     
                     .shimmer-wave-1 {
-                        animation: shimmerWave1 0.6s ease-out forwards;
+                        animation: shimmerWave1 0.8s ease-out forwards;
                     }
                     
                     .shimmer-wave-2 {
-                        animation: shimmerWave2 0.6s ease-out 0.05s forwards;
+                        animation: shimmerWave2 0.8s ease-out 0.05s forwards;
                     }
                     
                     .shimmer-wave-3 {
-                        animation: shimmerWave3 0.6s ease-out 0.02s forwards;
+                        animation: shimmerWave3 0.8s ease-out 0.02s forwards;
                     }
                     
                     .sheen-pulse {
-                        animation: sheenPulse 0.3s ease-in-out infinite;
+                        animation: sheenPulse 0.4s ease-in-out infinite;
                     }
                     
                     .curl-shadow {
-                        animation: curlShadowGrow 0.6s ease-in-out forwards;
+                        animation: curlShadowGrow 0.8s ease-in-out forwards;
                     }
                     
                     @keyframes fadeIn {

@@ -661,10 +661,7 @@ const LessonPlayerPage: React.FC = () => {
                             onEnded={() => {
                                 setIsVideoPlaying(false);
                                 setVideoWatched(true);
-                                // Auto-advance to devotional after video ends
-                                setTimeout(() => {
-                                    setCurrentScreen('devotional');
-                                }, 500);
+                                // Show continue button - don't auto-advance, let user click
                             }}
                             onLoadedData={() => {
                                 // Autoplay video when loaded
@@ -688,6 +685,23 @@ const LessonPlayerPage: React.FC = () => {
                                         <Play className="w-12 h-12 text-white" />
                                     )}
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Continue Button - Shows after watching video or when video ends */}
+                        {videoWatched && (
+                            <div className="absolute bottom-16 left-0 right-0 flex justify-center z-30 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <button
+                                    onClick={() => setCurrentScreen('devotional')}
+                                    className="flex items-center gap-3 bg-[#8B4513] hover:bg-[#A0522D] text-white px-8 py-4 rounded-full font-bold font-display text-lg shadow-2xl border-4 border-[#FFD700] transition-all transform hover:scale-105 active:scale-95"
+                                    style={{
+                                        boxShadow: '0 0 20px rgba(255, 215, 0, 0.4), 0 8px 32px rgba(0, 0, 0, 0.5)'
+                                    }}
+                                >
+                                    <Book className="w-6 h-6" />
+                                    Continue to Devotional
+                                    <ChevronRight className="w-6 h-6" />
+                                </button>
                             </div>
                         )}
 

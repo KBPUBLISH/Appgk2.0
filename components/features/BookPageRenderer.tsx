@@ -173,12 +173,26 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     return (
         <div
             className="w-full h-full relative bg-gradient-to-b from-[#fdf6e3] to-[#e8d5b7] overflow-hidden shadow-2xl"
+            style={{
+                // Lock background in place - prevent iOS overscroll/bounce
+                overscrollBehavior: 'none',
+                touchAction: 'pan-x', // Allow horizontal swipes only at container level
+                position: 'relative',
+            }}
             onClick={handleScrollClick}
             onTouchStart={handleScrollTouchStart}
             onTouchEnd={handleScrollTouchEnd}
         >
             {/* Background Layer - warm parchment gradient as fallback instead of black */}
-            <div className="absolute inset-0 bg-gradient-to-b from-[#fdf6e3] to-[#e8d5b7] overflow-hidden">
+            {/* Fixed position prevents movement during touch/swipe gestures */}
+            <div 
+                className="absolute inset-0 bg-gradient-to-b from-[#fdf6e3] to-[#e8d5b7] overflow-hidden"
+                style={{
+                    // Ensure background stays locked in place
+                    touchAction: 'none',
+                    pointerEvents: 'none',
+                }}
+            >
                 {page.backgroundType === 'video' ? (
                     <video
                         src={page.backgroundUrl}
@@ -192,6 +206,10 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                             objectFit: 'cover',
                             width: '100%',
                             height: '100%',
+                            // Lock video in place
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
                         }}
                     />
                 ) : page.backgroundUrl ? (
@@ -200,6 +218,14 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                         alt={`Page ${page.pageNumber}`}
                         className="w-full h-full object-contain"
                         loading="eager"
+                        style={{
+                            // Lock image in place
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                        }}
                     />
                 ) : null}
             </div>

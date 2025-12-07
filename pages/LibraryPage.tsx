@@ -5,11 +5,23 @@ import BookCard from '../components/ui/BookCard';
 import Header from '../components/layout/Header';
 import SectionTitle from '../components/ui/SectionTitle';
 import { useBooks } from '../context/BooksContext';
-import { Search, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown, Music, BookOpen, Clock, Heart } from 'lucide-react';
 import { libraryService } from '../services/libraryService';
 import { favoritesService } from '../services/favoritesService';
+import { readingProgressService } from '../services/readingProgressService';
+import { playHistoryService } from '../services/playHistoryService';
+import { getApiBaseUrl } from '../services/apiService';
 
 const ageOptions = ['All Ages', '3+', '4+', '5+', '6+', '7+', '8+', '9+', '10+'];
+
+interface Playlist {
+  _id: string;
+  title: string;
+  author?: string;
+  coverImage?: string;
+  type?: 'Song' | 'Audiobook';
+  items: any[];
+}
 
 const LibraryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -18,6 +30,8 @@ const LibraryPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAge, setSelectedAge] = useState<string>('All Ages');
   const [showAgeDropdown, setShowAgeDropdown] = useState(false);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [playlistsLoading, setPlaylistsLoading] = useState(true);
   const ageDropdownRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
@@ -40,6 +54,27 @@ const LibraryPage: React.FC = () => {
     lastScrollY.current = currentScrollY;
   };
 
+  // Fetch playlists
+  useEffect(() => {
+    const fetchPlaylists = async () => {
+      try {
+        setPlaylistsLoading(true);
+        const baseUrl = getApiBaseUrl();
+        const response = await fetch(`${baseUrl}playlists?status=published`);
+        if (response.ok) {
+          const data = await response.json();
+          const playlistsArray = Array.isArray(data) ? data : (data.data || []);
+          setPlaylists(playlistsArray);
+        }
+      } catch (error) {
+        console.error('Error fetching playlists:', error);
+      } finally {
+        setPlaylistsLoading(false);
+      }
+    };
+    fetchPlaylists();
+  }, []);
+
   // Close age dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -56,33 +91,131 @@ const LibraryPage: React.FC = () => {
     }
   }, [showAgeDropdown]);
 
-  // Filter for user's books (from library or favorites)
-  const libraryBookIds = libraryService.getLibrary();
+  // Get favorite books
   const favoriteBookIds = favoritesService.getFavorites();
-  const allUserBookIds = [...new Set([...libraryBookIds, ...favoriteBookIds])];
-  const myBooks = books.filter(b => allUserBookIds.includes(b.id));
-  const displayBooks = myBooks.length > 0 ? myBooks : []; // Show empty if no saved books
+  const favoriteBooks = books.filter(b => favoriteBookIds.includes(b.id) || favoriteBookIds.includes((b as any)._id));
 
-  // Filter by age
-  const ageFilteredBooks = selectedAge === 'All Ages'
-    ? displayBooks
-    : displayBooks.filter(b => {
+  // Get favorite playlists
+  const favoritePlaylistIds = favoritesService.getPlaylistFavorites();
+  const favoritePlaylists = playlists.filter(p => favoritePlaylistIds.includes(p._id));
+
+  // Get recently read books (history)
+  const recentBookIds = readingProgressService.getRecentlyReadBookIds(10);
+  const recentBooks = recentBookIds
+    .map(id => books.find(b => b.id === id || (b as any)._id === id))
+    .filter(Boolean) as typeof books;
+
+  // Get recently played playlists (history)
+  const recentPlaylistIds = playHistoryService.getRecentlyPlayedPlaylistIds(10);
+  const recentPlaylists = recentPlaylistIds
+    .map(id => playlists.find(p => p._id === id))
+    .filter(Boolean) as Playlist[];
+
+  // Filter by search and age
+  const filterBooks = (bookList: typeof books) => {
+    let filtered = bookList;
+    
+    // Age filter
+    if (selectedAge !== 'All Ages') {
+      filtered = filtered.filter(b => {
         const bookAge = b.level || '';
-        if (selectedAge === '3+') return bookAge.includes('3');
-        if (selectedAge === '4+') return bookAge.includes('4');
-        if (selectedAge === '5+') return bookAge.includes('5');
-        if (selectedAge === '6+') return bookAge.includes('6');
-        if (selectedAge === '7+') return bookAge.includes('7');
-        if (selectedAge === '8+') return bookAge.includes('8');
-        if (selectedAge === '9+') return bookAge.includes('9');
-        if (selectedAge === '10+') return bookAge.includes('10');
-        return true;
+        return bookAge.includes(selectedAge.replace('+', ''));
       });
+    }
+    
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter(b => 
+        b.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (b.author && b.author.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
+    
+    return filtered;
+  };
 
-  // Apply Search Filter
-  const filteredBooks = ageFilteredBooks.filter(b => 
-    b.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (b.author && b.author.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filterPlaylists = (playlistList: Playlist[]) => {
+    if (!searchQuery) return playlistList;
+    return playlistList.filter(p => 
+      p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (p.author && p.author.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  };
+
+  const filteredFavoriteBooks = filterBooks(favoriteBooks);
+  const filteredFavoritePlaylists = filterPlaylists(favoritePlaylists);
+  const filteredRecentBooks = filterBooks(recentBooks);
+  const filteredRecentPlaylists = filterPlaylists(recentPlaylists);
+
+  const hasNoContent = 
+    filteredFavoriteBooks.length === 0 && 
+    filteredFavoritePlaylists.length === 0 && 
+    filteredRecentBooks.length === 0 && 
+    filteredRecentPlaylists.length === 0;
+
+  const isLoading = loading || playlistsLoading;
+
+  // Render a horizontal scrollable row of book cards
+  const renderBookRow = (bookList: typeof books) => (
+    <div className="w-screen overflow-x-auto no-scrollbar pb-4 -mx-4">
+      <div className="flex space-x-3 px-4">
+        {bookList.map(book => (
+          <div key={book.id} className="flex-shrink-0 w-[42vw] md:w-[30vw] lg:w-[23vw] max-w-[200px]">
+            <BookCard 
+              book={book} 
+              onClick={(id) => navigate(`/book/${id}`, { state: { from: '/library' } })} 
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Render a horizontal scrollable row of playlist cards
+  const renderPlaylistRow = (playlistList: Playlist[]) => (
+    <div className="w-screen overflow-x-auto no-scrollbar pb-4 -mx-4">
+      <div className="flex space-x-3 px-4">
+        {playlistList.map(playlist => (
+          <div 
+            key={playlist._id} 
+            className="flex-shrink-0 w-[42vw] md:w-[30vw] lg:w-[23vw] max-w-[200px] cursor-pointer"
+            onClick={() => navigate(`/audio/playlist/${playlist._id}`)}
+          >
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg border-2 border-white/20 hover:shadow-2xl hover:scale-105 transition-all group">
+              <div className="aspect-square bg-gradient-to-br from-indigo-500 to-purple-600 relative overflow-hidden">
+                {playlist.coverImage ? (
+                  <img
+                    src={playlist.coverImage}
+                    alt={playlist.title}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Music className="w-16 h-16 text-white/60" />
+                  </div>
+                )}
+                {/* Type Badge */}
+                <div className="absolute top-2 right-2 bg-black/50 backdrop-blur-sm px-2 py-1 rounded-full">
+                  <span className="text-white text-xs font-medium">
+                    {playlist.type === 'Audiobook' ? '📖' : '🎵'} {playlist.type || 'Audio'}
+                  </span>
+                </div>
+              </div>
+              <div className="p-3">
+                <h3 className="text-white font-bold text-sm truncate">{playlist.title}</h3>
+                {playlist.author && (
+                  <p className="text-white/60 text-xs truncate mt-1">{playlist.author}</p>
+                )}
+                <p className="text-white/40 text-xs mt-1">
+                  {playlist.items?.length || 0} {playlist.type === 'Audiobook' ? 'chapters' : 'songs'}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 
   return (
@@ -91,12 +224,12 @@ const LibraryPage: React.FC = () => {
       onScroll={handleScroll}
       className="flex flex-col h-full overflow-y-auto no-scrollbar relative"
     >
-      <Header isVisible={isHeaderVisible} title="MY BOOKS" />
+      <Header isVisible={isHeaderVisible} title="MY LIBRARY" />
 
       <div className="px-4 pt-28 pb-52">
         
         {/* Search Bar with Age Filter */}
-        <div className="flex gap-2 mb-2">
+        <div className="flex gap-2 mb-4">
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
               <Search className="text-white/60" size={20} />
@@ -144,33 +277,76 @@ const LibraryPage: React.FC = () => {
           </div>
         </div>
 
-        <SectionTitle title="Favorites & History" />
-        
-        {loading ? (
-           <div className="text-white font-display text-center mt-10">Checking backpack...</div>
+        {isLoading ? (
+          <div className="text-white font-display text-center mt-10">Checking backpack...</div>
+        ) : hasNoContent ? (
+          <div className="flex flex-col items-center justify-center mt-10 bg-black/20 p-6 rounded-2xl backdrop-blur-sm">
+            {searchQuery ? (
+              <p className="text-white font-display text-lg mb-2">No matching content found.</p>
+            ) : (
+              <>
+                <p className="text-white font-display text-lg mb-2">Your backpack is empty!</p>
+                <p className="text-blue-100 text-sm text-center">Go explore and start reading or listening to fill up your library.</p>
+              </>
+            )}
+          </div>
         ) : (
           <>
-            {filteredBooks.length === 0 ? (
-                <div className="flex flex-col items-center justify-center mt-10 bg-black/20 p-6 rounded-2xl backdrop-blur-sm">
-                    {searchQuery ? (
-                         <p className="text-white font-display text-lg mb-2">No matching books found.</p>
-                    ) : (
-                        <>
-                            <p className="text-white font-display text-lg mb-2">Your backpack is empty!</p>
-                            <p className="text-blue-100 text-sm text-center">Go explore and start reading to fill up your library.</p>
-                        </>
-                    )}
-                </div>
-            ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 md:gap-x-8 gap-y-8 justify-items-center">
-                    {filteredBooks.map(book => (
-                    <BookCard 
-                        key={book.id} 
-                        book={book} 
-                        onClick={(id) => navigate(`/book/${id}`, { state: { from: '/library' } })} 
-                    />
-                    ))}
-                </div>
+            {/* Favorite Books Section */}
+            {filteredFavoriteBooks.length > 0 && (
+              <section className="mb-6">
+                <SectionTitle 
+                  title="Favorite Books" 
+                  icon="📚"
+                  color="#E91E63"
+                />
+                {renderBookRow(filteredFavoriteBooks)}
+              </section>
+            )}
+
+            {/* Favorite Audio Section */}
+            {filteredFavoritePlaylists.length > 0 && (
+              <section className="mb-6">
+                <SectionTitle 
+                  title="Favorite Audio" 
+                  icon="🎧"
+                  color="#9C27B0"
+                />
+                {renderPlaylistRow(filteredFavoritePlaylists)}
+              </section>
+            )}
+
+            {/* Reading History Section */}
+            {filteredRecentBooks.length > 0 && (
+              <section className="mb-6">
+                <SectionTitle 
+                  title="Reading History" 
+                  icon="📖"
+                  color="#4CAF50"
+                />
+                {renderBookRow(filteredRecentBooks)}
+              </section>
+            )}
+
+            {/* Listening History Section */}
+            {filteredRecentPlaylists.length > 0 && (
+              <section className="mb-6">
+                <SectionTitle 
+                  title="Listening History" 
+                  icon="🎵"
+                  color="#2196F3"
+                />
+                {renderPlaylistRow(filteredRecentPlaylists)}
+              </section>
+            )}
+
+            {/* Empty state for individual sections when searching */}
+            {searchQuery && filteredFavoriteBooks.length === 0 && filteredFavoritePlaylists.length === 0 && 
+             filteredRecentBooks.length === 0 && filteredRecentPlaylists.length === 0 && (
+              <div className="flex flex-col items-center justify-center mt-10 bg-black/20 p-6 rounded-2xl backdrop-blur-sm">
+                <p className="text-white font-display text-lg mb-2">No matching content found.</p>
+                <p className="text-blue-100 text-sm text-center">Try a different search term.</p>
+              </div>
             )}
           </>
         )}

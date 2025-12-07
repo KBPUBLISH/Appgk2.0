@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Crown, Play, Pause, Music, Headphones, Heart, Bookmark, Hammer, Wrench } from 'lucide-react';
 import { getApiBaseUrl } from '../services/apiService';
-import { libraryService } from '../services/libraryService';
+import { favoritesService } from '../services/favoritesService';
 import { useAudio } from '../context/AudioContext';
 import MiniPlayer from '../components/audio/MiniPlayer';
 
@@ -177,15 +177,14 @@ const PlaylistDetailPage: React.FC = () => {
     useEffect(() => {
         fetchPlaylist();
         // Check if favorited/liked from localStorage
-        const favorites = JSON.parse(localStorage.getItem('favorited_playlists') || '[]');
         const likes = JSON.parse(localStorage.getItem('liked_playlists') || '[]');
         const isLocallyLiked = likes.includes(playlistId);
-        setIsFavorited(favorites.includes(playlistId));
         setIsLiked(isLocallyLiked);
         
-        // Check if in library
+        // Check if saved to library (using favorites service)
         if (playlistId) {
-            setIsInLibrary(libraryService.isInLibrary(playlistId));
+            setIsFavorited(favoritesService.isPlaylistFavorite(playlistId));
+            setIsInLibrary(favoritesService.isPlaylistFavorite(playlistId));
         }
     }, [playlistId]);
     
@@ -240,25 +239,10 @@ const PlaylistDetailPage: React.FC = () => {
     const handleSave = () => {
         if (!playlistId) return;
         
-        // Toggle library status
-        const newLibraryState = libraryService.toggleLibrary(playlistId);
-        setIsInLibrary(newLibraryState);
-        
-        // Also update favorite status to match
-        const favorites = JSON.parse(localStorage.getItem('favorited_playlists') || '[]');
-        if (newLibraryState) {
-            // Add to favorites if not already
-            if (!favorites.includes(playlistId)) {
-                favorites.push(playlistId);
-                localStorage.setItem('favorited_playlists', JSON.stringify(favorites));
-                setIsFavorited(true);
-            }
-        } else {
-            // Remove from favorites
-            const updated = favorites.filter((id: string) => id !== playlistId);
-            localStorage.setItem('favorited_playlists', JSON.stringify(updated));
-            setIsFavorited(false);
-        }
+        // Toggle playlist favorite status using the favorites service
+        const newFavoriteState = favoritesService.togglePlaylistFavorite(playlistId);
+        setIsFavorited(newFavoriteState);
+        setIsInLibrary(newFavoriteState);
     };
 
     const handleLike = () => {

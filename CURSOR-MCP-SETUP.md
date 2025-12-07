@@ -112,3 +112,4 @@ The configuration is also saved in `.cursor-mcp-config.json` in your project roo
 
 
 
+

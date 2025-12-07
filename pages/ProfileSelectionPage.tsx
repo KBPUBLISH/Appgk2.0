@@ -266,7 +266,7 @@ const ProfileSelectionPage: React.FC = () => {
 
           {/* Bottom Buttons */}
           <div className={`w-full max-w-xs flex gap-4 ${!isSubscribed ? 'mt-2' : 'mt-8'}`}>
-             <WoodButton variant="light" fullWidth className="text-sm py-3 rounded-xl border-b-4 shadow-lg" onClick={() => {}}>
+             <WoodButton variant="light" fullWidth className="text-sm py-3 rounded-xl border-b-4 shadow-lg" onClick={() => navigate('/edit-profile')}>
                 EDIT PROFILE
              </WoodButton>
              <WoodButton 

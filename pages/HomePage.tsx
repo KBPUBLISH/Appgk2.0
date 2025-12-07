@@ -75,6 +75,15 @@ const HomePage: React.FC = () => {
   const [hasEngagedDailyKey, setHasEngagedDailyKey] = useState(false);
   const [hasEngagedStrength, setHasEngagedStrength] = useState(false);
   const [hasEngagedPrayer, setHasEngagedPrayer] = useState(false);
+  
+  // Game purchase state - tracks purchased games to update UI without reload
+  const [purchasedGamesState, setPurchasedGamesState] = useState<string[]>(() => {
+    const stored = localStorage.getItem(profileService.getProfileKey('purchased_games'));
+    return stored ? JSON.parse(stored) : [];
+  });
+  
+  // Success notification state
+  const [unlockSuccess, setUnlockSuccess] = useState<{ show: boolean; gameName: string }>({ show: false, gameName: '' });
 
   // Lessons state
   const [lessons, setLessons] = useState<any[]>([]);
@@ -926,13 +935,15 @@ const HomePage: React.FC = () => {
               {/* Dynamic Games from Backend */}
               {dynamicGames.map((game) => {
                 const isPurchasable = game.isPurchasable === true;
-                const hasUnlocked = isGamePurchased(game._id || game.gameId);
+                const gameId = game._id || game.gameId;
+                // Check both localStorage helper and React state for purchased status
+                const hasUnlocked = isGamePurchased(gameId) || purchasedGamesState.includes(gameId);
                 const isLocked = isPurchasable && !hasUnlocked;
                 const canAfford = coins >= (game.goldCoinPrice || 0);
                 
                 return (
                   <div
-                    key={game._id || game.gameId}
+                    key={gameId}
                     className="relative w-[calc((100vw-48px-40px)/4)] flex-shrink-0 cursor-pointer"
                     onClick={() => {
                       if (isLocked) {
@@ -941,9 +952,13 @@ const HomePage: React.FC = () => {
                           if (window.confirm(`Unlock "${game.name}" for ${game.goldCoinPrice} gold coins?`)) {
                             // Spend coins and unlock game
                             spendCoins(game.goldCoinPrice || 0, `Unlocked game: ${game.name}`);
-                            markGamePurchased(game._id || game.gameId);
-                            // Force re-render
-                            window.location.reload();
+                            markGamePurchased(gameId);
+                            // Update React state to trigger re-render (no page reload!)
+                            setPurchasedGamesState(prev => [...prev, gameId]);
+                            // Show success notification
+                            setUnlockSuccess({ show: true, gameName: game.name });
+                            // Auto-hide after 3 seconds
+                            setTimeout(() => setUnlockSuccess({ show: false, gameName: '' }), 3000);
                           }
                         } else {
                           alert(`You need ${game.goldCoinPrice} gold coins to unlock this game. You have ${coins} coins.`);
@@ -1204,6 +1219,21 @@ const HomePage: React.FC = () => {
           animation: spin-reverse 4s linear infinite;
         }
       `}</style>
+
+      {/* Game Unlock Success Notification */}
+      {unlockSuccess.show && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div className="bg-gradient-to-r from-[#FFD700] to-[#FFA500] px-6 py-3 rounded-2xl shadow-2xl border-2 border-white/30 flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+              <span className="text-2xl">🎮</span>
+            </div>
+            <div>
+              <p className="text-[#5c2e0b] font-display font-bold text-sm">Game Unlocked!</p>
+              <p className="text-[#5c2e0b]/80 font-display text-xs">{unlockSuccess.gameName} is now available</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

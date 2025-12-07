@@ -73,6 +73,7 @@ interface UserContextType {
   // Kids Profiles
   kids: any[]; // Fixed: Use `any[]` as fallback until KidProfile type is defined/imported
   addKid: (kid: any) => void;
+  updateKid: (id: string, updates: Partial<any>) => void;
   removeKid: (id: string) => void;
   
   // Active Profile
@@ -154,6 +155,7 @@ const UserContext = createContext<UserContextType>({
   setParentName: () => {},
   kids: [],
   addKid: () => {},
+  updateKid: () => {},
   removeKid: () => {},
   equippedAvatar: '',
   equippedFrame: '',
@@ -469,6 +471,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (currentProfileId === id) {
       setCurrentProfileId(null);
     }
+  };
+
+  const updateKid = (id: string, updates: Partial<KidProfile>) => {
+    setKids(prev => prev.map(kid => 
+      kid.id === id ? { ...kid, ...updates } : kid
+    ));
   };
 
   // Helper to get current avatar state
@@ -980,6 +988,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setParentName,
       kids,
       addKid,
+      updateKid,
       removeKid,
       equippedAvatar,
       equippedFrame,

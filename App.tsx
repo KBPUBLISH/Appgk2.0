@@ -11,6 +11,7 @@ import LibraryPage from './pages/LibraryPage';
 import BookDetailPage from './pages/BookDetailPage';
 import ProfileSelectionPage from './pages/ProfileSelectionPage';
 import CreateProfilePage from './pages/CreateProfilePage';
+import EditProfilePage from './pages/EditProfilePage';
 import AudioPlayerPage from './pages/AudioPlayerPage';
 import PaywallPage from './pages/PaywallPage';
 import SettingsPage from './pages/SettingsPage';
@@ -224,6 +225,7 @@ const App: React.FC = () => {
                 <Route path="/lesson/:lessonId" element={<LessonPlayerPage />} />
                 <Route path="/profile" element={<ProfileSelectionPage />} />
                 <Route path="/create-profile" element={<CreateProfilePage />} />
+                <Route path="/edit-profile" element={<EditProfilePage />} />
                 <Route path="/paywall" element={<PaywallPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/demo/video-lesson" element={<VideoLessonDemo />} />

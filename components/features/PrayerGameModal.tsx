@@ -14,7 +14,7 @@ interface PrayerGameModalProps {
   onClose: () => void;
 }
 
-type GameState = 'intro' | 'selection' | 'focus' | 'success';
+type GameState = 'intro' | 'selection' | 'instruction' | 'focus' | 'success';
 
 // --- DATA COLLECTIONS ---
 
@@ -300,14 +300,19 @@ const PrayerGameModal: React.FC<PrayerGameModalProps> = ({ isOpen, onClose }) =>
   const startPrayer = async () => {
       if (selectedTopics.length > 0) {
           playClick();
-          
-          // Initialize Mic if needed
-          if (!audioContextRef.current) {
-              await startListening();
-          }
-          
-          setGameState('focus');
+          setGameState('instruction');
       }
+  };
+
+  const beginPrayingFocus = async () => {
+      playClick();
+      
+      // Initialize Mic if needed
+      if (!audioContextRef.current) {
+          await startListening();
+      }
+      
+      setGameState('focus');
   };
 
   // Restart loop when we enter focus mode or switch topics
@@ -469,6 +474,47 @@ const PrayerGameModal: React.FC<PrayerGameModalProps> = ({ isOpen, onClose }) =>
                             className={`bg-[#7b1fa2] hover:bg-[#8e24aa] border-[#4a148c] py-4 text-xl ${selectedTopics.length === 0 ? 'opacity-50' : ''}`}
                           >
                               BEGIN PRAYER
+                          </WoodButton>
+                      </div>
+                  </div>
+              )}
+
+              {/* --- INSTRUCTION SCREEN --- */}
+              {gameState === 'instruction' && (
+                  <div className="flex flex-col items-center justify-center w-full h-full flex-1 animate-in fade-in zoom-in duration-500">
+                      
+                      {/* Praying Hands / Mic Icon */}
+                      <div className="relative mb-8">
+                          <div className="w-32 h-32 rounded-full bg-gradient-to-br from-[#7b1fa2] to-[#4a148c] flex items-center justify-center shadow-2xl border-4 border-[#ab47bc]">
+                              <Mic size={56} className="text-white drop-shadow-lg" />
+                          </div>
+                          <div className="absolute -top-2 -right-2 bg-[#FFD700] rounded-full p-2 shadow-lg animate-bounce">
+                              <Sparkles size={20} className="text-[#B8860B]" />
+                          </div>
+                      </div>
+
+                      <h3 className="font-display font-bold text-2xl text-white mb-4 text-center">
+                          Read the Prayer<br/>Out Loud!
+                      </h3>
+                      
+                      <div className="bg-black/30 rounded-2xl p-5 mb-8 border border-white/20 max-w-[280px]">
+                          <p className="text-[#e1bee7] text-center leading-relaxed">
+                              When the prayer appears, <span className="text-white font-bold">speak it with your voice</span>. God loves to hear you pray!
+                          </p>
+                          <div className="flex items-center justify-center gap-2 mt-4 text-[#ab47bc]">
+                              <div className="w-2 h-2 rounded-full bg-[#ab47bc] animate-pulse"></div>
+                              <span className="text-xs font-bold uppercase tracking-wide">Microphone will listen</span>
+                          </div>
+                      </div>
+
+                      <div className="w-full px-4">
+                          <WoodButton 
+                              onClick={beginPrayingFocus}
+                              variant="gold"
+                              fullWidth
+                              className="py-4 text-xl shadow-[0_0_20px_#FFD700]"
+                          >
+                              OK, I'M READY!
                           </WoodButton>
                       </div>
                   </div>
