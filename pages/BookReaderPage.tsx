@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, X, Play, Pause, Volume2, Mic, Check, Music, Home, Heart, Star, RotateCcw, Lock, Sparkles, HelpCircle, Share2, Copy, Smartphone, Grid3X3, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Play, Pause, Volume2, Mic, Check, Music, Home, Heart, Star, RotateCcw, Lock, Sparkles, HelpCircle, Share2, Copy, Smartphone, Grid3X3, Loader2, Globe } from 'lucide-react';
 import { ApiService } from '../services/apiService';
 import { voiceCloningService, ClonedVoice } from '../services/voiceCloningService';
+import { translationService, SUPPORTED_LANGUAGES } from '../services/translationService';
 import VoiceCloningModal from '../components/features/VoiceCloningModal';
 import ColoringModal from '../components/features/ColoringModal';
 import BookQuizModal from '../components/features/BookQuizModal';
@@ -109,6 +110,13 @@ const BookReaderPage: React.FC = () => {
     const [currentWordIndex, setCurrentWordIndex] = useState<number>(-1);
     const [showVoiceCloningModal, setShowVoiceCloningModal] = useState(false);
     const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
+    
+    // Translation state
+    const [selectedLanguage, setSelectedLanguage] = useState<string>(() => translationService.getPreferredLanguage());
+    const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+    const [translatedContent, setTranslatedContent] = useState<Map<string, { text: string; textBoxes: Array<{ translatedText: string }> }>>(new Map());
+    const [isTranslating, setIsTranslating] = useState(false);
+    const languageDropdownRef = useRef<HTMLDivElement>(null);
     const wordAlignmentRef = useRef<{ words: Array<{ word: string; start: number; end: number }> } | null>(null);
     const bookBackgroundMusicRef = useRef<HTMLAudioElement | null>(null);
     const voiceDropdownRef = useRef<HTMLDivElement>(null);
@@ -582,6 +590,64 @@ const BookReaderPage: React.FC = () => {
         };
     }, [showVoiceDropdown]);
 
+    // Close language dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (languageDropdownRef.current && !languageDropdownRef.current.contains(event.target as Node)) {
+                setShowLanguageDropdown(false);
+            }
+        };
+
+        if (showLanguageDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showLanguageDropdown]);
+
+    // Fetch translation when language changes
+    useEffect(() => {
+        const fetchTranslation = async () => {
+            if (selectedLanguage === 'en' || pages.length === 0) {
+                setTranslatedContent(new Map());
+                return;
+            }
+
+            const currentPage = pages[currentPageIndex];
+            if (!currentPage?._id) return;
+
+            // Check if we already have this translation
+            const cacheKey = `${currentPage._id}_${selectedLanguage}`;
+            if (translatedContent.has(cacheKey)) return;
+
+            setIsTranslating(true);
+            try {
+                const result = await translationService.getTranslatedPage(currentPage._id, selectedLanguage);
+                if (result) {
+                    setTranslatedContent(prev => {
+                        const newMap = new Map(prev);
+                        newMap.set(cacheKey, {
+                            text: result.translatedText,
+                            textBoxes: result.translatedTextBoxes,
+                        });
+                        return newMap;
+                    });
+                }
+            } catch (error) {
+                console.error('Translation error:', error);
+            } finally {
+                setIsTranslating(false);
+            }
+        };
+
+        fetchTranslation();
+        
+        // Save language preference
+        translationService.setPreferredLanguage(selectedLanguage);
+    }, [selectedLanguage, currentPageIndex, pages]);
+
     // Cleanup audio on unmount
     useEffect(() => {
         return () => {
@@ -768,6 +834,37 @@ const BookReaderPage: React.FC = () => {
         scrollStateRef.current = newState;
     };
 
+    // Get translated text for a specific page and text box
+    const getTranslatedText = (pageId: string, textBoxIndex: number, originalText: string): string => {
+        if (selectedLanguage === 'en') return originalText;
+        
+        const cacheKey = `${pageId}_${selectedLanguage}`;
+        const cached = translatedContent.get(cacheKey);
+        
+        if (cached && cached.textBoxes && cached.textBoxes[textBoxIndex]) {
+            return cached.textBoxes[textBoxIndex].translatedText || originalText;
+        }
+        
+        return originalText;
+    };
+
+    // Get all translated text boxes for current page
+    const getTranslatedTextBoxes = (page: Page): TextBox[] => {
+        if (!page.content?.textBoxes) return [];
+        
+        if (selectedLanguage === 'en') {
+            return page.content.textBoxes;
+        }
+        
+        const cacheKey = `${page._id}_${selectedLanguage}`;
+        const cached = translatedContent.get(cacheKey);
+        
+        return page.content.textBoxes.map((tb, index) => {
+            const translatedText = cached?.textBoxes?.[index]?.translatedText || tb.text;
+            return { ...tb, text: translatedText };
+        });
+    };
+
     // Cycle scroll state: mid -> hidden (tap to hide)
     const toggleScrollVisibility = (e?: React.MouseEvent) => {
         // Stop propagation to prevent music unlock
@@ -882,7 +979,8 @@ const BookReaderPage: React.FC = () => {
                 const textBox = page.textBoxes[textBoxIndex];
                 if (!textBox.text) continue;
                 
-                const cacheKey = `${pageIndex}-${textBoxIndex}-${selectedVoiceId}`;
+                // Include language in cache key for multilingual support
+                const cacheKey = `${pageIndex}-${textBoxIndex}-${selectedVoiceId}${selectedLanguage !== 'en' ? `-${selectedLanguage}` : ''}`;
                 
                 // Skip if already cached or currently preloading
                 if (audioPreloadCacheRef.current.has(cacheKey) || preloadingInProgressRef.current.has(cacheKey)) {
@@ -895,11 +993,14 @@ const BookReaderPage: React.FC = () => {
                 // Preload in background (don't await to avoid blocking)
                 (async () => {
                     try {
-                        const processedText = processTextWithEmotionalCues(textBox.text);
+                        // Use translated text if available
+                        const textToSpeak = getTranslatedText(page._id, textBoxIndex, textBox.text);
+                        const processedText = processTextWithEmotionalCues(textToSpeak);
                         const result = await ApiService.generateTTS(
                             processedText.ttsText,
                             selectedVoiceId,
-                            bookId || undefined
+                            bookId || undefined,
+                            selectedLanguage !== 'en' ? selectedLanguage : undefined
                         );
                         
                         if (result && result.audioUrl) {
@@ -1029,19 +1130,27 @@ const BookReaderPage: React.FC = () => {
         try {
             // Check preload cache first - use ref for accurate page index (state might be stale)
             const actualPageIndex = currentPageIndexRef.current;
-            const cacheKey = `${actualPageIndex}-${index}-${selectedVoiceId}`;
+            // Include language in cache key for multilingual support
+            const cacheKey = `${actualPageIndex}-${index}-${selectedVoiceId}${selectedLanguage !== 'en' ? `-${selectedLanguage}` : ''}`;
             let result = audioPreloadCacheRef.current.get(cacheKey);
+            
+            // Get translated text if available
+            const currentPage = pages[actualPageIndex];
+            const textToSpeak = currentPage?._id 
+                ? getTranslatedText(currentPage._id, index, text) 
+                : text;
             
             if (result) {
                 console.log(`🎵 Using preloaded audio for page ${actualPageIndex + 1}, text box ${index + 1}`);
                 setShowLoadingPopup(false); // Hide popup immediately if cached
             } else {
-                // Not in cache, generate now
-                const processedText = processTextWithEmotionalCues(text);
+                // Not in cache, generate now with translated text
+                const processedText = processTextWithEmotionalCues(textToSpeak);
                 result = await ApiService.generateTTS(
                     processedText.ttsText, // Send text with cues to ElevenLabs
                     selectedVoiceId,
-                    bookId || undefined
+                    bookId || undefined,
+                    selectedLanguage !== 'en' ? selectedLanguage : undefined
                 ) || undefined;
             }
 
@@ -1658,8 +1767,65 @@ const BookReaderPage: React.FC = () => {
                     <ChevronLeft className="w-5 h-5" />
                 </button>
 
-                {/* Right: Voice Selector and Music Toggle */}
+                {/* Right: Language Selector, Voice Selector and Music Toggle */}
                 <div className="pointer-events-auto flex items-center gap-2">
+                    {/* Language Selector */}
+                    <div
+                        ref={languageDropdownRef}
+                        className="relative"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowLanguageDropdown(!showLanguageDropdown);
+                            }}
+                            className="bg-black/40 backdrop-blur-md rounded-full px-2.5 py-1.5 flex items-center gap-1.5 hover:bg-black/60 transition-colors"
+                            title="Change language"
+                        >
+                            <Globe className="w-4 h-4 text-white" />
+                            <span className="text-white text-xs">
+                                {SUPPORTED_LANGUAGES[selectedLanguage]?.flag || '🌐'}
+                            </span>
+                            {isTranslating && (
+                                <Loader2 className="w-3 h-3 text-white animate-spin" />
+                            )}
+                        </button>
+
+                        {/* Language Dropdown */}
+                        {showLanguageDropdown && (
+                            <div className="absolute top-full right-0 mt-2 bg-black/95 backdrop-blur-md rounded-xl border border-white/20 shadow-2xl z-50 min-w-[180px] max-h-[350px] overflow-y-auto">
+                                <div className="py-2">
+                                    <div className="px-4 py-1 text-xs text-white/50 uppercase tracking-wider">Select Language</div>
+                                    {Object.entries(SUPPORTED_LANGUAGES).map(([code, lang]) => (
+                                        <button
+                                            key={code}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedLanguage(code);
+                                                setShowLanguageDropdown(false);
+                                            }}
+                                            className={`w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors flex items-center gap-3 ${
+                                                selectedLanguage === code ? 'bg-white/20' : ''
+                                            }`}
+                                        >
+                                            <span className="text-lg">{lang.flag}</span>
+                                            <div className="flex-1">
+                                                <div className={selectedLanguage === code ? 'font-bold' : ''}>
+                                                    {lang.nativeName}
+                                                </div>
+                                                <div className="text-xs text-white/50">{lang.name}</div>
+                                            </div>
+                                            {selectedLanguage === code && (
+                                                <Check className="w-4 h-4 text-[#FFD700]" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Background Music Toggle - Only show if book has music */}
                     {hasBookMusic ? (
                         <button
@@ -2026,7 +2192,11 @@ const BookReaderPage: React.FC = () => {
                     {/* The actual page content - always visible underneath */}
                     <div className="absolute inset-0 z-10">
                         <BookPageRenderer
-                            page={currentPage}
+                            page={{
+                                ...currentPage,
+                                // Use translated textBoxes if available
+                                textBoxes: getTranslatedTextBoxes(currentPage),
+                            }}
                             activeTextBoxIndex={activeTextBoxIndex}
                             scrollState={scrollState}
                             onScrollStateChange={handleScrollStateChange}

@@ -220,8 +220,11 @@ const LessonPlayerPage: React.FC = () => {
                 }, 100);
             }, 300);
         } else if (!hasEpisodes || currentEpisodeIndex >= totalEpisodes - 1) {
-            // Last episode finished - mark as watched
+            // Last episode finished - auto-transition to devotional
             setVideoWatched(true);
+            setTimeout(() => {
+                setCurrentScreen('devotional');
+            }, 500); // Brief delay before transitioning
         }
     };
 
@@ -839,6 +842,10 @@ const LessonPlayerPage: React.FC = () => {
                                     onEnded={() => {
                                         setIsVideoPlaying(false);
                                         setVideoWatched(true);
+                                        // Auto-transition to devotional
+                                        setTimeout(() => {
+                                            setCurrentScreen('devotional');
+                                        }, 500);
                                     }}
                                     onLoadedData={() => {
                                         if (videoRef.current) {

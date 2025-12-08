@@ -956,14 +956,15 @@ export const ApiService = {
   generateTTS: async (
     text: string, 
     voiceId: string, 
-    bookId?: string
+    bookId?: string,
+    languageCode?: string
   ): Promise<{ audioUrl: string; alignment: any } | null> => {
     try {
       const baseUrl = getApiBaseUrl();
       const response = await fetchWithTimeout(`${baseUrl}tts/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voiceId, bookId }),
+        body: JSON.stringify({ text, voiceId, bookId, languageCode }),
         timeout: 60000 // 60 seconds for TTS generation (can take longer for longer texts)
       });
 
