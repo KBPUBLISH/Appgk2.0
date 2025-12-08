@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Eraser, RotateCcw, Download, Layers } from 'lucide-react';
+import { Eraser, RotateCcw, Download, Layers, Save } from 'lucide-react';
 
 interface DrawingCanvasProps {
     prompt: string;
@@ -7,6 +7,8 @@ interface DrawingCanvasProps {
     onComplete?: () => void;
     // If true, use layered mode (lines on top, coloring underneath)
     layeredMode?: boolean;
+    // Unique key for saving/loading progress (e.g., "book-123-page-5")
+    saveKey?: string;
 }
 
 // Crayon colors - arranged like a real crayon box
@@ -60,7 +62,7 @@ const CrayonIcon: React.FC<{ color: string; isSelected: boolean; onClick: () => 
     </button>
 );
 
-const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUrl, onComplete, layeredMode = true }) => {
+const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUrl, onComplete, layeredMode = true, saveKey }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const overlayRef = useRef<HTMLImageElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -77,6 +79,11 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
     // Store processed line art for layered mode
     const [processedLineArt, setProcessedLineArt] = useState<string | null>(null);
     const [isProcessingImage, setIsProcessingImage] = useState(false);
+    
+    // Auto-save state
+    const [hasSavedProgress, setHasSavedProgress] = useState(false);
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Store last position for smooth drawing
     const lastPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -86,6 +93,10 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
     const CRAYON_MAX_SIZE = 35;
     // Higher opacity in layered mode since lines stay on top
     const CRAYON_OPACITY = layeredMode ? 0.7 : 0.3;
+    
+    // Storage key for this coloring page
+    const STORAGE_PREFIX = 'godlykids_coloring_';
+    const storageKey = saveKey ? `${STORAGE_PREFIX}${saveKey}` : null;
 
     // Process image to extract line art (remove white background, keep dark lines)
     const processImageForLayeredMode = useCallback((imageUrl: string): Promise<string> => {
@@ -149,6 +160,72 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
             
             img.src = imageUrl;
         });
+    }, []);
+
+    // Save canvas progress to localStorage
+    const saveProgress = useCallback(() => {
+        if (!storageKey || !canvasRef.current) return;
+        
+        try {
+            const canvas = canvasRef.current;
+            const dataUrl = canvas.toDataURL('image/png');
+            localStorage.setItem(storageKey, dataUrl);
+            setLastSaved(new Date());
+            setHasSavedProgress(true);
+            console.log('🎨 Coloring progress saved:', storageKey);
+        } catch (e) {
+            console.error('🎨 Error saving coloring progress:', e);
+        }
+    }, [storageKey]);
+
+    // Load saved canvas progress from localStorage
+    const loadProgress = useCallback(() => {
+        if (!storageKey || !canvasRef.current) return false;
+        
+        const savedData = localStorage.getItem(storageKey);
+        if (!savedData) return false;
+        
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return false;
+        
+        const img = new Image();
+        img.onload = () => {
+            const dpr = window.devicePixelRatio || 1;
+            const canvasWidth = canvas.width / dpr;
+            const canvasHeight = canvas.height / dpr;
+            
+            // Draw saved progress
+            ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+            setHasSavedProgress(true);
+            console.log('🎨 Coloring progress loaded:', storageKey);
+        };
+        img.src = savedData;
+        return true;
+    }, [storageKey]);
+
+    // Auto-save after drawing stops (debounced)
+    const scheduleAutoSave = useCallback(() => {
+        if (!storageKey) return;
+        
+        // Clear any pending save
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+        
+        // Schedule save after 1 second of inactivity
+        saveTimeoutRef.current = setTimeout(() => {
+            saveProgress();
+        }, 1000);
+    }, [storageKey, saveProgress]);
+
+    // Cleanup auto-save timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
     }, []);
 
     // Initialize canvas
@@ -254,6 +331,23 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
             img.src = backgroundImageUrl;
         }
     }, [canvasReady, backgroundImageUrl, layeredMode, processImageForLayeredMode]);
+
+    // Load saved progress after canvas and image are ready
+    useEffect(() => {
+        if (!canvasReady || !storageKey) return;
+        
+        // In layered mode, wait for image processing to complete
+        // In non-layered mode, wait for image to load
+        if (layeredMode && !processedLineArt) return;
+        if (!layeredMode && backgroundImageUrl && !imageLoaded) return;
+        
+        // Small delay to ensure canvas is fully rendered
+        const loadTimeout = setTimeout(() => {
+            loadProgress();
+        }, 100);
+        
+        return () => clearTimeout(loadTimeout);
+    }, [canvasReady, storageKey, layeredMode, processedLineArt, imageLoaded, backgroundImageUrl, loadProgress]);
 
     // Apply crayon stroke style
     const applyCrayonStyle = useCallback((ctx: CanvasRenderingContext2D) => {
@@ -395,8 +489,11 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
             }
             setIsDrawing(false);
             lastPosRef.current = null;
+            
+            // Schedule auto-save after drawing stops
+            scheduleAutoSave();
         }
-    }, [isDrawing]);
+    }, [isDrawing, scheduleAutoSave]);
 
     const handleMouseLeave = useCallback(() => {
         stopDrawing();
@@ -436,6 +533,14 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
 
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+        
+        // Clear saved progress
+        if (storageKey) {
+            localStorage.removeItem(storageKey);
+            setHasSavedProgress(false);
+            setLastSaved(null);
+            console.log('🎨 Coloring progress cleared:', storageKey);
+        }
 
         // In layered mode, don't redraw background (lines are in overlay)
         // In non-layered mode, redraw background image if provided
@@ -588,6 +693,27 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
                     </button>
                 </div>
             </div>
+
+            {/* Auto-save Status */}
+            {storageKey && (
+                <div className="flex items-center justify-center gap-2 mt-2 text-xs">
+                    {lastSaved ? (
+                        <span className="text-green-400 flex items-center gap-1">
+                            <Save size={12} />
+                            Progress saved
+                        </span>
+                    ) : hasSavedProgress ? (
+                        <span className="text-blue-400 flex items-center gap-1">
+                            <Save size={12} />
+                            Progress restored
+                        </span>
+                    ) : (
+                        <span className="text-white/40">
+                            Auto-save enabled
+                        </span>
+                    )}
+                </div>
+            )}
 
             {/* Complete Button */}
             {!isCompleted && onComplete && (

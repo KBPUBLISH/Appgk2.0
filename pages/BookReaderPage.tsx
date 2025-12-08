@@ -2581,6 +2581,7 @@ const BookReaderPage: React.FC = () => {
                 isOpen={showColoringModal}
                 onClose={() => setShowColoringModal(false)}
                 backgroundImageUrl={selectedColoringPage?.backgroundUrl || selectedColoringPage?.files?.background?.url}
+                pageId={selectedColoringPage ? `book-${bookId}-coloring-${selectedColoringPage.pageNumber || selectedColoringPage._id}` : undefined}
             />
 
             {/* Quiz Modal */}

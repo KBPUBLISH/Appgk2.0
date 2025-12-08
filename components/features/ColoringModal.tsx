@@ -7,6 +7,8 @@ interface ColoringModalProps {
     isOpen: boolean;
     onClose: () => void;
     backgroundImageUrl?: string;
+    // Unique identifier for saving progress (e.g., "book-123-page-5")
+    pageId?: string;
 }
 
 // Helper to resolve media URLs (similar to apiService)
@@ -27,7 +29,7 @@ const resolveMediaUrl = (url?: string): string => {
     return `https://storage.googleapis.com/productiongk/${url}`;
 };
 
-const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgroundImageUrl }) => {
+const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgroundImageUrl, pageId }) => {
     const navigate = useNavigate();
     const [showReward, setShowReward] = useState(false);
     const [resolvedImageUrl, setResolvedImageUrl] = useState<string>('');
@@ -90,6 +92,7 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
                         prompt="Color the picture!"
                         backgroundImageUrl={resolvedImageUrl}
                         onComplete={handleComplete}
+                        saveKey={pageId}
                     />
 
                     {/* Reward Overlay */}
