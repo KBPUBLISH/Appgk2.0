@@ -1020,13 +1020,21 @@ const BookReaderPage: React.FC = () => {
         }
     };
 
-    // Trigger audio preloading when page changes or voice changes
+    // Trigger audio preloading when page changes, voice changes, or language changes
     useEffect(() => {
         if (pages.length > 0 && selectedVoiceId) {
             // Start preloading from current page
             preloadUpcomingAudio(currentPageIndex);
         }
-    }, [currentPageIndex, selectedVoiceId, pages.length]);
+    }, [currentPageIndex, selectedVoiceId, pages.length, selectedLanguage]);
+
+    // Clear audio cache when language changes (to force re-generation with new language)
+    useEffect(() => {
+        // Clear the preloaded audio cache when language changes
+        audioPreloadCacheRef.current.clear();
+        preloadingInProgressRef.current.clear();
+        console.log(`🌐 Language changed to ${selectedLanguage}, cleared audio cache`);
+    }, [selectedLanguage]);
 
     // Preload background images/videos for upcoming pages to prevent black flash
     const preloadBackgrounds = (startPageIndex: number) => {
