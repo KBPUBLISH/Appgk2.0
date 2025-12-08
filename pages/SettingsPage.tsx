@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Volume2, Bell, Shield, FileText, LogOut, Crown, HelpCircle, Mic, Trash2, RefreshCw, CheckCircle, AlertCircle, Music } from 'lucide-react';
+import { ChevronLeft, Volume2, Bell, Shield, FileText, LogOut, Crown, HelpCircle, Mic, Trash2, RefreshCw, CheckCircle, AlertCircle, Music, Globe, Check, ChevronRight } from 'lucide-react';
 import WoodButton from '../components/ui/WoodButton';
 import { useUser } from '../context/UserContext';
 import { useAudio } from '../context/AudioContext';
+import { useLanguage } from '../context/LanguageContext';
 import { voiceCloningService, ClonedVoice } from '../services/voiceCloningService';
 import { ApiService } from '../services/apiService';
 import { getHiddenVoices, isVoiceHidden, toggleVoiceVisibility } from '../services/voiceManagementService';
@@ -16,11 +17,13 @@ const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const { isSubscribed, isVoiceUnlocked, setIsSubscribed } = useUser();
   const { sfxEnabled, toggleSfx, playBack, musicEnabled, toggleMusic, musicVolume, setMusicVolume } = useAudio();
+  const { currentLanguage, setLanguage, supportedLanguages, isTranslating } = useLanguage();
   const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
   const [deletingVoiceId, setDeletingVoiceId] = useState<string | null>(null);
   const [availableVoices, setAvailableVoices] = useState<any[]>([]);
   const [unlockedVoices, setUnlockedVoices] = useState<any[]>([]);
   const [loadingVoices, setLoadingVoices] = useState(false);
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   
   // Restore purchases state
   const [isRestoring, setIsRestoring] = useState(false);
@@ -253,6 +256,73 @@ const SettingsPage: React.FC = () => {
                             <div className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm left-5"></div>
                         </button>
                     </div>
+                </div>
+            </section>
+
+            {/* Language Settings */}
+            <section className="bg-[#fff8e1] rounded-2xl p-5 border-2 border-[#eecaa0] shadow-sm">
+                <h3 className="font-display font-bold text-[#8B4513] text-lg mb-4 uppercase tracking-wide opacity-80">Language</h3>
+                
+                <div className="space-y-3">
+                    <button 
+                        onClick={() => setShowLanguageSelector(!showLanguageSelector)}
+                        className="w-full flex items-center justify-between bg-white/60 rounded-xl p-4 border border-[#eecaa0] hover:bg-white/80 transition-colors"
+                    >
+                        <div className="flex items-center gap-3 text-[#5c2e0b]">
+                            <div className="w-8 h-8 rounded-full bg-[#bbdefb] flex items-center justify-center text-[#1976d2]">
+                                <Globe size={18} />
+                            </div>
+                            <div className="text-left">
+                                <span className="font-bold block">App Language</span>
+                                <span className="text-sm text-[#8B4513]/70">
+                                    {supportedLanguages[currentLanguage]?.flag} {supportedLanguages[currentLanguage]?.nativeName || 'English'}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {isTranslating && (
+                                <div className="w-4 h-4 border-2 border-[#8B4513] border-t-transparent rounded-full animate-spin"></div>
+                            )}
+                            <ChevronRight className={`w-5 h-5 text-[#8B4513]/50 transition-transform ${showLanguageSelector ? 'rotate-90' : ''}`} />
+                        </div>
+                    </button>
+
+                    {/* Language Selector Dropdown */}
+                    {showLanguageSelector && (
+                        <div className="bg-white/80 rounded-xl border border-[#eecaa0] overflow-hidden">
+                            <div className="max-h-64 overflow-y-auto">
+                                {Object.entries(supportedLanguages).map(([code, lang]) => (
+                                    <button
+                                        key={code}
+                                        onClick={() => {
+                                            setLanguage(code);
+                                            setShowLanguageSelector(false);
+                                        }}
+                                        className={`w-full flex items-center justify-between px-4 py-3 hover:bg-[#fff8e1] transition-colors border-b border-[#eecaa0]/30 last:border-b-0 ${
+                                            currentLanguage === code ? 'bg-[#fff8e1]' : ''
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xl">{lang.flag}</span>
+                                            <div className="text-left">
+                                                <div className={`font-medium text-[#5c2e0b] ${currentLanguage === code ? 'font-bold' : ''}`}>
+                                                    {lang.nativeName}
+                                                </div>
+                                                <div className="text-xs text-[#8B4513]/60">{lang.name}</div>
+                                            </div>
+                                        </div>
+                                        {currentLanguage === code && (
+                                            <Check className="w-5 h-5 text-[#8bc34a]" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <p className="text-xs text-[#8B4513]/60 px-2">
+                        Changes the language of the app interface and automatically translates book text.
+                    </p>
                 </div>
             </section>
 

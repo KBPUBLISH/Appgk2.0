@@ -29,6 +29,7 @@ import { BooksProvider } from './context/BooksContext';
 import { UserProvider } from './context/UserContext';
 import { AudioProvider } from './context/AudioContext';
 import { SubscriptionProvider } from './context/SubscriptionContext';
+import { LanguageProvider } from './context/LanguageContext';
 import NotificationService from './services/notificationService';
 import { activityTrackingService } from './services/activityTrackingService';
 
@@ -201,6 +202,7 @@ const App: React.FC = () => {
   }, []);
 
   return (
+    <LanguageProvider>
     <AudioProvider>
       <UserProvider>
         <SubscriptionProvider>
@@ -237,6 +239,7 @@ const App: React.FC = () => {
         </SubscriptionProvider>
       </UserProvider>
     </AudioProvider>
+    </LanguageProvider>
   );
 };
 

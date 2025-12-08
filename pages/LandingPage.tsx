@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Globe, Check, X } from 'lucide-react';
 import WoodButton from '../components/ui/WoodButton';
+import { useLanguage } from '../context/LanguageContext';
 
 const STORAGE_KEY = 'godly_kids_data_v6';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const [isChecking, setIsChecking] = useState(true);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const { currentLanguage, setLanguage, supportedLanguages } = useLanguage();
 
   // Check if user has already completed onboarding
   useEffect(() => {
@@ -77,6 +81,81 @@ const LandingPage: React.FC = () => {
            className="w-full h-full object-cover"
          />
       </div>
+
+      {/* Language Selector Button - Top Right */}
+      <button
+        onClick={() => setShowLanguageModal(true)}
+        className="absolute top-4 right-4 z-30 flex items-center gap-2 bg-black/30 backdrop-blur-md hover:bg-black/50 text-white px-3 py-2 rounded-full transition-all border border-white/20"
+      >
+        <span className="text-lg">{supportedLanguages[currentLanguage]?.flag || '🌐'}</span>
+        <span className="text-sm font-medium">{supportedLanguages[currentLanguage]?.nativeName || 'English'}</span>
+        <Globe className="w-4 h-4 opacity-70" />
+      </button>
+
+      {/* Language Selection Modal */}
+      {showLanguageModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowLanguageModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl w-full max-w-sm mx-4 max-h-[80vh] overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-[#8B4513] to-[#A0522D]">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-white" />
+                <h2 className="font-bold text-white text-lg">Select Language</h2>
+              </div>
+              <button
+                onClick={() => setShowLanguageModal(false)}
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            {/* Language List */}
+            <div className="overflow-y-auto max-h-[60vh]">
+              {Object.entries(supportedLanguages).map(([code, lang]) => (
+                <button
+                  key={code}
+                  onClick={() => {
+                    setLanguage(code);
+                    setShowLanguageModal(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-4 py-3 hover:bg-[#fff8e1] transition-colors border-b border-gray-100 last:border-b-0 ${
+                    currentLanguage === code ? 'bg-[#fff8e1]' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{lang.flag}</span>
+                    <div className="text-left">
+                      <div className={`font-medium text-gray-800 ${currentLanguage === code ? 'font-bold text-[#8B4513]' : ''}`}>
+                        {lang.nativeName}
+                      </div>
+                      <div className="text-xs text-gray-500">{lang.name}</div>
+                    </div>
+                  </div>
+                  {currentLanguage === code && (
+                    <div className="w-6 h-6 rounded-full bg-[#8bc34a] flex items-center justify-center">
+                      <Check className="w-4 h-4 text-white" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 border-t border-gray-200 bg-gray-50">
+              <p className="text-xs text-gray-500 text-center">
+                The app will be displayed in your selected language
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- OCEAN / UI SECTION --- */}
       <div className="absolute bottom-0 left-0 right-0 h-[50%] z-20">
