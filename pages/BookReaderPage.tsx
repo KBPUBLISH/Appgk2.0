@@ -607,24 +607,24 @@ const BookReaderPage: React.FC = () => {
         };
     }, [showLanguageDropdown]);
 
-    // Fetch translation when language changes
+    // Fetch translation when language changes - preload current + next 3 pages
     useEffect(() => {
-        const fetchTranslation = async () => {
-            if (selectedLanguage === 'en' || pages.length === 0) {
-                setTranslatedContent(new Map());
-                return;
-            }
-
-            const currentPage = pages[currentPageIndex];
-            if (!currentPage?._id) return;
+        const PAGES_TO_PRELOAD = 3;
+        
+        const fetchTranslation = async (pageIndex: number, showLoading: boolean = false) => {
+            if (selectedLanguage === 'en' || pages.length === 0) return;
+            
+            const page = pages[pageIndex];
+            if (!page?._id) return;
 
             // Check if we already have this translation
-            const cacheKey = `${currentPage._id}_${selectedLanguage}`;
+            const cacheKey = `${page._id}_${selectedLanguage}`;
             if (translatedContent.has(cacheKey)) return;
 
-            setIsTranslating(true);
+            if (showLoading) setIsTranslating(true);
+            
             try {
-                const result = await translationService.getTranslatedPage(currentPage._id, selectedLanguage);
+                const result = await translationService.getTranslatedPage(page._id, selectedLanguage);
                 if (result) {
                     setTranslatedContent(prev => {
                         const newMap = new Map(prev);
@@ -638,11 +638,30 @@ const BookReaderPage: React.FC = () => {
             } catch (error) {
                 console.error('Translation error:', error);
             } finally {
-                setIsTranslating(false);
+                if (showLoading) setIsTranslating(false);
             }
         };
 
-        fetchTranslation();
+        const preloadTranslations = async () => {
+            if (selectedLanguage === 'en') {
+                setTranslatedContent(new Map());
+                return;
+            }
+
+            // Fetch current page first (with loading indicator)
+            await fetchTranslation(currentPageIndex, true);
+            
+            // Then preload next pages in background (no loading indicator)
+            for (let i = 1; i <= PAGES_TO_PRELOAD; i++) {
+                const nextIndex = currentPageIndex + i;
+                if (nextIndex < pages.length) {
+                    // Don't await - let them load in parallel
+                    fetchTranslation(nextIndex, false);
+                }
+            }
+        };
+
+        preloadTranslations();
         
         // Save language preference
         translationService.setPreferredLanguage(selectedLanguage);
