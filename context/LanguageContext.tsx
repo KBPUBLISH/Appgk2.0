@@ -2,100 +2,151 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { SUPPORTED_LANGUAGES } from '../services/translationService';
 import { getApiBaseUrl } from '../services/apiService';
 
-// UI text translations - static strings used throughout the app
-const UI_TRANSLATIONS: Record<string, Record<string, string>> = {
-    en: {
-        // Navigation
-        home: 'Home',
-        explore: 'Explore',
-        read: 'Read',
-        listen: 'Listen',
-        settings: 'Settings',
-        profile: 'Profile',
-        library: 'Library',
-        
-        // Actions
-        play: 'Play',
-        pause: 'Pause',
-        stop: 'Stop',
-        continue: 'Continue',
-        next: 'Next',
-        back: 'Back',
-        skip: 'Skip',
-        retry: 'Retry',
-        save: 'Save',
-        cancel: 'Cancel',
-        close: 'Close',
-        done: 'Done',
-        
-        // Sections
-        dailyLessons: 'Daily Lessons',
-        featuredBooks: 'Featured Books',
-        recentlyRead: 'Recently Read',
-        favorites: 'Favorites',
-        categories: 'Categories',
-        allBooks: 'All Books',
-        audioBooks: 'Audio Books',
-        
-        // Book Reader
-        readAloud: 'Read Aloud',
-        autoPlay: 'Auto Play',
-        voice: 'Voice',
-        language: 'Language',
-        selectLanguage: 'Select Language',
-        
-        // Lessons
-        watchVideo: 'Watch Video',
-        devotional: 'Devotional',
-        activity: 'Activity',
-        quiz: 'Quiz',
-        takeQuiz: 'Take Quiz',
-        episode: 'Episode',
-        
-        // Settings
-        account: 'Account',
-        notifications: 'Notifications',
-        appearance: 'Appearance',
-        privacy: 'Privacy',
-        help: 'Help',
-        about: 'About',
-        signOut: 'Sign Out',
-        
-        // Common
-        loading: 'Loading...',
-        error: 'Error',
-        success: 'Success',
-        noResults: 'No results found',
-        searchPlaceholder: 'Search...',
-        
-        // Messages
-        welcome: 'Welcome',
-        greatJob: 'Great job!',
-        keepGoing: 'Keep going!',
-        theEnd: 'The End!',
-        whatNext: "Great reading! What's next?",
-        readAgain: 'Read Again',
-        addToFavorites: 'Add to Favorites',
-        removeFromFavorites: 'Remove from Favorites',
-    },
+// All UI text strings used throughout the app (English as default)
+const UI_STRINGS: Record<string, string> = {
+    // Navigation
+    home: 'Home',
+    explore: 'Explore',
+    read: 'Read',
+    listen: 'Listen',
+    settings: 'Settings',
+    profile: 'Profile',
+    library: 'Library',
+    
+    // Actions
+    play: 'Play',
+    pause: 'Pause',
+    stop: 'Stop',
+    continue: 'Continue',
+    next: 'Next',
+    back: 'Back',
+    skip: 'Skip',
+    retry: 'Retry',
+    save: 'Save',
+    cancel: 'Cancel',
+    close: 'Close',
+    done: 'Done',
+    signIn: 'Sign In',
+    signOut: 'Sign Out',
+    
+    // Settings Page
+    audioAndNotifications: 'Audio & Notifications',
+    backgroundMusic: 'Background Music',
+    soundEffects: 'Sound Effects',
+    notifications: 'Notifications',
+    language: 'Language',
+    appLanguage: 'App Language',
+    voiceLibrary: 'Voice Library',
+    deleteVoice: 'Delete Voice',
+    restorePurchases: 'Restore Purchases',
+    manageSubscription: 'Manage Subscription',
+    privacyPolicy: 'Privacy Policy',
+    termsOfService: 'Terms of Service',
+    helpSupport: 'Help & Support',
+    account: 'Account',
+    appearance: 'Appearance',
+    privacy: 'Privacy',
+    help: 'Help',
+    about: 'About',
+    
+    // Sections & Titles
+    dailyLessons: 'Daily Lessons',
+    featuredBooks: 'Featured Books',
+    recentlyRead: 'Recently Read',
+    favorites: 'Favorites',
+    categories: 'Categories',
+    allBooks: 'All Books',
+    audioBooks: 'Audio Books',
+    dailyTasks: 'Daily Tasks & IQ Games',
+    thisWeeksProgress: "This Week's Progress",
+    
+    // Book Reader
+    readAloud: 'Read Aloud',
+    autoPlay: 'Auto Play',
+    voice: 'Voice',
+    selectLanguage: 'Select Language',
+    selectVoice: 'Select Voice',
+    
+    // Lessons
+    watchVideo: 'Watch Video',
+    devotional: 'Devotional',
+    activity: 'Activity',
+    quiz: 'Quiz',
+    takeQuiz: 'Take Quiz',
+    episode: 'Episode',
+    continueToDevotional: 'Continue to Devotional',
+    
+    // Common
+    loading: 'Loading...',
+    error: 'Error',
+    success: 'Success',
+    noResults: 'No results found',
+    searchPlaceholder: 'Search...',
+    
+    // Messages
+    welcome: 'Welcome',
+    greatJob: 'Great job!',
+    keepGoing: 'Keep going!',
+    theEnd: 'The End!',
+    whatNext: "Great reading! What's next?",
+    readAgain: 'Read Again',
+    addToFavorites: 'Add to Favorites',
+    removeFromFavorites: 'Remove from Favorites',
+    adventureAwaits: 'Adventure Awaits!',
+    
+    // Onboarding
+    setup: 'Setup',
+    parent: 'Parent',
+    family: 'Family',
+    unlock: 'Unlock',
+    parentName: 'Parent Name',
+    createParentProfile: 'Step 1: Create the Parent Profile',
+    tapToChangeAvatar: 'Tap to change avatar',
+    nextFamily: 'NEXT: FAMILY',
+    
+    // Profile
+    selectProfile: 'Select Profile',
+    addChild: 'Add Child',
+    editProfile: 'Edit Profile',
+    
+    // Subscription
+    premium: 'Premium',
+    subscribe: 'Subscribe',
+    freeTrial: 'Free Trial',
+    
+    // Days
+    monday: 'Mon',
+    tuesday: 'Tue',
+    wednesday: 'Wed',
+    thursday: 'Thu',
+    friday: 'Fri',
+    saturday: 'Sat',
+    sunday: 'Sun',
+    
+    // Misc
+    days: 'Days',
+    hours: 'Hours',
+    minutes: 'Minutes',
+    comingSoon: 'Coming Soon',
+    restAndPlayDay: 'Rest & Play Day!',
+    noLessonsToday: 'No lessons today. Enjoy reading stories or playing games with family!',
 };
 
-// Cache for dynamically translated content
-const translationCache = new Map<string, string>();
+// Storage keys
+const LANGUAGE_STORAGE_KEY = 'godlykids_app_language';
+const TRANSLATIONS_CACHE_KEY = 'godlykids_translations_cache';
 
 interface LanguageContextType {
     currentLanguage: string;
     setLanguage: (lang: string) => void;
-    t: (key: string) => string; // Translate UI text
-    translateText: (text: string) => Promise<string>; // Translate dynamic content
-    translateTexts: (texts: string[]) => Promise<string[]>; // Batch translate
+    t: (key: string, fallback?: string) => string;
+    translateText: (text: string) => Promise<string>;
+    translateTexts: (texts: string[]) => Promise<string[]>;
     isTranslating: boolean;
     supportedLanguages: typeof SUPPORTED_LANGUAGES;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
-
-const LANGUAGE_STORAGE_KEY = 'godlykids_app_language';
 
 interface LanguageProviderProps {
     children: ReactNode;
@@ -106,61 +157,106 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
         return localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'en';
     });
     const [isTranslating, setIsTranslating] = useState(false);
-    const [dynamicTranslations, setDynamicTranslations] = useState<Record<string, Record<string, string>>>({});
+    const [translations, setTranslations] = useState<Record<string, Record<string, string>>>(() => {
+        // Load cached translations from localStorage
+        try {
+            const cached = localStorage.getItem(TRANSLATIONS_CACHE_KEY);
+            if (cached) {
+                return JSON.parse(cached);
+            }
+        } catch (e) {
+            console.error('Failed to load cached translations:', e);
+        }
+        return { en: UI_STRINGS };
+    });
 
-    // Save language preference
+    // Save language preference and trigger translation
     const setLanguage = useCallback((lang: string) => {
         setCurrentLanguage(lang);
         localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
     }, []);
 
     // Translate static UI text
-    const t = useCallback((key: string): string => {
-        // If English, return English text
+    const t = useCallback((key: string, fallback?: string): string => {
+        // If English, return English text directly
         if (currentLanguage === 'en') {
-            return UI_TRANSLATIONS.en[key] || key;
+            return UI_STRINGS[key] || fallback || key;
         }
 
-        // Check if we have a cached translation for this language
-        if (dynamicTranslations[currentLanguage]?.[key]) {
-            return dynamicTranslations[currentLanguage][key];
+        // Check if we have a translation for this language
+        if (translations[currentLanguage]?.[key]) {
+            return translations[currentLanguage][key];
         }
 
-        // Return English as fallback while translation loads
-        return UI_TRANSLATIONS.en[key] || key;
-    }, [currentLanguage, dynamicTranslations]);
+        // Return English as fallback
+        return UI_STRINGS[key] || fallback || key;
+    }, [currentLanguage, translations]);
 
-    // Translate UI strings when language changes
+    // Translate all UI strings when language changes
     useEffect(() => {
-        const translateUIStrings = async () => {
+        const translateAllStrings = async () => {
             if (currentLanguage === 'en') return;
-            if (dynamicTranslations[currentLanguage]) return; // Already cached
+            if (translations[currentLanguage] && Object.keys(translations[currentLanguage]).length > 10) {
+                // Already have translations for this language
+                return;
+            }
 
             setIsTranslating(true);
+            console.log(`🌐 Translating UI to ${currentLanguage}...`);
+
             try {
-                const englishStrings = UI_TRANSLATIONS.en;
-                const keys = Object.keys(englishStrings);
-                const texts = Object.values(englishStrings);
+                const keys = Object.keys(UI_STRINGS);
+                const texts = Object.values(UI_STRINGS);
 
-                // Batch translate all UI strings
-                const response = await fetch(`${getApiBaseUrl()}translate/ui`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ texts, lang: currentLanguage }),
-                });
+                // Translate in batches of 20 to avoid API limits
+                const batchSize = 20;
+                const translatedStrings: Record<string, string> = {};
 
-                if (response.ok) {
-                    const data = await response.json();
-                    const translated: Record<string, string> = {};
-                    keys.forEach((key, index) => {
-                        translated[key] = data.translations[index] || englishStrings[key];
-                    });
+                for (let i = 0; i < texts.length; i += batchSize) {
+                    const batchTexts = texts.slice(i, i + batchSize);
+                    const batchKeys = keys.slice(i, i + batchSize);
 
-                    setDynamicTranslations(prev => ({
-                        ...prev,
-                        [currentLanguage]: translated,
-                    }));
+                    try {
+                        const response = await fetch(`${getApiBaseUrl()}translate/ui`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ texts: batchTexts, lang: currentLanguage }),
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            batchKeys.forEach((key, index) => {
+                                translatedStrings[key] = data.translations[index] || UI_STRINGS[key];
+                            });
+                        } else {
+                            // Fallback to English for this batch
+                            batchKeys.forEach((key, index) => {
+                                translatedStrings[key] = UI_STRINGS[key];
+                            });
+                        }
+                    } catch (err) {
+                        console.error('Batch translation error:', err);
+                        batchKeys.forEach((key) => {
+                            translatedStrings[key] = UI_STRINGS[key];
+                        });
+                    }
                 }
+
+                // Update state and cache
+                const newTranslations = {
+                    ...translations,
+                    [currentLanguage]: translatedStrings,
+                };
+                setTranslations(newTranslations);
+                
+                // Cache to localStorage
+                try {
+                    localStorage.setItem(TRANSLATIONS_CACHE_KEY, JSON.stringify(newTranslations));
+                } catch (e) {
+                    console.error('Failed to cache translations:', e);
+                }
+
+                console.log(`✅ UI translated to ${currentLanguage} (${Object.keys(translatedStrings).length} strings)`);
             } catch (error) {
                 console.error('Failed to translate UI strings:', error);
             } finally {
@@ -168,17 +264,12 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
             }
         };
 
-        translateUIStrings();
+        translateAllStrings();
     }, [currentLanguage]);
 
     // Translate dynamic content (book titles, descriptions, etc.)
     const translateText = useCallback(async (text: string): Promise<string> => {
         if (!text || currentLanguage === 'en') return text;
-
-        const cacheKey = `${currentLanguage}_${text}`;
-        if (translationCache.has(cacheKey)) {
-            return translationCache.get(cacheKey)!;
-        }
 
         try {
             const response = await fetch(
@@ -192,7 +283,6 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
 
             if (response.ok) {
                 const data = await response.json();
-                translationCache.set(cacheKey, data.translatedText);
                 return data.translatedText;
             }
         } catch (error) {
@@ -204,26 +294,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
 
     // Batch translate multiple texts
     const translateTexts = useCallback(async (texts: string[]): Promise<string[]> => {
-        if (currentLanguage === 'en') return texts;
-
-        // Check cache for each text
-        const results: string[] = [];
-        const uncachedTexts: string[] = [];
-        const uncachedIndices: number[] = [];
-
-        texts.forEach((text, index) => {
-            const cacheKey = `${currentLanguage}_${text}`;
-            if (translationCache.has(cacheKey)) {
-                results[index] = translationCache.get(cacheKey)!;
-            } else {
-                uncachedTexts.push(text);
-                uncachedIndices.push(index);
-            }
-        });
-
-        if (uncachedTexts.length === 0) {
-            return results;
-        }
+        if (currentLanguage === 'en' || texts.length === 0) return texts;
 
         try {
             const response = await fetch(
@@ -231,29 +302,19 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ texts: uncachedTexts }),
+                    body: JSON.stringify({ texts }),
                 }
             );
 
             if (response.ok) {
                 const data = await response.json();
-                data.translations.forEach((translated: string, i: number) => {
-                    const originalIndex = uncachedIndices[i];
-                    const originalText = uncachedTexts[i];
-                    const cacheKey = `${currentLanguage}_${originalText}`;
-                    translationCache.set(cacheKey, translated);
-                    results[originalIndex] = translated;
-                });
+                return data.translations;
             }
         } catch (error) {
             console.error('Batch translation error:', error);
-            // Fill remaining with original texts
-            uncachedIndices.forEach((index, i) => {
-                if (!results[index]) results[index] = uncachedTexts[i];
-            });
         }
 
-        return results;
+        return texts;
     }, [currentLanguage]);
 
     const value: LanguageContextType = {
@@ -282,4 +343,3 @@ export const useLanguage = (): LanguageContextType => {
 };
 
 export default LanguageContext;
-

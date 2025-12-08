@@ -17,7 +17,7 @@ const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const { isSubscribed, isVoiceUnlocked, setIsSubscribed } = useUser();
   const { sfxEnabled, toggleSfx, playBack, musicEnabled, toggleMusic, musicVolume, setMusicVolume } = useAudio();
-  const { currentLanguage, setLanguage, supportedLanguages, isTranslating } = useLanguage();
+  const { currentLanguage, setLanguage, supportedLanguages, isTranslating, t } = useLanguage();
   const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
   const [deletingVoiceId, setDeletingVoiceId] = useState<string | null>(null);
   const [availableVoices, setAvailableVoices] = useState<any[]>([]);
@@ -174,7 +174,7 @@ const SettingsPage: React.FC = () => {
             </button>
             
             <h1 className="flex-1 text-center font-display font-extrabold text-[#5c2e0b] text-2xl tracking-widest drop-shadow-sm uppercase">
-                Settings
+                {t('settings')}
             </h1>
             
             <div className="w-12" /> {/* Spacer to balance header */}
@@ -187,7 +187,7 @@ const SettingsPage: React.FC = () => {
             
             {/* Audio Settings */}
             <section className="bg-[#fff8e1] rounded-2xl p-5 border-2 border-[#eecaa0] shadow-sm">
-                <h3 className="font-display font-bold text-[#8B4513] text-lg mb-4 uppercase tracking-wide opacity-80">Audio & Notifications</h3>
+                <h3 className="font-display font-bold text-[#8B4513] text-lg mb-4 uppercase tracking-wide opacity-80">{t('audioAndNotifications')}</h3>
                 
                 <div className="space-y-5">
                     {/* Background Music Toggle */}
@@ -197,7 +197,7 @@ const SettingsPage: React.FC = () => {
                                 <div className="w-8 h-8 rounded-full bg-[#e1bee7] flex items-center justify-center text-[#8e24aa]">
                                     <Music size={18} />
                                 </div>
-                                <span className="font-bold">Background Music</span>
+                                <span className="font-bold">{t('backgroundMusic')}</span>
                             </div>
                             <button 
                                 onClick={toggleMusic}
@@ -232,7 +232,7 @@ const SettingsPage: React.FC = () => {
                             <div className="w-8 h-8 rounded-full bg-[#ffe0b2] flex items-center justify-center text-[#f57c00]">
                                 <Volume2 size={18} />
                             </div>
-                            <span className="font-bold">Sound Effects</span>
+                            <span className="font-bold">{t('soundEffects')}</span>
                         </div>
                         <button 
                             onClick={toggleSfx}
@@ -248,7 +248,7 @@ const SettingsPage: React.FC = () => {
                             <div className="w-8 h-8 rounded-full bg-[#ffe0b2] flex items-center justify-center text-[#f57c00]">
                                 <Bell size={18} />
                             </div>
-                            <span className="font-bold">Notifications</span>
+                            <span className="font-bold">{t('notifications')}</span>
                         </div>
                         <button 
                             className="w-12 h-7 rounded-full relative transition-colors duration-200 border-2 bg-[#8bc34a] border-[#689f38]"
@@ -261,7 +261,7 @@ const SettingsPage: React.FC = () => {
 
             {/* Language Settings */}
             <section className="bg-[#fff8e1] rounded-2xl p-5 border-2 border-[#eecaa0] shadow-sm">
-                <h3 className="font-display font-bold text-[#8B4513] text-lg mb-4 uppercase tracking-wide opacity-80">Language</h3>
+                <h3 className="font-display font-bold text-[#8B4513] text-lg mb-4 uppercase tracking-wide opacity-80">{t('language')}</h3>
                 
                 <div className="space-y-3">
                     <button 
@@ -273,7 +273,7 @@ const SettingsPage: React.FC = () => {
                                 <Globe size={18} />
                             </div>
                             <div className="text-left">
-                                <span className="font-bold block">App Language</span>
+                                <span className="font-bold block">{t('appLanguage')}</span>
                                 <span className="text-sm text-[#8B4513]/70">
                                     {supportedLanguages[currentLanguage]?.flag} {supportedLanguages[currentLanguage]?.nativeName || 'English'}
                                 </span>
