@@ -89,6 +89,16 @@ export const authService = {
     localStorage.removeItem(USER_KEY);
   },
 
+  // Sign out - clear all auth data
+  signOut: (): void => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    // Dispatch event for any listeners
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('authSignOut'));
+    }
+  },
+
   // Store user data
   setUser: (user: User): void => {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
