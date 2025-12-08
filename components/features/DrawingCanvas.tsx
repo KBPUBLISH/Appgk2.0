@@ -1,10 +1,12 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Eraser, RotateCcw, Download } from 'lucide-react';
+import { Eraser, RotateCcw, Download, Layers } from 'lucide-react';
 
 interface DrawingCanvasProps {
     prompt: string;
     backgroundImageUrl?: string;
     onComplete?: () => void;
+    // If true, use layered mode (lines on top, coloring underneath)
+    layeredMode?: boolean;
 }
 
 // Crayon colors - arranged like a real crayon box
@@ -58,8 +60,10 @@ const CrayonIcon: React.FC<{ color: string; isSelected: boolean; onClick: () => 
     </button>
 );
 
-const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUrl, onComplete }) => {
+const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUrl, onComplete, layeredMode = true }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const overlayRef = useRef<HTMLImageElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [selectedColor, setSelectedColor] = useState(CRAYON_COLORS[0].color);
     const [brushSize, setBrushSize] = useState(18); // Crayon default size
@@ -69,6 +73,10 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
     // Track if canvas has been initialized
     const [canvasReady, setCanvasReady] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
+    
+    // Store processed line art for layered mode
+    const [processedLineArt, setProcessedLineArt] = useState<string | null>(null);
+    const [isProcessingImage, setIsProcessingImage] = useState(false);
 
     // Store last position for smooth drawing
     const lastPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -76,7 +84,72 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
     // Crayon brush settings
     const CRAYON_MIN_SIZE = 10;
     const CRAYON_MAX_SIZE = 35;
-    const CRAYON_OPACITY = 0.3; // 30% transparency - very light so lines clearly show through
+    // Higher opacity in layered mode since lines stay on top
+    const CRAYON_OPACITY = layeredMode ? 0.7 : 0.3;
+
+    // Process image to extract line art (remove white background, keep dark lines)
+    const processImageForLayeredMode = useCallback((imageUrl: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            img.onload = () => {
+                // Create temporary canvas for processing
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = img.width;
+                tempCanvas.height = img.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                if (!tempCtx) {
+                    reject(new Error('Could not get canvas context'));
+                    return;
+                }
+                
+                // Draw image
+                tempCtx.drawImage(img, 0, 0);
+                
+                // Get image data
+                const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                const data = imageData.data;
+                
+                // Process each pixel: make white/light pixels transparent, keep dark pixels
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    
+                    // Calculate brightness (0-255)
+                    const brightness = (r + g + b) / 3;
+                    
+                    // If pixel is light (brightness > 200), make it transparent
+                    // Keep dark pixels (lines) visible
+                    if (brightness > 200) {
+                        data[i + 3] = 0; // Set alpha to 0 (transparent)
+                    } else {
+                        // For darker pixels, set to black with some transparency based on darkness
+                        data[i] = 0;     // R
+                        data[i + 1] = 0; // G
+                        data[i + 2] = 0; // B
+                        // Alpha based on how dark the pixel is (darker = more opaque)
+                        data[i + 3] = Math.min(255, (255 - brightness) * 2);
+                    }
+                }
+                
+                // Put processed data back
+                tempCtx.putImageData(imageData, 0, 0);
+                
+                // Convert to data URL
+                resolve(tempCanvas.toDataURL('image/png'));
+            };
+            
+            img.onerror = () => {
+                console.log('🎨 Could not process image for line art, using original');
+                resolve(imageUrl); // Fall back to original image
+            };
+            
+            img.src = imageUrl;
+        });
+    }, []);
 
     // Initialize canvas
     useEffect(() => {
@@ -127,41 +200,60 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        console.log('🎨 DrawingCanvas: Loading background image:', backgroundImageUrl);
+        console.log('🎨 DrawingCanvas: Loading background image:', backgroundImageUrl, 'Layered mode:', layeredMode);
 
-        const img = new Image();
-        // Don't use crossOrigin for GCS images - it triggers CORS requirements
-        // The canvas will be "tainted" but that's fine for coloring (no export needed)
+        if (layeredMode) {
+            // In layered mode, process image to extract lines and use as overlay
+            setIsProcessingImage(true);
+            
+            processImageForLayeredMode(backgroundImageUrl)
+                .then((processedUrl) => {
+                    console.log('🎨 DrawingCanvas: Line art processed for layered mode');
+                    setProcessedLineArt(processedUrl);
+                    setImageLoaded(true);
+                    setIsProcessingImage(false);
+                })
+                .catch((err) => {
+                    console.error('🎨 DrawingCanvas: Error processing image:', err);
+                    // Fall back to using original image as overlay
+                    setProcessedLineArt(backgroundImageUrl);
+                    setImageLoaded(true);
+                    setIsProcessingImage(false);
+                });
+        } else {
+            // Original behavior: draw image directly on canvas
+            const img = new Image();
+            
+            img.onload = () => {
+                console.log('🎨 DrawingCanvas: Image loaded successfully!', { width: img.width, height: img.height });
+                const dpr = window.devicePixelRatio || 1;
+                const canvasWidth = canvas.width / dpr;
+                const canvasHeight = canvas.height / dpr;
 
-        img.onload = () => {
-            console.log('🎨 DrawingCanvas: Image loaded successfully!', { width: img.width, height: img.height });
-            const dpr = window.devicePixelRatio || 1;
-            const canvasWidth = canvas.width / dpr;
-            const canvasHeight = canvas.height / dpr;
+                // Clear canvas and redraw white background
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-            // Clear canvas and redraw white background
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+                // Calculate aspect ratio to fit image within canvas
+                const scale = Math.min(canvasWidth / img.width, canvasHeight / img.height);
+                const x = (canvasWidth / 2) - (img.width / 2) * scale;
+                const y = (canvasHeight / 2) - (img.height / 2) * scale;
 
-            // Calculate aspect ratio to fit image within canvas
-            const scale = Math.min(canvasWidth / img.width, canvasHeight / img.height);
-            const x = (canvasWidth / 2) - (img.width / 2) * scale;
-            const y = (canvasHeight / 2) - (img.height / 2) * scale;
+                try {
+                    ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                    setImageLoaded(true);
+                } catch (e) {
+                    console.error('🎨 DrawingCanvas: Error drawing image to canvas (likely CORS):', e);
+                }
+            };
 
-            try {
-                ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-                setImageLoaded(true);
-            } catch (e) {
-                console.error('🎨 DrawingCanvas: Error drawing image to canvas (likely CORS):', e);
-            }
-        };
+            img.onerror = (err) => {
+                console.error('🎨 DrawingCanvas: Failed to load image:', backgroundImageUrl, err);
+            };
 
-        img.onerror = (err) => {
-            console.error('🎨 DrawingCanvas: Failed to load image:', backgroundImageUrl, err);
-        };
-
-        img.src = backgroundImageUrl;
-    }, [canvasReady, backgroundImageUrl]);
+            img.src = backgroundImageUrl;
+        }
+    }, [canvasReady, backgroundImageUrl, layeredMode, processImageForLayeredMode]);
 
     // Apply crayon stroke style
     const applyCrayonStyle = useCallback((ctx: CanvasRenderingContext2D) => {
@@ -345,8 +437,9 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-        // Redraw background image if provided
-        if (backgroundImageUrl) {
+        // In layered mode, don't redraw background (lines are in overlay)
+        // In non-layered mode, redraw background image if provided
+        if (!layeredMode && backgroundImageUrl) {
             const img = new Image();
             img.src = backgroundImageUrl;
             img.onload = () => {
@@ -376,17 +469,45 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
                 <p className="text-white text-sm md:text-base font-semibold">{prompt}</p>
             </div>
 
-            {/* Canvas Container */}
-            <div className="flex-1 bg-white rounded-lg overflow-hidden shadow-lg mb-2 relative min-h-0">
+            {/* Canvas Container - Layered structure */}
+            <div 
+                ref={containerRef}
+                className="flex-1 bg-white rounded-lg overflow-hidden shadow-lg mb-2 relative min-h-0"
+            >
+                {/* Bottom Layer: Drawing Canvas (user colors here) */}
                 <canvas
                     ref={canvasRef}
-                    className="w-full h-full touch-none cursor-crosshair"
+                    className="absolute inset-0 w-full h-full touch-none cursor-crosshair"
                     style={{ minHeight: '250px' }}
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}
                     onMouseLeave={handleMouseLeave}
                 />
+                
+                {/* Top Layer: Line art overlay (in layered mode) */}
+                {layeredMode && processedLineArt && (
+                    <img
+                        ref={overlayRef}
+                        src={processedLineArt}
+                        alt="Coloring lines"
+                        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                        style={{ 
+                            zIndex: 10,
+                            mixBlendMode: 'multiply' // Makes white transparent, keeps black lines
+                        }}
+                    />
+                )}
+                
+                {/* Loading indicator */}
+                {isProcessingImage && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-20">
+                        <div className="flex flex-col items-center gap-2">
+                            <div className="w-8 h-8 border-4 border-[#FFD700] border-t-transparent rounded-full animate-spin"></div>
+                            <span className="text-[#5c2e0b] font-bold text-sm">Preparing coloring page...</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Crayon Box - Looks like a real crayon set */}
