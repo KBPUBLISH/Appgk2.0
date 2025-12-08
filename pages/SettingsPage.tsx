@@ -187,7 +187,7 @@ const SettingsPage: React.FC = () => {
             
             {/* Audio Settings */}
             <section className="bg-[#fff8e1] rounded-2xl p-5 border-2 border-[#eecaa0] shadow-sm">
-                <h3 className="font-display font-bold text-[#8B4513] text-lg mb-4 uppercase tracking-wide opacity-80">{t('audioAndNotifications')}</h3>
+                <h3 className="font-display font-bold text-[#8B4513] text-lg mb-4 uppercase tracking-wide opacity-80">{t('audioNotifications')}</h3>
                 
                 <div className="space-y-5">
                     {/* Background Music Toggle */}
@@ -552,7 +552,16 @@ const SettingsPage: React.FC = () => {
 
             {/* Logout */}
             <button 
-                onClick={() => navigate('/')}
+                onClick={() => {
+                    // Clear all user data
+                    localStorage.removeItem('godly_kids_data_v6');
+                    localStorage.removeItem('godlykids_app_language');
+                    localStorage.removeItem('godlykids_reader_language');
+                    // Sign out from auth service
+                    authService.signOut();
+                    // Navigate to landing page
+                    navigate('/', { replace: true });
+                }}
                 className="w-full bg-[#ffcdd2] hover:bg-[#ef9a9a] text-[#c62828] font-bold py-4 rounded-xl border-b-4 border-[#e57373] active:border-b-0 active:translate-y-1 shadow-sm flex items-center justify-center gap-2 transition-all"
             >
                 <LogOut size={20} />

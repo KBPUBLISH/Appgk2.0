@@ -10,7 +10,7 @@ const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const [isChecking, setIsChecking] = useState(true);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
-  const { currentLanguage, setLanguage, supportedLanguages } = useLanguage();
+  const { currentLanguage, setLanguage, supportedLanguages, t } = useLanguage();
 
   // Check if user has already completed onboarding
   useEffect(() => {
@@ -172,7 +172,7 @@ const LandingPage: React.FC = () => {
                     GODLY KIDS
                  </h1>
                  <p className="text-blue-100 font-sans font-bold text-sm mt-1 opacity-90">
-                    Adventure Awaits!
+                    {t('adventureAwaits')}
                  </p>
               </div>
 
@@ -184,18 +184,18 @@ const LandingPage: React.FC = () => {
                     variant="primary"
                     className="py-4 text-lg"
                   >
-                    Sign In
+                    {t('signIn')}
                   </WoodButton>
 
                   <button
                     onClick={() => navigate('/onboarding')}
                     className="w-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/30 text-white font-bold py-3 px-4 rounded-xl shadow-[0_4px_0_rgba(0,0,0,0.1)] active:translate-y-[2px] active:shadow-none transition-all"
                   >
-                    Continue
+                    {t('continue')}
                   </button>
 
                   <p className="text-center text-white/60 text-xs mt-4">
-                    By continuing you agree to our Terms & Conditions
+                    {t('termsConditions')}
                   </p>
               </div>
           </div>
