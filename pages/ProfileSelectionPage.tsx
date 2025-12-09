@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, User as UserIcon, Settings, ChevronLeft, ShoppingBag, Crown } from 'lucide-react';
+import { Plus, User as UserIcon, Settings, ChevronLeft, ShoppingBag, Crown, Lock } from 'lucide-react';
 import WoodButton from '../components/ui/WoodButton';
 import ShopModal from '../components/features/ShopModal';
 import AvatarCompositor from '../components/avatar/AvatarCompositor';
@@ -224,23 +224,25 @@ const ProfileSelectionPage: React.FC = () => {
           </div>
 
           {/* New Profile Button - Moved Outside Grid, Lower Down */}
-          {/* Show lock message if free user already has 1 kid */}
+          {/* Show lock badge if free user already has 1 kid */}
           {!isSubscribed && kids.length >= 1 ? (
             <div 
                 onClick={() => navigate('/paywall')}
-                className="flex flex-col items-center gap-3 cursor-pointer group mt-8"
+                className="flex flex-col items-center gap-2 cursor-pointer group mt-8"
             >
-               <div className="w-28 h-28 rounded-full bg-[#64748b]/40 backdrop-blur-md border-4 border-white/20 shadow-lg flex items-center justify-center transition-transform duration-200 group-active:scale-95 relative">
-                  <Plus size={48} className="text-white/50" strokeWidth={4} />
-                  {/* Lock overlay */}
-                  <div className="absolute inset-0 rounded-full bg-black/30 flex items-center justify-center">
-                    <div className="bg-[#FFD700] rounded-full p-2 border-2 border-[#B8860B]">
-                      <Crown size={20} className="text-[#B8860B]" fill="#B8860B" />
-                    </div>
+               <div className="w-28 h-28 rounded-full bg-[#64748b]/50 backdrop-blur-md border-4 border-dashed border-white/40 shadow-lg flex items-center justify-center transition-transform duration-200 group-active:scale-95 group-hover:bg-[#64748b]/60 relative">
+                  {/* Plus sign - clearly visible */}
+                  <Plus size={48} className="text-white/80" strokeWidth={3} />
+                  {/* Small lock badge in corner */}
+                  <div className="absolute -top-1 -right-1 bg-gradient-to-br from-[#FFD700] to-[#FFA500] rounded-full p-1.5 border-2 border-white shadow-lg">
+                    <Lock size={14} className="text-[#5c2e0b]" />
                   </div>
                </div>
-               <span className="font-display font-bold text-white/70 text-base tracking-wide drop-shadow-md text-center">
-                  Premium Only
+               <span className="font-display font-bold text-white text-base tracking-wide drop-shadow-md text-center">
+                  Add Profile
+                </span>
+               <span className="text-[10px] text-[#FFD700] font-bold bg-black/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Crown size={10} fill="currentColor" /> Premium
                 </span>
             </div>
           ) : (
