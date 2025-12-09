@@ -409,55 +409,100 @@ export const RevenueCatService = {
       return { success: true, isPremium: localPremium };
     }
 
+    const userId = getUserId();
+    const apiBaseUrl = localStorage.getItem('godlykids_api_url') || 
+      (window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://backendgk2-0.onrender.com');
+
     // Clear any stale premium status before restore
-    // This ensures we get a fresh check from Apple
     const hadPremiumBefore = localStorage.getItem('godlykids_premium') === 'true';
     console.log('🔄 Premium status before restore:', hadPremiumBefore);
+    console.log('🔄 User ID for backend check:', userId);
 
     // Trigger DeSpia restore via URL scheme
     // This tells DeSpia to ask Apple/RevenueCat for subscription status
     window.despia = 'restoreinapppurchases://';
     console.log('🔗 Triggered DeSpia restore - waiting for Apple response...');
 
-    // Poll for restore completion
-    // DeSpia should set localStorage when it gets a response from Apple
+    // Poll for restore completion - check BOTH localStorage AND backend
     return new Promise((resolve) => {
       let pollCount = 0;
-      const maxPolls = 15; // 15 seconds max (Apple can be slow)
+      const maxPolls = 20; // 20 seconds max
+      let backendChecked = false;
       
-      const pollInterval = setInterval(() => {
+      const pollInterval = setInterval(async () => {
         pollCount++;
         
-        // Check if premium was restored
-        const isPremium = localStorage.getItem('godlykids_premium') === 'true';
+        // Check localStorage first (DeSpia might set this)
+        const localPremium = localStorage.getItem('godlykids_premium') === 'true';
         
         if (pollCount <= 2) {
-          // Give DeSpia a moment to process
           console.log(`🔄 Waiting for DeSpia... (${pollCount}s)`);
           return;
         }
         
-        if (isPremium) {
+        if (localPremium) {
           clearInterval(pollInterval);
-          console.log('✅ Restore complete! Premium status: true');
+          console.log('✅ Restore complete! Premium found in localStorage');
           window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
           resolve({ success: true, isPremium: true });
           return;
         }
         
+        // Every 3 seconds, also check our backend (RevenueCat webhooks update this)
+        if (pollCount % 3 === 0 && userId) {
+          console.log(`🔄 Checking backend for subscription... (${pollCount}s)`);
+          try {
+            const response = await fetch(`${apiBaseUrl}/api/webhooks/purchase-status/${encodeURIComponent(userId)}`);
+            if (response.ok) {
+              const data = await response.json();
+              console.log('🔄 Backend response:', data);
+              if (data.isPremium) {
+                clearInterval(pollInterval);
+                console.log('✅ Premium confirmed by backend!');
+                localStorage.setItem('godlykids_premium', 'true');
+                window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
+                resolve({ success: true, isPremium: true });
+                return;
+              }
+            }
+            backendChecked = true;
+          } catch (error) {
+            console.log('⚠️ Backend check failed:', error);
+          }
+        }
+        
         // Log progress
-        if (pollCount % 3 === 0) {
-          console.log(`🔄 Still checking... (${pollCount}s)`);
+        if (pollCount % 5 === 0) {
+          console.log(`🔄 Still waiting... (${pollCount}s)`);
         }
         
         if (pollCount >= maxPolls) {
           clearInterval(pollInterval);
-          console.log('⏱️ Restore check complete - no premium subscription found after', maxPolls, 'seconds');
-          // Return success: true (restore worked) but isPremium: false (no subscription found)
+          console.log('⏱️ Restore check complete after', maxPolls, 'seconds');
+          
+          // One final backend check
+          if (userId && !backendChecked) {
+            try {
+              const response = await fetch(`${apiBaseUrl}/api/webhooks/purchase-status/${encodeURIComponent(userId)}`);
+              if (response.ok) {
+                const data = await response.json();
+                if (data.isPremium) {
+                  console.log('✅ Premium found in final backend check!');
+                  localStorage.setItem('godlykids_premium', 'true');
+                  window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
+                  resolve({ success: true, isPremium: true });
+                  return;
+                }
+              }
+            } catch (error) {
+              console.log('⚠️ Final backend check failed');
+            }
+          }
+          
           resolve({ 
             success: true, 
             isPremium: false, 
-            error: 'No active subscription found. If you just subscribed, please wait a moment and try again.' 
+            error: 'Could not verify subscription. Apple shows you are subscribed - please contact support with your Apple ID email.' 
           });
         }
       }, 1000);
