@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Check, Plus, Trash2, UserCircle, Mic, X, ChevronDown, ChevronUp, BookOpen, Music, Sparkles, Users, Loader2, Lock, Crown, ClipboardList, RefreshCw } from 'lucide-react';
+import { ChevronLeft, Check, Plus, Trash2, UserCircle, Mic, X, ChevronDown, ChevronUp, BookOpen, Music, Sparkles, Users, Loader2, Lock, Crown, ClipboardList, RefreshCw, Volume2 } from 'lucide-react';
 import WoodButton from '../components/ui/WoodButton';
 import { useUser } from '../context/UserContext';
 import { useAudio } from '../context/AudioContext';
@@ -1273,19 +1273,16 @@ const OnboardingPage: React.FC = () => {
 
         {/* --- STEP 3: VOICE SELECTION --- */}
         {step === 3 && (
-          <div className="w-full max-w-md px-6 animate-in slide-in-from-right-10 duration-500">
-            <div className="text-center mb-6">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-2xl border-4 border-[#8B4513]">
-                <Mic className="text-[#8B4513]" size={40} />
+          <div className="w-full max-w-md px-6 animate-in slide-in-from-right-10 duration-500 flex flex-col h-full">
+            <div className="text-center mb-4">
+              <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center shadow-2xl border-4 border-[#8B4513]">
+                <Mic className="text-[#8B4513]" size={32} />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">
+              <h2 className="text-xl font-bold text-white mb-1">
                 Choose Your First Voice!
               </h2>
-              <p className="text-[#eecaa0] text-sm mb-1">
-                Select a voice to read stories and devotionals
-              </p>
-              <p className="text-[#eecaa0]/70 text-xs">
-                Don't worry, more voices can be unlocked in the shop!
+              <p className="text-[#eecaa0] text-sm">
+                Tap a voice to hear a preview
               </p>
             </div>
 
@@ -1294,58 +1291,68 @@ const OnboardingPage: React.FC = () => {
             ) : availableVoices.length === 0 ? (
               <div className="text-center text-[#eecaa0] py-8">No voices available</div>
             ) : (
-              <div className="space-y-3 mb-6 max-h-[400px] overflow-y-auto">
+              <div className="space-y-3 mb-4 max-h-[280px] overflow-y-auto flex-shrink-0">
                 {availableVoices.map((voice) => (
                   <button
                     key={voice.voice_id}
                     onClick={() => handleVoiceClick(voice.voice_id)}
                     disabled={previewingVoiceId === voice.voice_id}
-                    className={`w-full p-4 rounded-xl border-2 transition-all ${
+                    className={`w-full p-3 rounded-xl border-2 transition-all ${
                       selectedVoiceId === voice.voice_id
                         ? 'bg-[#FFD700]/20 border-[#FFD700] shadow-lg'
                         : 'bg-[#3E1F07]/50 border-[#5c2e0b] hover:border-[#FFD700]/50'
                     } ${previewingVoiceId === voice.voice_id ? 'opacity-75 cursor-wait' : ''}`}
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       {voice.characterImage ? (
                         <img 
                           src={voice.characterImage} 
                           alt={voice.name}
-                          className="w-16 h-16 rounded-full object-cover border-2 border-white/20"
+                          className="w-14 h-14 rounded-full object-cover border-2 border-white/20"
                         />
                       ) : (
-                        <div className="w-16 h-16 rounded-full bg-[#5c2e0b] flex items-center justify-center border-2 border-white/20">
-                          <Mic className="text-[#eecaa0]" size={24} />
+                        <div className="w-14 h-14 rounded-full bg-[#5c2e0b] flex items-center justify-center border-2 border-white/20">
+                          <Mic className="text-[#eecaa0]" size={20} />
                         </div>
                       )}
                       <div className="flex-1 text-left">
-                        <div className="text-white font-bold text-lg">{voice.name}</div>
+                        <div className="text-white font-bold">{voice.name}</div>
                         {cleanVoiceDescription(voice.description) && (
-                          <div className="text-[#eecaa0] text-sm mt-1">{cleanVoiceDescription(voice.description)}</div>
-                        )}
-                        {cleanVoiceCategory(voice.category) && (
-                          <div className="text-[#eecaa0]/70 text-xs mt-1 capitalize">{cleanVoiceCategory(voice.category)}</div>
+                          <div className="text-[#eecaa0] text-xs mt-0.5 line-clamp-1">{cleanVoiceDescription(voice.description)}</div>
                         )}
                       </div>
                       {previewingVoiceId === voice.voice_id ? (
                         <div className="w-6 h-6 border-2 border-[#FFD700] border-t-transparent rounded-full animate-spin"></div>
                       ) : selectedVoiceId === voice.voice_id ? (
                         <Check className="text-[#FFD700]" size={24} />
-                      ) : null}
+                      ) : (
+                        <Volume2 className="text-white/40" size={20} />
+                      )}
                     </div>
                   </button>
                 ))}
               </div>
             )}
 
-            <WoodButton
-              fullWidth
-              onClick={handleStep3Continue}
-              disabled={!selectedVoiceId}
-              className={`py-4 text-xl ${!selectedVoiceId ? 'opacity-50 grayscale' : ''}`}
-            >
-              CONTINUE
-            </WoodButton>
+            {/* Sticky Continue Button Area */}
+            <div className="mt-auto pt-4 pb-2 bg-gradient-to-t from-[#1a237e] via-[#1a237e] to-transparent -mx-6 px-6">
+              {!selectedVoiceId && (
+                <p className="text-center text-[#FFD700] text-sm mb-3 animate-pulse">
+                  👆 Select a voice above to continue
+                </p>
+              )}
+              <WoodButton
+                fullWidth
+                onClick={handleStep3Continue}
+                disabled={!selectedVoiceId}
+                className={`py-4 text-xl ${!selectedVoiceId ? 'opacity-40 grayscale' : 'animate-pulse'}`}
+              >
+                {selectedVoiceId ? '✨ CONTINUE' : 'SELECT A VOICE'}
+              </WoodButton>
+              <p className="text-[#eecaa0]/60 text-[10px] text-center mt-2">
+                More voices available in the shop later!
+              </p>
+            </div>
           </div>
         )}
 
