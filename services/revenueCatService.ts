@@ -410,6 +410,7 @@ export const RevenueCatService = {
     }
 
     const userId = getUserId();
+    // New backend URL (Render)
     const apiBaseUrl = localStorage.getItem('godlykids_api_url') || 
       (window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://backendgk2-0.onrender.com');
 
@@ -419,9 +420,10 @@ export const RevenueCatService = {
     console.log('🔄 User ID for backend check:', userId);
 
     // Trigger DeSpia restore via URL scheme
-    // This tells DeSpia to ask Apple/RevenueCat for subscription status
+    // This tells DeSpia to call RevenueCat which then calls Apple's StoreKit
+    // to check for any subscriptions associated with the user's Apple ID
     window.despia = 'restoreinapppurchases://';
-    console.log('🔗 Triggered DeSpia restore - waiting for Apple response...');
+    console.log('🔗 Triggered DeSpia restore - Apple will check your Apple ID for subscriptions...');
 
     // Poll for restore completion - check BOTH localStorage AND backend
     return new Promise((resolve) => {
