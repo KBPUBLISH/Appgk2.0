@@ -315,10 +315,10 @@ const PaywallPage: React.FC = () => {
                     <div className="absolute top-0 -left-full w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-[-20deg] group-hover:animate-[shimmer_1s_infinite]"></div>
                 </button>
 
-                {/* Restore Purchases Button */}
+                {/* Restore Purchases Button - Always clickable unless actively restoring */}
                 <button
                   onClick={handleRestorePurchases}
-                  disabled={isPurchasing || isRestoring || isLoading}
+                  disabled={isRestoring}
                   className="text-[#7c4dff] text-sm font-semibold flex items-center gap-2 mb-4 hover:text-[#651fff] transition-colors disabled:opacity-50"
                 >
                   {isRestoring ? (
