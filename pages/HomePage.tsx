@@ -657,7 +657,7 @@ const HomePage: React.FC = () => {
             })()}
           </div>
 
-          {/* Lessons Grid - 3.5 per row */}
+          {/* Lessons Path - Gamified Learning Path Style */}
           {lessonsLoading ? (
             <div className="text-white/70 text-center py-8 px-4">Loading lessons...</div>
           ) : (() => {
@@ -676,110 +676,193 @@ const HomePage: React.FC = () => {
             }
 
             return (
-              <div className="grid grid-cols-3 gap-2">
-                {dayLessons.map((lesson: any) => {
-                  const status = getLessonStatus(lesson);
-                  const isLessonLocked = status === 'locked'; // Only lock based on status, not future day
-                  const canWatch = !isFutureDay && !isLessonLocked; // Can only watch if not future and not locked
+              <div 
+                className="relative rounded-2xl overflow-hidden py-6 px-4"
+                style={{
+                  background: 'linear-gradient(180deg, #1a237e 0%, #283593 50%, #3949ab 100%)'
+                }}
+              >
+                {/* Decorative stars */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                  <div className="absolute top-4 left-6 w-2 h-2 bg-white/40 rounded-full animate-pulse" />
+                  <div className="absolute top-8 right-10 w-1.5 h-1.5 bg-white/30 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }} />
+                  <div className="absolute top-20 left-12 w-1 h-1 bg-white/20 rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
+                  <div className="absolute bottom-12 right-8 w-2 h-2 bg-white/30 rounded-full animate-pulse" style={{ animationDelay: '0.3s' }} />
+                  <div className="absolute bottom-20 left-8 w-1.5 h-1.5 bg-white/25 rounded-full animate-pulse" style={{ animationDelay: '0.7s' }} />
+                </div>
 
-                  return (
-                    <div
-                      key={lesson._id || lesson.id}
-                      className={`relative cursor-pointer transition-transform active:scale-95 ${!canWatch && status !== 'completed' ? 'opacity-80' : ''}`}
-                      onClick={() => {
-                        if (isFutureDay) {
-                          // Show preview message for future lessons
-                          alert(`📅 Coming soon!\n\nThis lesson "${lesson.title}" will be available on ${
-                            ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
-                              getWeekDays()[selectedDayIndex]?.getDay() || 0
-                            ]
-                          }.`);
-                        } else if (canWatch) {
-                          handleLessonClick(lesson);
-                        }
-                      }}
-                    >
-                      {/* Thumbnail */}
-                      <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-800/50 border border-white/10">
-                        {lesson.video?.thumbnail ? (
-                          <img
-                            src={lesson.video.thumbnail}
-                            alt={lesson.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-600">
-                            <Video className="w-6 h-6 text-white/50" />
+                {/* Path container */}
+                <div className="relative flex flex-col items-center">
+                  {dayLessons.map((lesson: any, index: number) => {
+                    const status = getLessonStatus(lesson);
+                    const isLessonLocked = status === 'locked';
+                    const canWatch = !isFutureDay && !isLessonLocked;
+                    const isEven = index % 2 === 0;
+                    const isCompleted = status === 'completed';
+
+                    return (
+                      <div key={lesson._id || lesson.id} className="relative w-full">
+                        {/* Connecting path line */}
+                        {index < dayLessons.length - 1 && (
+                          <div className="absolute left-1/2 top-[70px] -translate-x-1/2 z-0">
+                            <svg width="60" height="50" viewBox="0 0 60 50" className="overflow-visible">
+                              <path 
+                                d={isEven ? "M30 0 Q30 25, 45 50" : "M30 0 Q30 25, 15 50"}
+                                stroke={isCompleted ? "#4CAF50" : "rgba(255,255,255,0.2)"}
+                                strokeWidth="4"
+                                strokeDasharray={isCompleted ? "0" : "8 4"}
+                                fill="none"
+                                strokeLinecap="round"
+                              />
+                            </svg>
                           </div>
                         )}
 
-                        {/* Completed Overlay */}
-                        {status === 'completed' && (
-                          <div className="absolute inset-0 bg-green-500/30 flex items-center justify-center">
-                            <div className="bg-green-500 rounded-full p-1.5">
-                              <Check className="w-4 h-4 text-white" strokeWidth={3} />
-                            </div>
-                          </div>
-                        )}
+                        {/* Lesson node */}
+                        <div 
+                          className={`flex items-center gap-4 mb-4 ${isEven ? 'flex-row' : 'flex-row-reverse'}`}
+                          style={{ marginLeft: isEven ? '10%' : '0', marginRight: isEven ? '0' : '10%' }}
+                        >
+                          {/* Circle thumbnail */}
+                          <div 
+                            className={`relative cursor-pointer transition-all duration-300 ${canWatch ? 'hover:scale-110 active:scale-95' : ''}`}
+                            onClick={() => {
+                              if (isFutureDay) {
+                                alert(`📅 Coming soon!\n\nThis lesson "${lesson.title}" will be available on ${
+                                  ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
+                                    getWeekDays()[selectedDayIndex]?.getDay() || 0
+                                  ]
+                                }.`);
+                              } else if (canWatch) {
+                                handleLessonClick(lesson);
+                              }
+                            }}
+                          >
+                            {/* Glow effect for current available */}
+                            {canWatch && !isCompleted && (
+                              <div className="absolute -inset-2 rounded-full bg-[#FFD700]/30 animate-pulse" />
+                            )}
 
-                        {/* Coming Soon Overlay (for future days) */}
-                        {isFutureDay && status !== 'completed' && (
-                          <div className="absolute inset-0 bg-indigo-900/60 flex flex-col items-center justify-center">
-                            <Clock className="w-5 h-5 text-white/90 mb-1" />
-                            <span className="text-[10px] text-white font-bold">COMING SOON</span>
-                          </div>
-                        )}
-
-                        {/* Locked Overlay (for past locked lessons) */}
-                        {isLessonLocked && !isFutureDay && status !== 'completed' && (
-                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                            <Lock className="w-5 h-5 text-white/70" />
-                          </div>
-                        )}
-
-                        {/* Play Button (for available lessons) */}
-                        {canWatch && status !== 'completed' && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="bg-white/20 backdrop-blur-sm rounded-full p-2">
-                              <Play className="w-5 h-5 text-white" fill="white" />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Type Badge */}
-                        {lesson.type && (
-                          <div className="absolute top-1 left-1">
-                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${
-                              lesson.type === 'Bible Study' || lesson.type === 'Bible' ? 'bg-purple-500 text-white' :
-                              lesson.type === 'Science' || lesson.type === 'Nature' ? 'bg-green-500 text-white' :
-                              lesson.type === 'History' || lesson.type === 'Social Studies' ? 'bg-amber-500 text-white' :
-                              lesson.type === 'Math' ? 'bg-blue-500 text-white' :
-                              lesson.type === 'English' || lesson.type === 'Reading' ? 'bg-indigo-500 text-white' :
-                              lesson.type === 'Arts & Crafts' || lesson.type === 'Art' ? 'bg-pink-500 text-white' :
-                              lesson.type === 'Music' ? 'bg-rose-500 text-white' :
-                              lesson.type === 'Physical Education' ? 'bg-orange-500 text-white' :
-                              lesson.type === 'Life Skills' ? 'bg-teal-500 text-white' :
-                              lesson.type === 'Technology' ? 'bg-cyan-500 text-white' :
-                              'bg-gray-500 text-white'
+                            {/* Main circle */}
+                            <div className={`relative w-20 h-20 rounded-full overflow-hidden border-4 shadow-xl ${
+                              isCompleted 
+                                ? 'border-green-500 ring-4 ring-green-500/30' 
+                                : isLessonLocked || isFutureDay
+                                  ? 'border-gray-500/50 grayscale opacity-60' 
+                                  : 'border-[#FFD700] ring-4 ring-[#FFD700]/30'
                             }`}>
-                              {lesson.type}
-                            </span>
+                              {lesson.video?.thumbnail ? (
+                                <img
+                                  src={lesson.video.thumbnail}
+                                  alt={lesson.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-600">
+                                  <Video className="w-8 h-8 text-white/50" />
+                                </div>
+                              )}
+
+                              {/* Completed overlay */}
+                              {isCompleted && (
+                                <div className="absolute inset-0 bg-green-500/40 flex items-center justify-center">
+                                  <div className="bg-green-500 rounded-full p-2 shadow-lg">
+                                    <Check className="w-6 h-6 text-white" strokeWidth={3} />
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Locked overlay */}
+                              {(isLessonLocked || isFutureDay) && !isCompleted && (
+                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                  {isFutureDay ? (
+                                    <Clock className="w-6 h-6 text-white/70" />
+                                  ) : (
+                                    <Lock className="w-6 h-6 text-white/70" />
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Play button for available */}
+                              {canWatch && !isCompleted && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                  <div className="bg-white/90 rounded-full p-2 shadow-lg">
+                                    <Play className="w-5 h-5 text-[#3E1F07] ml-0.5" fill="#3E1F07" />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Lesson number badge */}
+                            <div className={`absolute -top-1 -left-1 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shadow-md border-2 border-white ${
+                              isCompleted 
+                                ? 'bg-green-500 text-white' 
+                                : isLessonLocked || isFutureDay
+                                  ? 'bg-gray-500 text-white' 
+                                  : 'bg-[#FFD700] text-[#3E1F07]'
+                            }`}>
+                              {index + 1}
+                            </div>
                           </div>
-                        )}
+
+                          {/* Lesson info card */}
+                          <div 
+                            className={`flex-1 max-w-[180px] ${isEven ? 'text-left' : 'text-right'}`}
+                            onClick={() => {
+                              if (!isFutureDay && canWatch) {
+                                handleLessonClick(lesson);
+                              }
+                            }}
+                          >
+                            <div className={`inline-block px-3 py-2 rounded-xl shadow-lg cursor-pointer transition-all hover:scale-105 ${
+                              isCompleted 
+                                ? 'bg-green-500/20 border border-green-500/30' 
+                                : isLessonLocked || isFutureDay
+                                  ? 'bg-white/5 border border-white/10' 
+                                  : 'bg-[#FFD700]/20 border border-[#FFD700]/30'
+                            }`}>
+                              {/* Type badge */}
+                              {lesson.type && (
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full inline-block mb-1 ${
+                                  lesson.type === 'Bible Study' || lesson.type === 'Bible' ? 'bg-purple-500 text-white' :
+                                  lesson.type === 'Science' || lesson.type === 'Nature' ? 'bg-green-500 text-white' :
+                                  lesson.type === 'History' || lesson.type === 'Social Studies' ? 'bg-amber-500 text-white' :
+                                  lesson.type === 'Math' ? 'bg-blue-500 text-white' :
+                                  lesson.type === 'English' || lesson.type === 'Reading' ? 'bg-indigo-500 text-white' :
+                                  lesson.type === 'Arts & Crafts' || lesson.type === 'Art' ? 'bg-pink-500 text-white' :
+                                  lesson.type === 'Music' ? 'bg-rose-500 text-white' :
+                                  'bg-gray-500 text-white'
+                                }`}>
+                                  {lesson.type}
+                                </span>
+                              )}
+                              <h4 className={`text-sm font-bold font-display leading-tight ${
+                                isCompleted ? 'text-green-400' : isLessonLocked || isFutureDay ? 'text-white/50' : 'text-white'
+                              }`}>
+                                {lesson.title}
+                              </h4>
+                              {isCompleted && (
+                                <p className="text-green-400 text-[10px] font-semibold mt-1">✓ Completed</p>
+                              )}
+                              {isFutureDay && !isCompleted && (
+                                <p className="text-white/40 text-[10px] mt-1">Coming soon</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
+                    );
+                  })}
 
-                      {/* Title (truncated) */}
-                      <p className="text-white/80 text-[10px] font-medium mt-1 truncate px-0.5">
-                        {lesson.title}
-                      </p>
+                  {/* Completion message if all done */}
+                  {dayLessons.every((l: any) => getLessonStatus(l) === 'completed') && (
+                    <div className="mt-4 text-center animate-bounce">
+                      <div className="inline-block bg-gradient-to-r from-[#FFD700] to-[#FFA500] px-4 py-2 rounded-full shadow-lg">
+                        <span className="text-[#3E1F07] font-bold text-sm">🎉 All Done for Today!</span>
+                      </div>
                     </div>
-                  );
-                })}
-
-                {/* Fill remaining space if less than 3 lessons */}
-                {dayLessons.length < 3 && Array.from({ length: 3 - dayLessons.length }).map((_, i) => (
-                  <div key={`placeholder-${i}`} className="aspect-[9/16] rounded-lg bg-white/5 border border-dashed border-white/10" />
-                ))}
+                  )}
+                </div>
               </div>
             );
           })()}
