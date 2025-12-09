@@ -187,9 +187,15 @@ const PaywallStep: React.FC<{
               <input
                 type="email"
                 value={email}
-                onChange={(e) => { setEmail(e.target.value); setFormError(null); }}
+                onChange={(e) => { 
+                  console.log('📝 Email input changed to:', e.target.value);
+                  setEmail(e.target.value); 
+                  setFormError(null); 
+                }}
                 placeholder="your@email.com"
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
+                autoComplete="off"
+                name="new-email-field"
               />
             </div>
             
@@ -293,10 +299,15 @@ const PaywallStep: React.FC<{
                 Already have an account?{' '}
                 <button
                   onClick={() => {
+                    console.log('🔄 Sign in & Restore clicked');
+                    console.log('🔄 Email from state:', email);
+                    console.log('🔄 Password from state:', password ? '(has password)' : '(no password)');
+                    
                     if (!isAccountFormValid()) {
                       setFormError('Please fill in your email and password first');
                       return;
                     }
+                    console.log('🔄 Calling onRestore with email:', email);
                     onRestore(email, password);
                   }}
                   disabled={isRestoring}
@@ -838,6 +849,10 @@ const OnboardingPage: React.FC = () => {
   };
 
   const handleRestorePurchases = async (restoreEmail: string, restorePassword: string) => {
+    console.log('🔄 handleRestorePurchases called');
+    console.log('🔄 restoreEmail received:', restoreEmail);
+    console.log('🔄 restorePassword received:', restorePassword ? '(has password)' : '(no password)');
+    
     setIsRestoring(true);
     setPurchaseError(null);
     
