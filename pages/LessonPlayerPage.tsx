@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, Pause, RotateCcw, Volume2, VolumeX, Check, ChevronRight, Star, Book, FlaskConical, Calculator, Hourglass, Languages, Palette, Cpu, Video, X, Lock, Loader2, Mic, ChevronLeft } from 'lucide-react';
+import { ArrowLeft, Play, Pause, RotateCcw, Volume2, VolumeX, Check, ChevronRight, Star, Book, FlaskConical, Calculator, Hourglass, Languages, Palette, Cpu, Video, X, Lock, Loader2, Mic, ChevronLeft, Home, ShoppingBag } from 'lucide-react';
 import { ApiService } from '../services/apiService';
 import { markCompleted, getCompletion } from '../services/lessonService';
 import { useUser } from '../context/UserContext';
@@ -84,6 +84,7 @@ const LessonPlayerPage: React.FC = () => {
     const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
     const [devotionalRead, setDevotionalRead] = useState(false);
     const [activityCompleted, setActivityCompleted] = useState(false);
+    const [showDrawingComplete, setShowDrawingComplete] = useState(false);
     
     // Episode state
     const [currentEpisodeIndex, setCurrentEpisodeIndex] = useState(0);
@@ -200,6 +201,13 @@ const LessonPlayerPage: React.FC = () => {
     const goToNextEpisode = () => {
         if (hasEpisodes && currentEpisodeIndex < totalEpisodes - 1 && !isTransitioning) {
             setIsTransitioning(true);
+            
+            // PAUSE current video before transitioning
+            if (videoRef.current) {
+                videoRef.current.pause();
+                setIsVideoPlaying(false);
+            }
+            
             // Scroll to next episode with smooth animation
             if (episodeContainerRef.current) {
                 const containerWidth = episodeContainerRef.current.offsetWidth;
@@ -208,29 +216,35 @@ const LessonPlayerPage: React.FC = () => {
                     behavior: 'smooth'
                 });
             }
+            
+            // Update episode index after scroll animation
             setTimeout(() => {
                 setCurrentEpisodeIndex(prev => prev + 1);
                 setVideoProgress(0);
                 setIsTransitioning(false);
-                // Auto-play next episode
-                setTimeout(() => {
-                    if (videoRef.current) {
-                        videoRef.current.play().catch(err => console.log('Autoplay prevented:', err));
-                    }
-                }, 100);
-            }, 300);
+            }, 350);
         } else if (!hasEpisodes || currentEpisodeIndex >= totalEpisodes - 1) {
             // Last episode finished - auto-transition to devotional
+            if (videoRef.current) {
+                videoRef.current.pause();
+            }
             setVideoWatched(true);
             setTimeout(() => {
                 setCurrentScreen('devotional');
-            }, 500); // Brief delay before transitioning
+            }, 500);
         }
     };
 
     const goToPreviousEpisode = () => {
         if (hasEpisodes && currentEpisodeIndex > 0 && !isTransitioning) {
             setIsTransitioning(true);
+            
+            // PAUSE current video before transitioning
+            if (videoRef.current) {
+                videoRef.current.pause();
+                setIsVideoPlaying(false);
+            }
+            
             // Scroll to previous episode with smooth animation
             if (episodeContainerRef.current) {
                 const containerWidth = episodeContainerRef.current.offsetWidth;
@@ -239,22 +253,26 @@ const LessonPlayerPage: React.FC = () => {
                     behavior: 'smooth'
                 });
             }
+            
+            // Update episode index after scroll animation
             setTimeout(() => {
                 setCurrentEpisodeIndex(prev => prev - 1);
                 setVideoProgress(0);
                 setIsTransitioning(false);
-                setTimeout(() => {
-                    if (videoRef.current) {
-                        videoRef.current.play().catch(err => console.log('Autoplay prevented:', err));
-                    }
-                }, 100);
-            }, 300);
+            }, 350);
         }
     };
 
     const goToEpisode = (index: number) => {
-        if (hasEpisodes && index >= 0 && index < totalEpisodes && !isTransitioning) {
+        if (hasEpisodes && index >= 0 && index < totalEpisodes && !isTransitioning && index !== currentEpisodeIndex) {
             setIsTransitioning(true);
+            
+            // PAUSE current video before transitioning
+            if (videoRef.current) {
+                videoRef.current.pause();
+                setIsVideoPlaying(false);
+            }
+            
             // Scroll to selected episode
             if (episodeContainerRef.current) {
                 const containerWidth = episodeContainerRef.current.offsetWidth;
@@ -268,12 +286,7 @@ const LessonPlayerPage: React.FC = () => {
                 setVideoProgress(0);
                 setShowEpisodeSelector(false);
                 setIsTransitioning(false);
-                setTimeout(() => {
-                    if (videoRef.current) {
-                        videoRef.current.play().catch(err => console.log('Autoplay prevented:', err));
-                    }
-                }, 100);
-            }, 300);
+            }, 350);
         }
     };
 
@@ -337,8 +350,9 @@ const LessonPlayerPage: React.FC = () => {
             const progress = (videoRef.current.currentTime / videoRef.current.duration) * 100;
             setVideoProgress(progress);
 
-            // Mark as watched if > 90%
-            if (progress > 90 && !videoWatched) {
+            // Mark as watched if > 90% - but only for single videos or last episode
+            const isLastEpisode = !hasEpisodes || currentEpisodeIndex >= totalEpisodes - 1;
+            if (progress > 90 && !videoWatched && isLastEpisode) {
                 setVideoWatched(true);
             }
         }
@@ -1518,6 +1532,7 @@ const LessonPlayerPage: React.FC = () => {
                                             prompt={lesson.activity.content || lesson.activity.reflectionPrompt || 'Draw something that represents what you learned today!'}
                                             onComplete={() => {
                                                 setActivityCompleted(true);
+                                                setShowDrawingComplete(true); // Show completion popup
                                                 markCompleted(lessonId!, 0, 0);
                                                 
                                                 // Track lesson complete analytics
@@ -1543,6 +1558,49 @@ const LessonPlayerPage: React.FC = () => {
                                                 );
                                             }}
                                         />
+                                        
+                                        {/* Drawing Complete Popup */}
+                                        {showDrawingComplete && (
+                                            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
+                                                <div className="relative w-32 h-32 mb-6">
+                                                    <div className="absolute inset-0 bg-white/20 rounded-full animate-pulse"></div>
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <Star size={80} className="text-[#FFD700] fill-[#FFD700] drop-shadow-[0_0_15px_rgba(255,215,0,0.6)]" />
+                                                    </div>
+                                                </div>
+
+                                                <h3 className="font-display font-bold text-4xl text-white mb-2 animate-in zoom-in duration-300">
+                                                    GREAT JOB!
+                                                </h3>
+                                                <p className="text-white/80 font-bold text-xl mb-8 animate-in slide-in-from-bottom-4 duration-500">
+                                                    You finished your activity!
+                                                </p>
+
+                                                <div className="flex flex-col gap-4 w-full max-w-xs px-4 animate-in slide-in-from-bottom-8 duration-500">
+                                                    <button
+                                                        onClick={() => {
+                                                            setShowDrawingComplete(false);
+                                                            navigate('/home');
+                                                        }}
+                                                        className="bg-[#2196F3] hover:bg-[#1E88E5] text-white py-4 rounded-xl font-bold shadow-lg border-b-4 border-[#1565C0] active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        <Home size={24} />
+                                                        Go Home
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => {
+                                                            setShowDrawingComplete(false);
+                                                            navigate('/home', { state: { openShop: true } });
+                                                        }}
+                                                        className="bg-[#8B4513] hover:bg-[#795548] text-white py-4 rounded-xl font-bold shadow-lg border-b-4 border-[#5D4037] active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        <ShoppingBag size={24} />
+                                                        Go to Shop
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
