@@ -551,13 +551,13 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
                     )}
                     {isDisabled && !isLocked && (
                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-[1px]">
-                            <span className="text-white font-bold text-[8px] uppercase text-center px-1">Needs Body</span>
+                            <span className="text-white font-bold text-[8px] uppercase text-center px-1">{t('needBody')}</span>
                         </div>
                     )}
                     {isLocked && (
                         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[1px]">
                             <Crown size={36} className="text-[#FFD700] drop-shadow-md mb-1" fill="#B8860B" />
-                            <span className="text-[#FFD700] text-[8px] font-extrabold uppercase tracking-wide bg-black/60 px-1.5 py-0.5 rounded-full">Locked</span>
+                            <span className="text-[#FFD700] text-[8px] font-extrabold uppercase tracking-wide bg-black/60 px-1.5 py-0.5 rounded-full">{t('locked')}</span>
                         </div>
                     )}
                 </div>
@@ -572,7 +572,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
                         className="text-[10px] py-1.5 flex items-center justify-center gap-1 border border-[#B8860B] shadow-[0_2px_0_#8B4513]"
                         onClick={(e) => { e.stopPropagation(); onClose(); navigate('/paywall'); }}
                     >
-                        <Crown size={10} fill="currentColor" /> PREMIUM
+                        <Crown size={10} fill="currentColor" /> {t('premium').toUpperCase()}
                     </WoodButton>
                 ) : (owned || (isVoice && voiceUnlocked)) ? (
                     <div className="flex w-full gap-1">
@@ -583,7 +583,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
                                 className="flex-1 bg-[#2e7d32] text-white font-bold text-[10px] py-1.5 rounded-lg flex items-center justify-center gap-1 border border-white/20 shadow-inner"
                             >
                                 <Check size={12} />
-                                <span>UNLOCKED</span>
+                                <span>{t('unlocked').toUpperCase()}</span>
                             </button>
                         ) : equipped ? (
                             <button
@@ -595,9 +595,9 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
                                 className={`flex-1 bg-[#2e7d32] text-white font-bold text-[10px] py-1.5 rounded-lg flex items-center justify-center gap-1 border border-white/20 shadow-inner ${item.type !== 'animation' ? 'hover:bg-[#d32f2f] group-hover:content-["UNEQUIP"]' : ''}`}
                             >
                                 <Check size={12} />
-                                {item.type === 'animation' ? <span>ACTIVE</span> : (
+                                {item.type === 'animation' ? <span>{t('active').toUpperCase()}</span> : (
                                     <>
-                                        <span className="group-hover:hidden">ON</span>
+                                        <span className="group-hover:hidden">{t('on').toUpperCase()}</span>
                                         <span className="hidden group-hover:block"><Trash2 size={10} /></span>
                                     </>
                                 )}
@@ -608,7 +608,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
                                 disabled={isDisabled}
                                 className={`flex-1 font-bold text-[10px] py-1.5 rounded-lg flex items-center justify-center gap-1 shadow-[0_2px_0_rgba(0,0,0,0.2)] active:translate-y-[2px] active:shadow-none transition-all ${isDisabled ? 'bg-gray-400 text-gray-800 cursor-not-allowed' : 'bg-[#f3e5ab] hover:bg-[#fff5cc] text-[#5c2e0b] shadow-[0_2px_0_#d4a373]'}`}
                             >
-                                {isDisabled ? 'NEED BODY' : 'WEAR'}
+                                {isDisabled ? t('needBody').toUpperCase() : t('wear').toUpperCase()}
                             </button>
                         )}
                     </div>
@@ -620,7 +620,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
                         onClick={(e) => { e.stopPropagation(); handleBuy(item); }}
                         disabled={coins < item.price || isDisabled}
                     >
-                        {isDisabled ? 'NEED BODY' : item.price === 0 ? 'FREE' : `${item.price} gold`}
+                        {isDisabled ? t('needBody').toUpperCase() : item.price === 0 ? t('free').toUpperCase() : `${item.price} ${t('gold')}`}
                     </WoodButton>
                 )}
             </div>
