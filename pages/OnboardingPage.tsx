@@ -53,34 +53,31 @@ const INCLUDED_ITEMS = [
   { icon: ClipboardList, label: 'Report Cards', desc: 'Track learning & earning for each kid' },
 ];
 
-// PaywallStep Component
+// PaywallStep Component - Account creation is SEPARATE from subscription (Apple requirement)
 const PaywallStep: React.FC<{
   selectedPlan: 'annual' | 'monthly';
   setSelectedPlan: (plan: 'annual' | 'monthly') => void;
   onSubscribe: (email: string, password: string) => void;
   onSkip: () => void;
   onRestore: (email: string, password: string) => void;
+  onCreateAccount: (email: string, password: string) => Promise<boolean>;
   isPurchasing?: boolean;
   isRestoring?: boolean;
   error?: string | null;
   kidsCount?: number; // Number of kids added during onboarding
-}> = ({ selectedPlan, setSelectedPlan, onSubscribe, onSkip, onRestore, isPurchasing = false, isRestoring = false, error = null, kidsCount = 0 }) => {
+}> = ({ selectedPlan, setSelectedPlan, onSubscribe, onSkip, onRestore, onCreateAccount, isPurchasing = false, isRestoring = false, error = null, kidsCount = 0 }) => {
   const [showIncluded, setShowIncluded] = useState(true); // Open by default so users see features
   const carouselRef = useRef<HTMLDivElement>(null);
   const [currentBenefit, setCurrentBenefit] = useState(0);
   
-  // Account creation state
-  // Note: Don't auto-populate from localStorage - user should enter email fresh each onboarding
+  // Account creation state - SEPARATE from subscription
+  const [showAccountForm, setShowAccountForm] = useState(true); // Show by default
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [accountCreated, setAccountCreated] = useState(false);
-  
-  // Only show "Account Ready" after user has actually created their account (email + password validated)
-  const hasExistingAccount = accountCreated;
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [showRestoreInput, setShowRestoreInput] = useState(false);
-  const [restoreEmail, setRestoreEmail] = useState('');
   
   // Terms agreement state
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -92,10 +89,9 @@ const PaywallStep: React.FC<{
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr);
   };
 
-  // If user already has account, form is always valid (no password needed)
-  const isFormValid = () => {
-    if (!agreedToTerms) return false; // Must agree to terms
-    if (hasExistingAccount) return true;
+  // Account form validation
+  const isAccountFormValid = () => {
+    if (!agreedToTerms) return false;
     if (!email.trim() || !isValidEmail(email)) return false;
     if (!password || password.length < 6) return false;
     if (password !== confirmPassword) return false;
@@ -103,12 +99,34 @@ const PaywallStep: React.FC<{
   };
 
   const getFormError = () => {
-    if (hasExistingAccount) return null;
-    if (!email.trim()) return null; // Don't show error if empty
+    if (!email.trim()) return null;
     if (!isValidEmail(email)) return 'Please enter a valid email address';
     if (password && password.length < 6) return 'Password must be at least 6 characters';
     if (confirmPassword && password !== confirmPassword) return 'Passwords do not match';
     return null;
+  };
+
+  // Handle account creation (independent of subscription)
+  const handleCreateAccount = async () => {
+    if (!isAccountFormValid()) {
+      setFormError(getFormError() || 'Please fill in all fields correctly');
+      return;
+    }
+    
+    setIsCreatingAccount(true);
+    setFormError(null);
+    
+    try {
+      const success = await onCreateAccount(email, password);
+      if (success) {
+        setAccountCreated(true);
+        setShowAccountForm(false);
+      }
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to create account');
+    } finally {
+      setIsCreatingAccount(false);
+    }
   };
 
   // Auto-scroll benefits carousel
@@ -122,374 +140,396 @@ const PaywallStep: React.FC<{
   return (
     <div className="w-full max-w-md px-4 animate-in slide-in-from-right-10 duration-500 pb-10">
       
-      {/* Hero Badge */}
-      <div className="text-center mb-4">
-        <div className="inline-block bg-gradient-to-r from-[#FFD700] to-[#FFA500] px-5 py-2 rounded-full animate-pulse shadow-lg">
-          <span className="text-[#3E1F07] font-extrabold text-base">🎁 3-DAY FREE TRIAL</span>
-        </div>
-      </div>
-
-      {/* Personalized Kids Message - Show if they added multiple kids */}
-      {kidsCount > 1 && (
-        <div className="bg-gradient-to-br from-[#3E1F07] to-[#5c2e0b] rounded-2xl p-4 mb-4 border-2 border-[#FFD700]/40 relative overflow-hidden">
-          <div className="absolute top-0 right-0 bg-[#FF6B6B] text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">
-            ACTION REQUIRED
-          </div>
-          <div className="flex items-center gap-3 mt-1">
-            <div className="w-12 h-12 bg-[#FFD700]/20 rounded-full flex items-center justify-center flex-shrink-0">
-              <Users className="w-6 h-6 text-[#FFD700]" />
-            </div>
-            <div>
-              <p className="text-white font-bold text-sm mb-1">
-                You added <span className="text-[#FFD700]">{kidsCount} kids</span>! 🎉
-              </p>
-              <p className="text-[#eecaa0] text-xs">
-                Free accounts get <span className="font-bold">1 profile</span>. Subscribe to unlock all {kidsCount} profiles with individual progress tracking & rewards.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* What's Included - Show ABOVE the paywall */}
-      <div className="bg-gradient-to-br from-[#3E1F07] to-[#5c2e0b] rounded-2xl border border-[#8B4513] overflow-hidden mb-5">
+      {/* ==================== STEP 1: CREATE ACCOUNT (REQUIRED FIRST) ==================== */}
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border-2 border-[#8B4513] mb-5 overflow-hidden">
+        
+        {/* Account Header - Always visible */}
         <button
-          onClick={() => setShowIncluded(!showIncluded)}
-          className="w-full px-4 py-3 flex items-center justify-between text-left"
+          onClick={() => !accountCreated && setShowAccountForm(!showAccountForm)}
+          className={`w-full px-5 py-4 flex items-center justify-between text-left ${accountCreated ? 'cursor-default' : 'cursor-pointer'}`}
         >
-          <div className="flex items-center gap-2">
-            <span className="text-[#FFD700] text-lg">✨</span>
-            <span className="text-white font-bold text-sm">What's Included</span>
+          <div className="flex items-center gap-3">
+            {accountCreated ? (
+              <div className="w-10 h-10 rounded-full bg-[#4CAF50] flex items-center justify-center">
+                <Check className="w-6 h-6 text-white" strokeWidth={3} />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center">
+                <span className="text-[#3E1F07] font-bold text-lg">1</span>
+              </div>
+            )}
+            <div>
+              <h3 className="text-[#3E1F07] font-display font-bold text-lg">
+                {accountCreated ? 'Account Created!' : 'Create Your Account'}
+              </h3>
+              {accountCreated ? (
+                <p className="text-[#4CAF50] text-sm font-medium">{email}</p>
+              ) : (
+                <p className="text-[#8B4513] text-xs">Required to save your progress</p>
+              )}
+            </div>
           </div>
-          {showIncluded ? (
-            <ChevronUp className="w-5 h-5 text-[#FFD700]" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-[#FFD700]" />
+          {!accountCreated && (
+            showAccountForm ? (
+              <ChevronUp className="w-6 h-6 text-[#8B4513]" />
+            ) : (
+              <ChevronDown className="w-6 h-6 text-[#8B4513]" />
+            )
           )}
         </button>
         
-        {/* Accordion Content */}
-        <div className={`overflow-hidden transition-all duration-300 ${showIncluded ? 'max-h-[400px]' : 'max-h-0'}`}>
-          <div className="px-4 pb-4 space-y-2">
-            {INCLUDED_ITEMS.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-3 bg-black/20 rounded-lg px-3 py-2">
-                <div className="w-8 h-8 rounded-full bg-[#FFD700]/20 flex items-center justify-center flex-shrink-0">
-                  <item.icon className="w-4 h-4 text-[#FFD700]" />
+        {/* Account Form - Accordion */}
+        <div className={`overflow-hidden transition-all duration-300 ${showAccountForm && !accountCreated ? 'max-h-[500px]' : 'max-h-0'}`}>
+          <div className="px-5 pb-5 space-y-3 border-t border-gray-200 pt-4">
+            {/* Email */}
+            <div>
+              <label className="text-[#5D4037] text-xs font-semibold mb-1 block">Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setFormError(null); }}
+                placeholder="your@email.com"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
+              />
+            </div>
+            
+            {/* Password */}
+            <div>
+              <label className="text-[#5D4037] text-xs font-semibold mb-1 block">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setFormError(null); }}
+                placeholder="At least 6 characters"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
+              />
+            </div>
+            
+            {/* Confirm Password */}
+            <div>
+              <label className="text-[#5D4037] text-xs font-semibold mb-1 block">Confirm Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => { setConfirmPassword(e.target.value); setFormError(null); }}
+                placeholder="Re-enter password"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
+              />
+            </div>
+
+            {/* Terms Agreement */}
+            <div className="pt-2">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <div className="relative mt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                    agreedToTerms 
+                      ? 'bg-[#FFD700] border-[#B8860B]' 
+                      : 'bg-white border-gray-300 group-hover:border-[#FFD700]'
+                  }`}>
+                    {agreedToTerms && <Check size={14} className="text-[#3E1F07]" strokeWidth={3} />}
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-semibold">{item.label}</p>
-                  <p className="text-[#eecaa0] text-[10px]">{item.desc}</p>
-                </div>
-                <Check className="w-4 h-4 text-[#4CAF50] flex-shrink-0" />
-              </div>
-            ))}
+                <span className="text-[#5D4037] text-xs leading-relaxed">
+                  I agree to the{' '}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setTermsModalUrl('https://www.godlykids.com/end-user-license-agreement');
+                      setTermsModalTitle('Terms of Agreement');
+                      setShowTermsModal(true);
+                    }}
+                    className="text-[#1976D2] font-semibold underline hover:text-[#1565C0]"
+                  >
+                    Terms of Agreement
+                  </button>
+                  {' '}and{' '}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setTermsModalUrl('https://www.godlykids.com/privacy');
+                      setTermsModalTitle('Privacy Policy');
+                      setShowTermsModal(true);
+                    }}
+                    className="text-[#1976D2] font-semibold underline hover:text-[#1565C0]"
+                  >
+                    Privacy Policy
+                  </button>
+                </span>
+              </label>
+            </div>
+            
+            {/* Form Error */}
+            {(getFormError() || formError) && (
+              <p className="text-red-500 text-xs">{formError || getFormError()}</p>
+            )}
+            
+            {/* Create Account Button */}
+            <button
+              onClick={handleCreateAccount}
+              disabled={isCreatingAccount || !isAccountFormValid()}
+              className="w-full py-3 bg-gradient-to-b from-[#8B4513] to-[#5c2e0b] text-white font-display font-bold text-lg rounded-xl shadow-lg border-2 border-[#3E1F07] disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              {isCreatingAccount ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'CREATE ACCOUNT'
+              )}
+            </button>
+            
+            {/* Restore Link */}
+            <div className="text-center pt-2">
+              <p className="text-[#8B4513] text-xs">
+                Already have an account?{' '}
+                <button
+                  onClick={() => {
+                    if (!isAccountFormValid()) {
+                      setFormError('Please fill in your email and password first');
+                      return;
+                    }
+                    onRestore(email, password);
+                  }}
+                  disabled={isRestoring}
+                  className="text-[#1976D2] font-semibold underline"
+                >
+                  {isRestoring ? 'Restoring...' : 'Sign in & Restore'}
+                </button>
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Main Payment Card - UP FRONT */}
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl p-5 shadow-2xl border-2 border-[#FFD700] mb-5">
+      {/* ==================== STEP 2: OPTIONAL SUBSCRIPTION ==================== */}
+      <div className={`transition-all duration-300 ${accountCreated ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
         
-        {/* Quick Tagline */}
-        <h2 className="text-[#3E1F07] font-display font-extrabold text-xl text-center mb-1">
-          Unlock Everything
-        </h2>
-        <p className="text-[#8B4513] text-xs text-center mb-4">
-          100% ad-free • Cancel anytime
-        </p>
-
-        {/* Pricing Options */}
-        <div className="space-y-2 mb-4">
-          {/* Annual Option */}
-          <div 
-            onClick={() => setSelectedPlan('annual')}
-            className={`relative w-full rounded-xl border-2 overflow-hidden cursor-pointer transition-all ${
-              selectedPlan === 'annual' 
-                ? 'bg-[#fff8e1] border-[#FFD700] shadow-md scale-[1.02]' 
-                : 'bg-gray-50 border-gray-200'
-            }`}
-          >
-            <div className="absolute top-0 right-0 bg-[#4CAF50] text-white text-[9px] font-extrabold px-2 py-0.5 rounded-bl-lg">
-              BEST VALUE
-            </div>
-            <div className="px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === 'annual' ? 'bg-[#FFD700] border-[#FFD700]' : 'border-gray-300'}`}>
-                  {selectedPlan === 'annual' && <Check size={12} className="text-[#3E1F07]" strokeWidth={4} />}
-                </div>
-                <div className="text-left">
-                  <span className="font-display font-bold text-sm text-[#3E1F07]">Annual</span>
-                  <span className="text-[10px] text-[#4CAF50] font-semibold block">Save 42% • $1.33/week</span>
-                </div>
-              </div>
-              <span className="font-display font-extrabold text-xl text-[#3E1F07]">$69<span className="text-xs font-normal">/yr</span></span>
-            </div>
-          </div>
-
-          {/* Monthly Option */}
-          <div 
-            onClick={() => setSelectedPlan('monthly')}
-            className={`relative w-full rounded-xl border-2 overflow-hidden cursor-pointer transition-all ${
-              selectedPlan === 'monthly' 
-                ? 'bg-[#fff8e1] border-[#FFD700] shadow-md scale-[1.02]' 
-                : 'bg-gray-50 border-gray-200'
-            }`}
-          >
-            <div className="px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === 'monthly' ? 'bg-[#FFD700] border-[#FFD700]' : 'border-gray-300'}`}>
-                  {selectedPlan === 'monthly' && <Check size={12} className="text-[#3E1F07]" strokeWidth={4} />}
-                </div>
-                <div className="text-left">
-                  <span className="font-display font-bold text-sm text-[#3E1F07]">Monthly</span>
-                  <span className="text-[10px] text-[#8B4513] block">Flexible billing</span>
-                </div>
-              </div>
-              <span className="font-display font-extrabold text-xl text-[#3E1F07]">$9.99<span className="text-xs font-normal">/mo</span></span>
-            </div>
+        {/* Hero Badge */}
+        <div className="text-center mb-4">
+          <div className="inline-block bg-gradient-to-r from-[#FFD700] to-[#FFA500] px-5 py-2 rounded-full animate-pulse shadow-lg">
+            <span className="text-[#3E1F07] font-extrabold text-base">🎁 3-DAY FREE TRIAL</span>
           </div>
         </div>
 
-        {/* Account Section */}
-        <div className="mb-4 space-y-3">
-          {hasExistingAccount ? (
-            /* User already has an account - just show their email */
-            <div className="bg-[#E8F5E9] border border-[#4CAF50] rounded-lg p-3">
-              <div className="flex items-center gap-2">
-                <Check className="w-5 h-5 text-[#4CAF50]" />
-                <div>
-                  <p className="text-[#2E7D32] text-sm font-semibold">Account Ready!</p>
-                  <p className="text-[#388E3C] text-xs">{email}</p>
-                </div>
+        {/* Personalized Kids Message - Show if they added multiple kids */}
+        {kidsCount > 1 && (
+          <div className="bg-gradient-to-br from-[#3E1F07] to-[#5c2e0b] rounded-2xl p-4 mb-4 border-2 border-[#FFD700]/40 relative overflow-hidden">
+            <div className="absolute top-0 right-0 bg-[#FF6B6B] text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+              ACTION REQUIRED
+            </div>
+            <div className="flex items-center gap-3 mt-1">
+              <div className="w-12 h-12 bg-[#FFD700]/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <Users className="w-6 h-6 text-[#FFD700]" />
+              </div>
+              <div>
+                <p className="text-white font-bold text-sm mb-1">
+                  You added <span className="text-[#FFD700]">{kidsCount} kids</span>! 🎉
+                </p>
+                <p className="text-[#eecaa0] text-xs">
+                  Free accounts get <span className="font-bold">1 profile</span>. Subscribe to unlock all {kidsCount} profiles with individual progress tracking & rewards.
+                </p>
               </div>
             </div>
-          ) : (
-            /* New user - show account creation form */
-            <>
-              <h3 className="text-[#3E1F07] text-sm font-bold">Create Your Account</h3>
-              
-              {/* Email */}
-              <div>
-                <label className="text-[#5D4037] text-xs font-semibold mb-1 block">Email Address</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); setFormError(null); }}
-                  placeholder="your@email.com"
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
-                />
-              </div>
-              
-              {/* Password */}
-              <div>
-                <label className="text-[#5D4037] text-xs font-semibold mb-1 block">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); setFormError(null); }}
-                  placeholder="At least 6 characters"
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
-                />
-              </div>
-              
-              {/* Confirm Password */}
-              <div>
-                <label className="text-[#5D4037] text-xs font-semibold mb-1 block">Confirm Password</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => { setConfirmPassword(e.target.value); setFormError(null); }}
-                  placeholder="Re-enter password"
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
-                />
-              </div>
-              
-              {/* Form Error */}
-              {getFormError() && (
-                <p className="text-red-500 text-xs">{getFormError()}</p>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Error Display */}
-        {error && (
-          <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-lg mb-3 text-sm">
-            {error}
           </div>
         )}
 
-        {/* Terms Agreement Checkbox */}
-        <div className="mb-4">
-          <label className="flex items-start gap-3 cursor-pointer group">
-            <div className="relative mt-0.5">
-              <input
-                type="checkbox"
-                checked={agreedToTerms}
-                onChange={(e) => setAgreedToTerms(e.target.checked)}
-                className="sr-only"
-              />
-              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                agreedToTerms 
-                  ? 'bg-[#FFD700] border-[#B8860B]' 
-                  : 'bg-white border-gray-300 group-hover:border-[#FFD700]'
-              }`}>
-                {agreedToTerms && <Check size={14} className="text-[#3E1F07]" strokeWidth={3} />}
-              </div>
-            </div>
-            <span className="text-[#5D4037] text-xs leading-relaxed">
-              I agree to the{' '}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setTermsModalUrl('https://www.godlykids.com/end-user-license-agreement');
-                  setTermsModalTitle('Terms of Agreement');
-                  setShowTermsModal(true);
-                }}
-                className="text-[#1976D2] font-semibold underline hover:text-[#1565C0]"
-              >
-                Terms of Agreement
-              </button>
-              {' '}and{' '}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setTermsModalUrl('https://www.godlykids.com/privacy');
-                  setTermsModalTitle('Privacy Policy');
-                  setShowTermsModal(true);
-                }}
-                className="text-[#1976D2] font-semibold underline hover:text-[#1565C0]"
-              >
-                Privacy Policy
-              </button>
-            </span>
-          </label>
-        </div>
-
-        {/* CTA Button */}
-        <WoodButton 
-          fullWidth 
-          variant="gold"
-          onClick={() => {
-            if (!isFormValid()) {
-              setFormError(getFormError() || 'Please fill in all fields correctly');
-              return;
-            }
-            onSubscribe(email, password);
-          }}
-          disabled={isPurchasing || !isFormValid()}
-          className="py-4 text-lg shadow-xl mb-2 border-b-4 border-[#B8860B] disabled:opacity-50"
-        >
-          {isPurchasing ? (
-            <span className="flex items-center justify-center gap-2">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Complete payment in Apple...
-            </span>
-          ) : (
-            '🎁 START FREE TRIAL'
-          )}
-        </WoodButton>
-        
-        <p className="text-[#5c2e0b] text-[10px] text-center opacity-70">
-          No charge until trial ends
-        </p>
-
-        {/* Restore Purchases - Uses the account creation fields above */}
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <p className="text-[#5D4037] text-xs text-center mb-3">
-            Already subscribed in the old app? Create your account above with the <strong>same email</strong>, then:
-          </p>
+        {/* What's Included */}
+        <div className="bg-gradient-to-br from-[#3E1F07] to-[#5c2e0b] rounded-2xl border border-[#8B4513] overflow-hidden mb-5">
           <button
-            onClick={() => {
-              if (!email.trim() || !isValidEmail(email)) {
-                setFormError('Please enter your email address above first');
-                return;
-              }
-              if (!password || password.length < 6) {
-                setFormError('Please enter a password (6+ characters) above first');
-                return;
-              }
-              if (password !== confirmPassword) {
-                setFormError('Passwords do not match');
-                return;
-              }
-              // Create account first, then restore
-              onRestore(email, password);
-            }}
-            disabled={isRestoring}
-            className="w-full px-4 py-2.5 bg-[#5D4037] text-white text-sm font-semibold rounded-lg hover:bg-[#4E342E] disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+            onClick={() => setShowIncluded(!showIncluded)}
+            className="w-full px-4 py-3 flex items-center justify-between text-left"
           >
-            {isRestoring ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Restoring...
-              </>
+            <div className="flex items-center gap-2">
+              <span className="text-[#FFD700] text-lg">✨</span>
+              <span className="text-white font-bold text-sm">What's Included</span>
+            </div>
+            {showIncluded ? (
+              <ChevronUp className="w-5 h-5 text-[#FFD700]" />
             ) : (
-              <>
-                <RefreshCw className="w-4 h-4" />
-                Restore Previous Subscription
-              </>
+              <ChevronDown className="w-5 h-5 text-[#FFD700]" />
             )}
           </button>
-        </div>
-        
-        {formError && (
-          <p className="text-red-500 text-xs text-center mt-2">{formError}</p>
-        )}
-      </div>
-
-      {/* Benefits Carousel */}
-      <div className="mb-5">
-        <div className="overflow-hidden">
-          <div 
-            ref={carouselRef}
-            className="flex transition-transform duration-500 ease-out"
-            style={{ transform: `translateX(-${currentBenefit * 100}%)` }}
-          >
-            {BENEFITS.map((benefit, idx) => (
-              <div key={idx} className="w-full flex-shrink-0 px-2">
-                <div className="bg-gradient-to-br from-[#FFD700]/20 to-[#FFA500]/10 rounded-xl p-4 border border-[#FFD700]/30 text-center">
-                  <div className="text-4xl mb-2">{benefit.icon}</div>
-                  <h3 className="text-white font-bold text-base mb-1">{benefit.title}</h3>
-                  <p className="text-[#eecaa0] text-xs">{benefit.desc}</p>
+          
+          {/* Accordion Content */}
+          <div className={`overflow-hidden transition-all duration-300 ${showIncluded ? 'max-h-[400px]' : 'max-h-0'}`}>
+            <div className="px-4 pb-4 space-y-2">
+              {INCLUDED_ITEMS.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-3 bg-black/20 rounded-lg px-3 py-2">
+                  <div className="w-8 h-8 rounded-full bg-[#FFD700]/20 flex items-center justify-center flex-shrink-0">
+                    <item.icon className="w-4 h-4 text-[#FFD700]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-semibold">{item.label}</p>
+                    <p className="text-[#eecaa0] text-[10px]">{item.desc}</p>
+                  </div>
+                  <Check className="w-4 h-4 text-[#4CAF50] flex-shrink-0" />
                 </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Subscription Card */}
+        <div className="bg-white/95 backdrop-blur-md rounded-2xl p-5 shadow-2xl border-2 border-[#FFD700] mb-5">
+          
+          {/* Step 2 Header */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFD700] to-[#FFA500] flex items-center justify-center">
+              <span className="text-[#3E1F07] font-bold text-lg">2</span>
+            </div>
+            <div>
+              <h2 className="text-[#3E1F07] font-display font-extrabold text-xl">
+                Unlock Everything
+              </h2>
+              <p className="text-[#8B4513] text-xs">
+                100% ad-free • Cancel anytime
+              </p>
+            </div>
+          </div>
+
+          {/* Pricing Options */}
+          <div className="space-y-2 mb-4">
+            {/* Annual Option */}
+            <div 
+              onClick={() => setSelectedPlan('annual')}
+              className={`relative w-full rounded-xl border-2 overflow-hidden cursor-pointer transition-all ${
+                selectedPlan === 'annual' 
+                  ? 'bg-[#fff8e1] border-[#FFD700] shadow-md scale-[1.02]' 
+                  : 'bg-gray-50 border-gray-200'
+              }`}
+            >
+              <div className="absolute top-0 right-0 bg-[#4CAF50] text-white text-[9px] font-extrabold px-2 py-0.5 rounded-bl-lg">
+                BEST VALUE
               </div>
+              <div className="px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === 'annual' ? 'bg-[#FFD700] border-[#FFD700]' : 'border-gray-300'}`}>
+                    {selectedPlan === 'annual' && <Check size={12} className="text-[#3E1F07]" strokeWidth={4} />}
+                  </div>
+                  <div className="text-left">
+                    <span className="font-display font-bold text-sm text-[#3E1F07]">Annual</span>
+                    <span className="text-[10px] text-[#4CAF50] font-semibold block">Save 42% • $1.33/week</span>
+                  </div>
+                </div>
+                <span className="font-display font-extrabold text-xl text-[#3E1F07]">$69<span className="text-xs font-normal">/yr</span></span>
+              </div>
+            </div>
+
+            {/* Monthly Option */}
+            <div 
+              onClick={() => setSelectedPlan('monthly')}
+              className={`relative w-full rounded-xl border-2 overflow-hidden cursor-pointer transition-all ${
+                selectedPlan === 'monthly' 
+                  ? 'bg-[#fff8e1] border-[#FFD700] shadow-md scale-[1.02]' 
+                  : 'bg-gray-50 border-gray-200'
+              }`}
+            >
+              <div className="px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === 'monthly' ? 'bg-[#FFD700] border-[#FFD700]' : 'border-gray-300'}`}>
+                    {selectedPlan === 'monthly' && <Check size={12} className="text-[#3E1F07]" strokeWidth={4} />}
+                  </div>
+                  <div className="text-left">
+                    <span className="font-display font-bold text-sm text-[#3E1F07]">Monthly</span>
+                    <span className="text-[10px] text-[#8B4513] block">Flexible billing</span>
+                  </div>
+                </div>
+                <span className="font-display font-extrabold text-xl text-[#3E1F07]">$9.99<span className="text-xs font-normal">/mo</span></span>
+              </div>
+            </div>
+          </div>
+
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-lg mb-3 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Subscribe Button */}
+          <WoodButton 
+            fullWidth 
+            variant="gold"
+            onClick={() => onSubscribe(email, password)}
+            disabled={isPurchasing || !accountCreated}
+            className="py-4 text-lg shadow-xl mb-2 border-b-4 border-[#B8860B] disabled:opacity-50"
+          >
+            {isPurchasing ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Complete payment in Apple...
+              </span>
+            ) : (
+              '🎁 START FREE TRIAL'
+            )}
+          </WoodButton>
+          
+          <p className="text-[#5c2e0b] text-[10px] text-center opacity-70">
+            No charge until trial ends
+          </p>
+        </div>
+
+        {/* Benefits Carousel */}
+        <div className="mb-5">
+          <div className="overflow-hidden">
+            <div 
+              ref={carouselRef}
+              className="flex transition-transform duration-500 ease-out"
+              style={{ transform: `translateX(-${currentBenefit * 100}%)` }}
+            >
+              {BENEFITS.map((benefit, idx) => (
+                <div key={idx} className="w-full flex-shrink-0 px-2">
+                  <div className="bg-gradient-to-br from-[#FFD700]/20 to-[#FFA500]/10 rounded-xl p-4 border border-[#FFD700]/30 text-center">
+                    <div className="text-4xl mb-2">{benefit.icon}</div>
+                    <h3 className="text-white font-bold text-base mb-1">{benefit.title}</h3>
+                    <p className="text-[#eecaa0] text-xs">{benefit.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Carousel Dots */}
+          <div className="flex justify-center gap-1.5 mt-3">
+            {BENEFITS.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentBenefit(idx)}
+                className={`w-2 h-2 rounded-full transition-all ${
+                  currentBenefit === idx 
+                    ? 'bg-[#FFD700] w-4' 
+                    : 'bg-white/30'
+                }`}
+              />
             ))}
           </div>
         </div>
-        {/* Carousel Dots */}
-        <div className="flex justify-center gap-1.5 mt-3">
-          {BENEFITS.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => setCurrentBenefit(idx)}
-              className={`w-2 h-2 rounded-full transition-all ${
-                currentBenefit === idx 
-                  ? 'bg-[#FFD700] w-4' 
-                  : 'bg-white/30'
-              }`}
-            />
-          ))}
+
+        {/* Scripture Quote */}
+        <div className="text-center mb-5 px-4">
+          <p className="text-white/80 text-xs italic">
+            "Train up a child in the way he should go"
+          </p>
+          <p className="text-[#FFD700] text-[10px] font-semibold mt-1">— Proverbs 22:6</p>
         </div>
       </div>
 
-      {/* Scripture Quote */}
-      <div className="text-center mb-5 px-4">
-        <p className="text-white/80 text-xs italic">
-          "Train up a child in the way he should go"
-        </p>
-        <p className="text-[#FFD700] text-[10px] font-semibold mt-1">— Proverbs 22:6</p>
-      </div>
-
-      {/* Skip Link */}
+      {/* Skip Link - Always visible */}
       <div className="text-center">
         <button 
           onClick={onSkip}
-          className="text-white/50 text-xs underline decoration-dotted hover:text-white/80"
+          disabled={!accountCreated}
+          className={`text-xs underline decoration-dotted transition-colors ${accountCreated ? 'text-white/50 hover:text-white/80' : 'text-white/20 cursor-not-allowed'}`}
         >
-          Continue with limited access
+          {accountCreated ? 'Continue with limited access' : 'Create account first to continue'}
         </button>
         <p className="text-white/30 text-[10px] mt-3">
           Loved by 10,000+ Christian families 🙏
@@ -751,6 +791,45 @@ const OnboardingPage: React.FC = () => {
 
   // Store password temporarily for account creation after parent gate
   const [userPassword, setUserPassword] = useState<string>('');
+  
+  // Handle account creation ONLY (no subscription) - Apple requirement
+  const handleCreateAccount = async (email: string, password: string): Promise<boolean> => {
+    try {
+      console.log('📧 Creating user account (no subscription):', email);
+      
+      const signUpResult = await ApiService.signUp(email, password);
+      
+      if (signUpResult.success) {
+        console.log('✅ Account created successfully!');
+        localStorage.setItem('godlykids_user_email', email);
+        setUserEmail(email);
+        setUserPassword(password);
+        window.dispatchEvent(new Event('authTokenUpdated'));
+        return true;
+      } else {
+        // If account already exists, try logging in instead
+        if (signUpResult.error?.includes('exists') || signUpResult.error?.includes('duplicate')) {
+          console.log('📧 Account exists, attempting login...');
+          const loginResult = await ApiService.login('email', { email, password });
+          if (loginResult.success) {
+            console.log('✅ Logged in successfully!');
+            localStorage.setItem('godlykids_user_email', email);
+            setUserEmail(email);
+            setUserPassword(password);
+            window.dispatchEvent(new Event('authTokenUpdated'));
+            return true;
+          } else {
+            throw new Error('Account exists but password is incorrect. Please try a different password.');
+          }
+        } else {
+          throw new Error(signUpResult.error || 'Failed to create account. Please try again.');
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Account creation error:', error);
+      throw error;
+    }
+  };
   
   const handleSubscribeClick = (email: string, password: string) => {
     setUserEmail(email);
@@ -1275,6 +1354,7 @@ const OnboardingPage: React.FC = () => {
             <PaywallStep 
               selectedPlan={selectedPlan}
               setSelectedPlan={setSelectedPlan}
+              onCreateAccount={handleCreateAccount}
               onSubscribe={handleSubscribeClick}
               onSkip={() => {
                 // User skipped without subscribing - limit to 1 kid account
