@@ -77,7 +77,7 @@ const PaywallPage: React.FC = () => {
       console.log('🔄 isNativeApp:', isNativeApp);
       
       // First, try native RevenueCat/DeSpia restore (this asks Apple directly)
-      const result = await restorePurchases();
+      const result = await restorePurchases(true); // true = trigger native Apple restore
       console.log('🔄 Native restore result:', result);
 
       // Check if premium was set (either by restore or by checking localStorage)

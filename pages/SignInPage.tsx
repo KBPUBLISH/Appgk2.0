@@ -36,12 +36,23 @@ const SignInPage: React.FC = () => {
     setForgotError(null);
     
     try {
-      // For now, just show success message
-      // In the future, this would call an API to send a reset email
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      setForgotSuccess(true);
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}password-reset/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.toLowerCase().trim() }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setForgotSuccess(true);
+      } else {
+        setForgotError(data.message || 'Something went wrong. Please try again.');
+      }
     } catch (err) {
-      setForgotError('Something went wrong. Please try again.');
+      console.error('Forgot password error:', err);
+      setForgotError('Unable to connect. Please check your internet and try again.');
     } finally {
       setForgotLoading(false);
     }
@@ -63,7 +74,7 @@ const SignInPage: React.FC = () => {
       console.log('🔄 Restore purchases clicked on Sign In page');
       
       // First try native RevenueCat/DeSpia restore
-      const result = await RevenueCatService.restorePurchases();
+      const result = await RevenueCatService.restorePurchases(true); // true = trigger native Apple restore
       console.log('🔄 Native restore result:', result);
       
       if (result.success && result.isPremium) {

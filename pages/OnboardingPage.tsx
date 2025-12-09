@@ -299,8 +299,8 @@ const PaywallStep: React.FC<{
                 Already have an account?{' '}
                 <button
                   onClick={() => {
-                    // Navigate to sign-in page
-                    window.location.href = '/sign-in';
+                    // Navigate to sign-in page using hash routing
+                    window.location.hash = '/signin';
                   }}
                   className="text-[#1976D2] font-semibold underline"
                 >
@@ -872,7 +872,7 @@ const OnboardingPage: React.FC = () => {
       console.log('🔄 Attempting native restore first...');
       const revenueCatModule = await import('../services/revenueCatService');
       const revenueCatService = revenueCatModule.default;
-      const nativeResult = await revenueCatService.restorePurchases();
+      const nativeResult = await revenueCatService.restorePurchases(true); // true = trigger native Apple restore
       console.log('🔄 Native restore result:', nativeResult);
       
       if (nativeResult.success && nativeResult.isPremium) {

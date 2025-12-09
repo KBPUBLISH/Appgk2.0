@@ -3,6 +3,7 @@ import React, { useMemo, useEffect } from 'react';
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import SignInPage from './pages/SignInPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import OnboardingPage from './pages/OnboardingPage';
 import HomePage from './pages/HomePage';
 import ListenPage from './pages/ListenPage';
@@ -213,6 +214,8 @@ const App: React.FC = () => {
               <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/signin" element={<SignInPage />} />
+                <Route path="/sign-in" element={<SignInPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/onboarding" element={<OnboardingPage />} />
                 <Route path="/home" element={<HomePage />} />
                 <Route path="/listen" element={<ListenPage />} />

@@ -194,12 +194,12 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     }
   }, []);
 
-  // Restore purchases
+  // Restore purchases (triggered by user action, so trigger native restore)
   const restorePurchases = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
     
     try {
-      const result = await RevenueCatService.restorePurchases();
+      const result = await RevenueCatService.restorePurchases(true); // true = trigger native Apple restore
       
       if (result.success) {
         setIsPremium(result.isPremium);

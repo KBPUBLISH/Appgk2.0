@@ -396,119 +396,107 @@ export const RevenueCatService = {
   },
 
   /**
-   * Restore previous purchases using DeSpia URL scheme
-   * This triggers Apple's StoreKit to check for existing subscriptions
+   * Restore previous purchases
+   * @param triggerNative - If true, triggers Apple's StoreKit popup. Default false for silent check.
    */
-  restorePurchases: async (): Promise<{ success: boolean; isPremium: boolean; error?: string }> => {
-    console.log('🔄 Restoring purchases via DeSpia URL scheme');
+  restorePurchases: async (triggerNative: boolean = false): Promise<{ success: boolean; isPremium: boolean; error?: string }> => {
+    console.log('🔄 Restoring purchases...');
     console.log('🔄 isNativeApp:', isNativeApp());
-
-    if (!isNativeApp()) {
-      console.warn('⚠️ Not in native app - checking local premium status only');
-      const localPremium = localStorage.getItem('godlykids_premium') === 'true';
-      return { success: true, isPremium: localPremium };
-    }
+    console.log('🔄 triggerNative:', triggerNative);
 
     const userId = getUserId();
-    // New backend URL (Render)
+    const userEmail = localStorage.getItem('godlykids_user_email');
     const apiBaseUrl = localStorage.getItem('godlykids_api_url') || 
       (window.location.hostname === 'localhost' ? 'http://localhost:5001' : 'https://backendgk2-0.onrender.com');
 
-    // Clear any stale premium status before restore
-    const hadPremiumBefore = localStorage.getItem('godlykids_premium') === 'true';
-    console.log('🔄 Premium status before restore:', hadPremiumBefore);
-    console.log('🔄 User ID for backend check:', userId);
+    // Step 1: Check localStorage first (instant)
+    const localPremium = localStorage.getItem('godlykids_premium') === 'true';
+    if (localPremium) {
+      console.log('✅ Premium found in localStorage');
+      return { success: true, isPremium: true };
+    }
 
-    // Trigger DeSpia restore via URL scheme
-    // This tells DeSpia to call RevenueCat which then calls Apple's StoreKit
-    // to check for any subscriptions associated with the user's Apple ID
-    window.despia = 'restoreinapppurchases://';
-    console.log('🔗 Triggered DeSpia restore - Apple will check your Apple ID for subscriptions...');
-
-    // Poll for restore completion - check BOTH localStorage AND backend
-    return new Promise((resolve) => {
-      let pollCount = 0;
-      const maxPolls = 20; // 20 seconds max
-      let backendChecked = false;
-      
-      const pollInterval = setInterval(async () => {
-        pollCount++;
-        
-        // Check localStorage first (DeSpia might set this)
-        const localPremium = localStorage.getItem('godlykids_premium') === 'true';
-        
-        if (pollCount <= 2) {
-          console.log(`🔄 Waiting for DeSpia... (${pollCount}s)`);
-          return;
-        }
-        
-        if (localPremium) {
-          clearInterval(pollInterval);
-          console.log('✅ Restore complete! Premium found in localStorage');
-          window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
-          resolve({ success: true, isPremium: true });
-          return;
-        }
-        
-        // Every 3 seconds, also check our backend (RevenueCat webhooks update this)
-        if (pollCount % 3 === 0 && userId) {
-          console.log(`🔄 Checking backend for subscription... (${pollCount}s)`);
-          try {
-            const response = await fetch(`${apiBaseUrl}/api/webhooks/purchase-status/${encodeURIComponent(userId)}`);
-            if (response.ok) {
-              const data = await response.json();
-              console.log('🔄 Backend response:', data);
-              if (data.isPremium) {
-                clearInterval(pollInterval);
-                console.log('✅ Premium confirmed by backend!');
-                localStorage.setItem('godlykids_premium', 'true');
-                window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
-                resolve({ success: true, isPremium: true });
-                return;
-              }
-            }
-            backendChecked = true;
-          } catch (error) {
-            console.log('⚠️ Backend check failed:', error);
+    // Step 2: Check backend for subscription status
+    console.log('🔄 Checking backend for subscription...');
+    if (userId) {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/webhooks/purchase-status/${encodeURIComponent(userId)}`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('🔄 Backend response:', data);
+          if (data.isPremium) {
+            console.log('✅ Premium confirmed by backend!');
+            localStorage.setItem('godlykids_premium', 'true');
+            window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
+            return { success: true, isPremium: true };
           }
         }
+      } catch (error) {
+        console.log('⚠️ Backend check failed:', error);
+      }
+    }
+
+    // Step 3: If native app and triggerNative is true, trigger Apple's restore
+    if (isNativeApp() && triggerNative) {
+      console.log('🔗 Triggering native Apple restore...');
+      window.despia = 'restoreinapppurchases://';
+      
+      // Wait for Apple's response
+      return new Promise((resolve) => {
+        let pollCount = 0;
+        const maxPolls = 15; // 15 seconds max for native restore
         
-        // Log progress
-        if (pollCount % 5 === 0) {
-          console.log(`🔄 Still waiting... (${pollCount}s)`);
-        }
-        
-        if (pollCount >= maxPolls) {
-          clearInterval(pollInterval);
-          console.log('⏱️ Restore check complete after', maxPolls, 'seconds');
+        const pollInterval = setInterval(async () => {
+          pollCount++;
           
-          // One final backend check
-          if (userId && !backendChecked) {
+          // Check if DeSpia set premium status
+          const isPremiumNow = localStorage.getItem('godlykids_premium') === 'true';
+          if (isPremiumNow) {
+            clearInterval(pollInterval);
+            console.log('✅ Premium restored via Apple!');
+            window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
+            resolve({ success: true, isPremium: true });
+            return;
+          }
+          
+          // Also check backend periodically
+          if (pollCount % 3 === 0 && userId) {
             try {
               const response = await fetch(`${apiBaseUrl}/api/webhooks/purchase-status/${encodeURIComponent(userId)}`);
               if (response.ok) {
                 const data = await response.json();
                 if (data.isPremium) {
-                  console.log('✅ Premium found in final backend check!');
+                  clearInterval(pollInterval);
                   localStorage.setItem('godlykids_premium', 'true');
                   window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
                   resolve({ success: true, isPremium: true });
                   return;
                 }
               }
-            } catch (error) {
-              console.log('⚠️ Final backend check failed');
+            } catch (e) {
+              // Ignore backend errors during polling
             }
           }
           
-          resolve({ 
-            success: true, 
-            isPremium: false, 
-            error: 'Could not verify subscription. Apple shows you are subscribed - please contact support with your Apple ID email.' 
-          });
-        }
-      }, 1000);
-    });
+          if (pollCount >= maxPolls) {
+            clearInterval(pollInterval);
+            resolve({ 
+              success: true, 
+              isPremium: false, 
+              error: `No active subscription found. If you believe this is an error, please contact hello@kbpublish.org with your Apple ID email${userEmail ? ` (${userEmail})` : ''}.`
+            });
+          }
+        }, 1000);
+      });
+    }
+
+    // No subscription found anywhere
+    console.log('❌ No subscription found');
+    return { 
+      success: true, 
+      isPremium: false, 
+      error: `No active subscription found for this device${userEmail ? ` or email (${userEmail})` : ''}. If you have an active subscription, please contact hello@kbpublish.org for assistance.`
+    };
   },
 
   /**
