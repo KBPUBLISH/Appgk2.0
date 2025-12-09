@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Crown, Play, Pause, Music, Headphones, Heart, Bookmark, Hammer, Wrench } from 'lucide-react';
+import { ChevronLeft, Crown, Play, Pause, Music, Headphones, Heart, Bookmark, Hammer, Wrench, Lock } from 'lucide-react';
 import { getApiBaseUrl } from '../services/apiService';
 import { favoritesService } from '../services/favoritesService';
 import { useAudio } from '../context/AudioContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useUser } from '../context/UserContext';
 import MiniPlayer from '../components/audio/MiniPlayer';
 
 // Predefined color palettes for fallback (warm, cool, vibrant variations)
@@ -158,6 +159,7 @@ const PlaylistDetailPage: React.FC = () => {
     const navigate = useNavigate();
     const { currentPlaylist, currentTrackIndex, isPlaying, togglePlayPause, playPlaylist } = useAudio();
     const { t, translateText, currentLanguage } = useLanguage();
+    const { isSubscribed } = useUser();
     const [playlist, setPlaylist] = useState<Playlist | null>(null);
     const [loading, setLoading] = useState(true);
     const [isFavorited, setIsFavorited] = useState(false);
@@ -221,6 +223,14 @@ const PlaylistDetailPage: React.FC = () => {
                 throw new Error('Failed to fetch playlist');
             }
             const data = await response.json();
+            
+            // Check if playlist is members-only and user is not subscribed
+            if (data.isMembersOnly && !isSubscribed) {
+                console.log('🔒 Playlist is members-only and user is not subscribed. Redirecting to paywall.');
+                navigate('/paywall', { state: { from: `/playlist/${playlistId}` } });
+                return;
+            }
+            
             // Sort items by order
             if (data.items && Array.isArray(data.items)) {
                 data.items.sort((a: AudioItem, b: AudioItem) => (a.order || 0) - (b.order || 0));

@@ -322,6 +322,14 @@ const BookReaderPage: React.FC = () => {
             try {
                 const book = await ApiService.getBookById(bookId);
                 
+                // Check if book is members-only and user is not subscribed
+                const bookIsMembersOnly = (book as any)?.isMembersOnly === true;
+                if (bookIsMembersOnly && !isSubscribed) {
+                    console.log('🔒 Book is members-only and user is not subscribed. Redirecting to paywall.');
+                    navigate('/paywall', { state: { from: `/book/${bookId}` } });
+                    return;
+                }
+                
                 // Set book title and orientation
                 if (book?.title) {
                     setBookTitle(book.title);

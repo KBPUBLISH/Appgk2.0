@@ -379,6 +379,14 @@ const LessonPlayerPage: React.FC = () => {
         try {
             const data = await ApiService.getLesson(lessonId!);
             if (data) {
+                // Check if lesson is members-only and user is not subscribed
+                const lessonIsMembersOnly = (data as any)?.isMembersOnly === true;
+                if (lessonIsMembersOnly && !isSubscribed) {
+                    console.log('🔒 Lesson is members-only and user is not subscribed. Redirecting to paywall.');
+                    navigate('/paywall', { state: { from: `/lesson/${lessonId}` } });
+                    return;
+                }
+                
                 setLesson(data);
                 // Track lesson view analytics
                 analyticsService.lessonView(lessonId!, data.title);

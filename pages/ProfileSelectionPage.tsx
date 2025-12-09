@@ -224,17 +224,38 @@ const ProfileSelectionPage: React.FC = () => {
           </div>
 
           {/* New Profile Button - Moved Outside Grid, Lower Down */}
-          <div 
-              onClick={() => navigate('/create-profile')}
-              className="flex flex-col items-center gap-3 cursor-pointer group mt-8"
-          >
-             <div className="w-28 h-28 rounded-full bg-[#64748b]/60 backdrop-blur-md border-4 border-white/30 shadow-lg flex items-center justify-center transition-transform duration-200 group-active:scale-95 group-hover:bg-[#64748b]/80">
-                <Plus size={48} className="text-white" strokeWidth={4} />
-             </div>
-             <span className="font-display font-bold text-white text-lg tracking-wide drop-shadow-md">
-                New
-              </span>
-          </div>
+          {/* Show lock message if free user already has 1 kid */}
+          {!isSubscribed && kids.length >= 1 ? (
+            <div 
+                onClick={() => navigate('/paywall')}
+                className="flex flex-col items-center gap-3 cursor-pointer group mt-8"
+            >
+               <div className="w-28 h-28 rounded-full bg-[#64748b]/40 backdrop-blur-md border-4 border-white/20 shadow-lg flex items-center justify-center transition-transform duration-200 group-active:scale-95 relative">
+                  <Plus size={48} className="text-white/50" strokeWidth={4} />
+                  {/* Lock overlay */}
+                  <div className="absolute inset-0 rounded-full bg-black/30 flex items-center justify-center">
+                    <div className="bg-[#FFD700] rounded-full p-2 border-2 border-[#B8860B]">
+                      <Crown size={20} className="text-[#B8860B]" fill="#B8860B" />
+                    </div>
+                  </div>
+               </div>
+               <span className="font-display font-bold text-white/70 text-base tracking-wide drop-shadow-md text-center">
+                  Premium Only
+                </span>
+            </div>
+          ) : (
+            <div 
+                onClick={() => navigate('/create-profile')}
+                className="flex flex-col items-center gap-3 cursor-pointer group mt-8"
+            >
+               <div className="w-28 h-28 rounded-full bg-[#64748b]/60 backdrop-blur-md border-4 border-white/30 shadow-lg flex items-center justify-center transition-transform duration-200 group-active:scale-95 group-hover:bg-[#64748b]/80">
+                  <Plus size={48} className="text-white" strokeWidth={4} />
+               </div>
+               <span className="font-display font-bold text-white text-lg tracking-wide drop-shadow-md">
+                  New
+                </span>
+            </div>
+          )}
 
           {/* Go Premium Banner (If Not Subscribed) */}
           {!isSubscribed && (

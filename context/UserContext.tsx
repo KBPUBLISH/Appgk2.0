@@ -203,6 +203,7 @@ const UserContext = createContext<UserContextType>({
 export const useUser = () => useContext(UserContext);
 
 const STORAGE_KEY = 'godly_kids_data_v6'; // Version bump for saves
+const FREE_KID_LIMIT = 1; // Free users can only have 1 kid profile
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   
@@ -304,7 +305,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [savedCharacters, setSavedCharacters] = useState<SavedCharacter[]>(saved?.savedCharacters ?? []);
 
-  const [isSubscribed, setIsSubscribed] = useState(saved?.isSubscribed ?? false);
+  // IMPORTANT: Read subscription status from godlykids_premium which is set by RevenueCat
+  // This is the SOURCE OF TRUTH for subscription status
+  const [isSubscribed, setIsSubscribed] = useState(() => {
+    const premiumFlag = localStorage.getItem('godlykids_premium');
+    return premiumFlag === 'true';
+  });
 
   // Store parent's avatar data persistently
   const [parentAvatarData, setParentAvatarData] = useState<{
@@ -395,6 +401,45 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     parentAvatarData
   ]);
 
+  // Sync subscription status from godlykids_premium (RevenueCat source of truth)
+  useEffect(() => {
+    const syncSubscription = () => {
+      const premiumFlag = localStorage.getItem('godlykids_premium');
+      const isPremium = premiumFlag === 'true';
+      if (isPremium !== isSubscribed) {
+        setIsSubscribed(isPremium);
+        console.log('🔄 Synced subscription status:', isPremium);
+      }
+    };
+
+    // Sync on mount
+    syncSubscription();
+
+    // Listen for storage changes (from other tabs or RevenueCat updates)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'godlykids_premium') {
+        syncSubscription();
+      }
+    };
+
+    // Listen for custom events from RevenueCat service
+    const handlePremiumChange = () => {
+      syncSubscription();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('authTokenUpdated', handlePremiumChange);
+    
+    // Check periodically in case localStorage changes without events
+    const interval = setInterval(syncSubscription, 5000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('authTokenUpdated', handlePremiumChange);
+      clearInterval(interval);
+    };
+  }, [isSubscribed]);
+
   const addCoins = (amount: number, reason: string = 'Coins earned', source: CoinTransaction['source'] = 'other') => {
     setCoins(prev => prev + amount);
     
@@ -454,6 +499,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const addKid = (kid: KidProfile) => {
+    // Check subscription limit - free users can only have 1 kid
+    if (!isSubscribed && kids.length >= FREE_KID_LIMIT) {
+      console.warn('🚫 Free users limited to', FREE_KID_LIMIT, 'kid profile(s). Upgrade to premium for unlimited profiles.');
+      return; // Don't add the kid
+    }
+    
     // Kids inherit parent's unlocked voices when created
     const kidWithInheritedVoices = {
       ...kid,

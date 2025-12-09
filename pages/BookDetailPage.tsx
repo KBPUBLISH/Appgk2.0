@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Heart, BookOpen, Crown, PlayCircle, Headphones, Disc, Lock, Globe, Bookmark, Plus } from 'lucide-react';
 import { useBooks } from '../context/BooksContext';
+import { useUser } from '../context/UserContext';
 import { Book } from '../types';
 import { readingProgressService } from '../services/readingProgressService';
 import { useAudio } from '../context/AudioContext';
@@ -50,6 +51,7 @@ const BookDetailPage: React.FC = () => {
   const { books, loading } = useBooks();
   const { musicEnabled, toggleMusic } = useAudio();
   const { t, translateText, currentLanguage } = useLanguage();
+  const { isSubscribed } = useUser();
   const [translatedTitle, setTranslatedTitle] = useState<string>('');
   const [translatedDescription, setTranslatedDescription] = useState<string>('');
   const [book, setBook] = useState<Book | null>(null);
@@ -151,6 +153,15 @@ const BookDetailPage: React.FC = () => {
       try {
         // Fetch full book data from API
         const fullBook = await ApiService.getBookById(id);
+        
+        // Check if book is members-only and user is not subscribed
+        const bookIsMembersOnly = (fullBook as any)?.isMembersOnly === true;
+        if (bookIsMembersOnly && !isSubscribed) {
+          console.log('🔒 Book is members-only and user is not subscribed. Redirecting to paywall.');
+          navigate('/paywall', { state: { from: `/book-details/${id}` } });
+          return;
+        }
+        
         if (fullBook && (fullBook as any).rawData) {
           const rawData = (fullBook as any).rawData;
           if (rawData.bookGames && Array.isArray(rawData.bookGames)) {
