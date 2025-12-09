@@ -151,6 +151,42 @@ const PaywallStep: React.FC<{
         </div>
       )}
 
+      {/* What's Included - Show ABOVE the paywall */}
+      <div className="bg-gradient-to-br from-[#3E1F07] to-[#5c2e0b] rounded-2xl border border-[#8B4513] overflow-hidden mb-5">
+        <button
+          onClick={() => setShowIncluded(!showIncluded)}
+          className="w-full px-4 py-3 flex items-center justify-between text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-[#FFD700] text-lg">✨</span>
+            <span className="text-white font-bold text-sm">What's Included</span>
+          </div>
+          {showIncluded ? (
+            <ChevronUp className="w-5 h-5 text-[#FFD700]" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-[#FFD700]" />
+          )}
+        </button>
+        
+        {/* Accordion Content */}
+        <div className={`overflow-hidden transition-all duration-300 ${showIncluded ? 'max-h-[400px]' : 'max-h-0'}`}>
+          <div className="px-4 pb-4 space-y-2">
+            {INCLUDED_ITEMS.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-3 bg-black/20 rounded-lg px-3 py-2">
+                <div className="w-8 h-8 rounded-full bg-[#FFD700]/20 flex items-center justify-center flex-shrink-0">
+                  <item.icon className="w-4 h-4 text-[#FFD700]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-semibold">{item.label}</p>
+                  <p className="text-[#eecaa0] text-[10px]">{item.desc}</p>
+                </div>
+                <Check className="w-4 h-4 text-[#4CAF50] flex-shrink-0" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Main Payment Card - UP FRONT */}
       <div className="bg-white/95 backdrop-blur-md rounded-2xl p-5 shadow-2xl border-2 border-[#FFD700] mb-5">
         
@@ -414,42 +450,6 @@ const PaywallStep: React.FC<{
         {formError && (
           <p className="text-red-500 text-xs text-center mt-2">{formError}</p>
         )}
-      </div>
-
-      {/* What's Included Accordion */}
-      <div className="bg-gradient-to-br from-[#3E1F07] to-[#5c2e0b] rounded-2xl border border-[#8B4513] overflow-hidden mb-5">
-        <button
-          onClick={() => setShowIncluded(!showIncluded)}
-          className="w-full px-4 py-3 flex items-center justify-between text-left"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-[#FFD700] text-lg">✨</span>
-            <span className="text-white font-bold text-sm">What's Included</span>
-          </div>
-          {showIncluded ? (
-            <ChevronUp className="w-5 h-5 text-[#FFD700]" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-[#FFD700]" />
-          )}
-        </button>
-        
-        {/* Accordion Content */}
-        <div className={`overflow-hidden transition-all duration-300 ${showIncluded ? 'max-h-[400px]' : 'max-h-0'}`}>
-          <div className="px-4 pb-4 space-y-2">
-            {INCLUDED_ITEMS.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-3 bg-black/20 rounded-lg px-3 py-2">
-                <div className="w-8 h-8 rounded-full bg-[#FFD700]/20 flex items-center justify-center flex-shrink-0">
-                  <item.icon className="w-4 h-4 text-[#FFD700]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-semibold">{item.label}</p>
-                  <p className="text-[#eecaa0] text-[10px]">{item.desc}</p>
-                </div>
-                <Check className="w-4 h-4 text-[#4CAF50] flex-shrink-0" />
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Benefits Carousel */}

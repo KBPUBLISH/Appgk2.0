@@ -12,6 +12,7 @@ import { cleanVoiceDescription } from '../utils/voiceUtils';
 import { authService } from '../services/authService';
 import { getApiBaseUrl } from '../services/apiService';
 import WebViewModal from '../components/features/WebViewModal';
+import ParentGateModal from '../components/features/ParentGateModal';
 
 const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -36,6 +37,9 @@ const SettingsPage: React.FC = () => {
   const [showWebView, setShowWebView] = useState(false);
   const [webViewUrl, setWebViewUrl] = useState('');
   const [webViewTitle, setWebViewTitle] = useState('');
+  
+  // Parent gate for Help Center
+  const [showHelpCenterGate, setShowHelpCenterGate] = useState(false);
   
   // Load cloned voices
   useEffect(() => {
@@ -542,7 +546,10 @@ const SettingsPage: React.FC = () => {
                     </div>
                     <span>{t('termsAndConditions')}</span>
                 </button>
-                <button className="w-full text-left px-3 py-3 text-[#5c2e0b] font-bold text-sm bg-white/40 hover:bg-white/80 rounded-lg border border-transparent hover:border-[#eecaa0] transition-all flex items-center gap-3 group">
+                <button 
+                    onClick={() => setShowHelpCenterGate(true)}
+                    className="w-full text-left px-3 py-3 text-[#5c2e0b] font-bold text-sm bg-white/40 hover:bg-white/80 rounded-lg border border-transparent hover:border-[#eecaa0] transition-all flex items-center gap-3 group"
+                >
                     <div className="w-6 h-6 rounded-full bg-[#d7ccc8] flex items-center justify-center text-[#5d4037] group-hover:bg-[#8d6e63] group-hover:text-white transition-colors">
                         <HelpCircle size={12} />
                     </div>
@@ -574,12 +581,23 @@ const SettingsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* WebView Modal for Privacy/Terms */}
+      {/* WebView Modal for Privacy/Terms - Hide external link for legal pages */}
       <WebViewModal
         isOpen={showWebView}
         onClose={() => setShowWebView(false)}
         url={webViewUrl}
         title={webViewTitle}
+        hideExternalLink={true}
+      />
+      
+      {/* Parent Gate Modal for Help Center */}
+      <ParentGateModal
+        isOpen={showHelpCenterGate}
+        onClose={() => setShowHelpCenterGate(false)}
+        onSuccess={() => {
+          // Open godlykids.com in a new tab
+          window.open('https://www.godlykids.com', '_blank');
+        }}
       />
     </div>
   );

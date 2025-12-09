@@ -7,9 +7,10 @@ interface WebViewModalProps {
   onClose: () => void;
   url: string;
   title: string;
+  hideExternalLink?: boolean; // Hide the "open in browser" button
 }
 
-const WebViewModal: React.FC<WebViewModalProps> = ({ isOpen, onClose, url, title }) => {
+const WebViewModal: React.FC<WebViewModalProps> = ({ isOpen, onClose, url, title, hideExternalLink = false }) => {
   const [isLoading, setIsLoading] = React.useState(true);
 
   if (!isOpen) return null;
@@ -34,15 +35,19 @@ const WebViewModal: React.FC<WebViewModalProps> = ({ isOpen, onClose, url, title
             {title}
           </h1>
           
-          <a 
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-10 h-10 bg-[#8B4513] hover:bg-[#A0522D] rounded-full flex items-center justify-center text-[#f3e5ab] border-2 border-[#eecaa0] active:scale-95 transition-transform shadow-md"
-            aria-label="Open in browser"
-          >
-            <ExternalLink size={18} />
-          </a>
+          {hideExternalLink ? (
+            <div className="w-10 h-10" /> // Spacer for layout balance
+          ) : (
+            <a 
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-10 h-10 bg-[#8B4513] hover:bg-[#A0522D] rounded-full flex items-center justify-center text-[#f3e5ab] border-2 border-[#eecaa0] active:scale-95 transition-transform shadow-md"
+              aria-label="Open in browser"
+            >
+              <ExternalLink size={18} />
+            </a>
+          )}
         </div>
       </div>
 

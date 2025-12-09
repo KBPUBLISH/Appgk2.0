@@ -228,17 +228,17 @@ const PaywallPage: React.FC = () => {
                             <div className="flex flex-col text-left">
                                 <span className={`font-display font-bold text-lg ${selectedPlan === 'annual' ? 'text-[#1a237e]' : 'text-gray-600'}`}>Annual Plan</span>
                                 <span className="text-xs text-[#7c4dff] font-semibold bg-[#ede7f6] px-2 py-0.5 rounded-md w-fit">
-                                  Only $1.54/week
+                                  Save 42% • $1.33/week
                                 </span>
                             </div>
                             <div className="flex flex-col items-end">
                                  <div className="flex items-center gap-1">
                                     <span className="font-display font-extrabold text-2xl text-[#1a237e]">
-                                      $79.99
+                                      $69
                                     </span>
                                     <span className="text-xs text-gray-500 font-bold">/yr</span>
                                  </div>
-                                 <span className="text-xs text-gray-400 line-through">$143.88</span>
+                                 <span className="text-xs text-gray-400 line-through">$119.88</span>
                             </div>
                         </div>
                         
@@ -277,7 +277,7 @@ const PaywallPage: React.FC = () => {
                             <div className="flex flex-col items-end">
                                 <div className="flex items-center gap-1">
                                      <span className="font-display font-extrabold text-2xl text-[#1a237e]">
-                                       $11.99
+                                       $9.99
                                      </span>
                                      <span className="text-xs text-gray-500 font-bold">/mo</span>
                                 </div>

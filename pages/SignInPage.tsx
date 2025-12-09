@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Apple, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import WoodButton from '../components/ui/WoodButton';
 import { ApiService } from '../services/apiService';
 
@@ -127,30 +127,6 @@ const SignInPage: React.FC = () => {
                 </div>
               )}
               
-              <button 
-                onClick={() => handleLogin('apple')} 
-                disabled={loading !== null}
-                className="w-full bg-white hover:bg-gray-50 text-black font-bold py-3 px-4 rounded-xl shadow-[0_4px_0_rgba(0,0,0,0.1)] active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                  <Apple size={20} />
-                  <span>{loading === 'apple' ? 'Signing in...' : 'Continue with Apple'}</span>
-              </button>
-
-              <button 
-                onClick={() => handleLogin('google')} 
-                disabled={loading !== null}
-                className="w-full bg-white hover:bg-gray-50 text-black font-bold py-3 px-4 rounded-xl shadow-[0_4px_0_rgba(0,0,0,0.1)] active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                  <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center text-xs font-bold border border-gray-300">G</div>
-                  <span>{loading === 'google' ? 'Signing in...' : 'Continue with Google'}</span>
-              </button>
-
-              <div className="relative py-2 flex items-center justify-center opacity-70">
-                    <div className="h-px bg-white/40 w-full"></div>
-                    <span className="px-2 text-white text-xs font-bold uppercase">Or</span>
-                    <div className="h-px bg-white/40 w-full"></div>
-              </div>
-
               {/* Sign In Form */}
               <form onSubmit={handleEmailFormSubmit} className="space-y-3">
                 <div className="space-y-2">

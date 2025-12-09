@@ -407,20 +407,20 @@ const PlaylistDetailPage: React.FC = () => {
                     {/* Title and Info */}
                     <div className="text-center">
                         <h1 className="text-3xl font-black text-[#fdf6e3] drop-shadow-lg font-display mb-2">
-                            {playlist.title}
+                            {translatedTitle || playlist.title}
                         </h1>
                         {playlist.author && (
                             <p className="text-[#e2cba5] font-medium text-lg mb-2">
                                 {playlist.author}
                             </p>
                         )}
-                        {playlist.description && (
+                        {(translatedDescription || playlist.description) && (
                             <p className="text-[#e2cba5] text-sm mb-3">
-                                {playlist.description}
+                                {translatedDescription || playlist.description}
                             </p>
                         )}
                         <p className="text-[#e2cba5] text-sm mb-4">
-                            {playlist.items.length} {playlist.type === 'Song' ? 'songs' : 'episodes'}
+                            {playlist.items.length} {playlist.type === 'Song' ? t('songs') : t('episodes')}
                         </p>
 
                         {/* Action Buttons */}
@@ -434,7 +434,7 @@ const PlaylistDetailPage: React.FC = () => {
                                     }`}
                             >
                                 <Bookmark size={18} fill={isInLibrary ? '#5c2e0b' : 'none'} />
-                                <span className="text-sm font-bold">{isInLibrary ? 'Saved' : 'Save'}</span>
+                                <span className="text-sm font-bold">{isInLibrary ? t('saved') : t('save')}</span>
                             </button>
 
                             {/* Like Button */}
@@ -455,7 +455,7 @@ const PlaylistDetailPage: React.FC = () => {
                                 className="flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#d4c5a0] bg-[#fdf6e3] text-[#8B4513] cursor-default"
                             >
                                 <Headphones size={18} />
-                                <span className="text-sm font-bold">My Plays: {playCount}</span>
+                                <span className="text-sm font-bold">{t('myListens')}: {playCount}</span>
                             </button>
                         </div>
                     </div>

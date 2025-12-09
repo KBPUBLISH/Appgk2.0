@@ -5,6 +5,7 @@ import { ApiService } from '../services/apiService';
 import { markCompleted, getCompletion } from '../services/lessonService';
 import { useUser } from '../context/UserContext';
 import { useAudio } from '../context/AudioContext';
+import { useLanguage } from '../context/LanguageContext';
 import { analyticsService } from '../services/analyticsService';
 import { voiceCloningService, ClonedVoice } from '../services/voiceCloningService';
 import DrawingCanvas from '../components/features/DrawingCanvas';
@@ -73,9 +74,22 @@ const LessonPlayerPage: React.FC = () => {
     const navigate = useNavigate();
     const { addCoins, isOwned, purchaseItem, coins, isSubscribed, isVoiceUnlocked } = useUser();
     const { setMusicPaused, musicEnabled } = useAudio();
+    const { translateText, translateTexts, currentLanguage, t } = useLanguage();
 
     const [lesson, setLesson] = useState<Lesson | null>(null);
     const [loading, setLoading] = useState(true);
+    
+    // Translated content state
+    const [translatedDevotional, setTranslatedDevotional] = useState<{
+        title?: string;
+        content?: string;
+        verse?: string;
+        verseText?: string;
+    }>({});
+    const [translatedQuizQuestions, setTranslatedQuizQuestions] = useState<Array<{
+        question: string;
+        options: string[];
+    }>>([]);
     const [currentScreen, setCurrentScreen] = useState<Screen>('video');
     const [videoProgress, setVideoProgress] = useState(0);
     const [isVideoPlaying, setIsVideoPlaying] = useState(false);
@@ -140,6 +154,69 @@ const LessonPlayerPage: React.FC = () => {
             }
         };
     }, [lessonId, musicEnabled, setMusicPaused]);
+
+    // Translate devotional and quiz content when lesson loads or language changes
+    useEffect(() => {
+        if (!lesson || currentLanguage === 'en') {
+            // Reset translations for English
+            setTranslatedDevotional({});
+            setTranslatedQuizQuestions([]);
+            return;
+        }
+
+        const translateContent = async () => {
+            // Translate devotional
+            if (lesson.devotional) {
+                const textsToTranslate: string[] = [];
+                const keys: string[] = [];
+                
+                if (lesson.devotional.title) {
+                    textsToTranslate.push(lesson.devotional.title);
+                    keys.push('title');
+                }
+                if (lesson.devotional.content) {
+                    textsToTranslate.push(lesson.devotional.content);
+                    keys.push('content');
+                }
+                if (lesson.devotional.verse) {
+                    textsToTranslate.push(lesson.devotional.verse);
+                    keys.push('verse');
+                }
+                if (lesson.devotional.verseText) {
+                    textsToTranslate.push(lesson.devotional.verseText);
+                    keys.push('verseText');
+                }
+
+                if (textsToTranslate.length > 0) {
+                    const translated = await translateTexts(textsToTranslate);
+                    const devotionalTranslations: typeof translatedDevotional = {};
+                    keys.forEach((key, index) => {
+                        (devotionalTranslations as any)[key] = translated[index];
+                    });
+                    setTranslatedDevotional(devotionalTranslations);
+                }
+            }
+
+            // Translate quiz questions and options
+            if (lesson.activity?.type === 'quiz' && lesson.activity.questions) {
+                const translatedQs = await Promise.all(
+                    lesson.activity.questions.map(async (q: any) => {
+                        const [translatedQuestion, ...translatedOptions] = await translateTexts([
+                            q.question,
+                            ...q.options.map((o: any) => o.text)
+                        ]);
+                        return {
+                            question: translatedQuestion,
+                            options: translatedOptions
+                        };
+                    })
+                );
+                setTranslatedQuizQuestions(translatedQs);
+            }
+        };
+
+        translateContent();
+    }, [lesson, currentLanguage, translateTexts]);
 
     // Note: isVoiceUnlocked comes from UserContext - uses the same unlock system as BookReader
 
@@ -1194,7 +1271,7 @@ const LessonPlayerPage: React.FC = () => {
                                         {lesson.devotional.title && (
                                             <div className="text-center mb-6 relative z-10">
                                                 <h2 className="text-[#5D4037] text-3xl md:text-4xl font-black font-display drop-shadow-sm tracking-wide">
-                                                    {lesson.devotional.title}
+                                                    {translatedDevotional.title || lesson.devotional.title}
                                                 </h2>
                                                 <div className="w-32 h-1 bg-[#8B4513] mx-auto mt-2 rounded-full opacity-50"></div>
                                             </div>
@@ -1204,7 +1281,7 @@ const LessonPlayerPage: React.FC = () => {
                                         {lesson.devotional.content && (
                                             <div className="mb-8 relative z-10">
                                                 {/* Split content by paragraphs and render each with proper spacing */}
-                                                {lesson.devotional.content
+                                                {(translatedDevotional.content || lesson.devotional.content)
                                                     .replace(/\[[^\]]+\][.,!?;:'"-]*/g, '') // Remove [brackets] AND trailing punctuation
                                                     .split(/\n\n+|\.\s+(?=[A-Z])/) // Split by double newlines or sentence boundaries
                                                     .filter(p => p.trim().length > 0)
@@ -1225,9 +1302,9 @@ const LessonPlayerPage: React.FC = () => {
                                             <div className="relative z-10 mt-8 border-t-2 border-[#d4c59a] pt-6">
                                                 <div className="flex flex-col items-center text-center">
                                                     <span className="text-2xl mb-2">📜</span>
-                                                    <p className="text-[#8B4513] font-black text-lg font-display mb-2">{lesson.devotional.verse}</p>
+                                                    <p className="text-[#8B4513] font-black text-lg font-display mb-2">{translatedDevotional.verse || lesson.devotional.verse}</p>
                                                     {lesson.devotional.verseText && (
-                                                        <p className="text-[#5D4037] text-xl italic font-serif leading-relaxed max-w-lg">"{lesson.devotional.verseText}"</p>
+                                                        <p className="text-[#5D4037] text-xl italic font-serif leading-relaxed max-w-lg">"{translatedDevotional.verseText || lesson.devotional.verseText}"</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -1309,7 +1386,7 @@ const LessonPlayerPage: React.FC = () => {
                                                     {/* Current Question */}
                                                     <div className="mb-8">
                                                         <h3 className="text-[#3E2723] text-2xl font-bold mb-6 text-center font-serif leading-relaxed">
-                                                            {questions[currentQuestionIndex].question}
+                                                            {translatedQuizQuestions[currentQuestionIndex]?.question || questions[currentQuestionIndex].question}
                                                         </h3>
 
                                                         <div className="space-y-4">
@@ -1317,6 +1394,7 @@ const LessonPlayerPage: React.FC = () => {
                                                                 const isSelected = selectedAnswers.get(currentQuestionIndex) === optIndex;
                                                                 const isCorrect = option.isCorrect;
                                                                 const showResult = quizSubmitted;
+                                                                const translatedOptionText = translatedQuizQuestions[currentQuestionIndex]?.options?.[optIndex] || option.text;
 
                                                                 return (
                                                                     <button
@@ -1340,7 +1418,7 @@ const LessonPlayerPage: React.FC = () => {
                                                                                 }`}>
                                                                                 {String.fromCharCode(65 + optIndex)}
                                                                             </div>
-                                                                            <span className="text-lg font-medium">{option.text}</span>
+                                                                            <span className="text-lg font-medium">{translatedOptionText}</span>
                                                                             {showResult && isCorrect && <Check className="w-6 h-6 text-green-600 ml-auto" />}
                                                                             {showResult && isSelected && !isCorrect && <X className="w-6 h-6 text-red-600 ml-auto" />}
                                                                         </div>
