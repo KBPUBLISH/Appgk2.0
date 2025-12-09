@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, Mail, Lock, Eye, EyeOff, X, Loader2 } from 'lucide-react';
 import WoodButton from '../components/ui/WoodButton';
-import { ApiService } from '../services/apiService';
+import { ApiService, getApiBaseUrl } from '../services/apiService';
 
 const SignInPage: React.FC = () => {
   const navigate = useNavigate();
@@ -11,6 +11,41 @@ const SignInPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Forgot password modal state
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+
+  const handleForgotPassword = async () => {
+    if (!forgotEmail || !forgotEmail.includes('@')) {
+      setForgotError('Please enter a valid email address');
+      return;
+    }
+    
+    setForgotLoading(true);
+    setForgotError(null);
+    
+    try {
+      // For now, just show success message
+      // In the future, this would call an API to send a reset email
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      setForgotSuccess(true);
+    } catch (err) {
+      setForgotError('Something went wrong. Please try again.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const closeForgotPasswordModal = () => {
+    setShowForgotPassword(false);
+    setForgotEmail('');
+    setForgotSuccess(false);
+    setForgotError(null);
+  };
 
   const handleLogin = async (provider: 'apple' | 'google' | 'email', emailValue?: string, passwordValue?: string) => {
     setLoading(provider);
@@ -165,6 +200,20 @@ const SignInPage: React.FC = () => {
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
+                  
+                  {/* Forgot Password Link */}
+                  <div className="text-right">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotEmail(email); // Pre-fill with current email
+                        setShowForgotPassword(true);
+                      }}
+                      className="text-white/70 text-sm hover:text-white transition-colors underline"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
                 </div>
 
                 <WoodButton 
@@ -195,6 +244,98 @@ const SignInPage: React.FC = () => {
               </p>
           </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={closeForgotPasswordModal}
+          />
+          
+          {/* Modal */}
+          <div className="relative bg-gradient-to-b from-[#5c3d2e] to-[#3e2a1e] rounded-2xl border-4 border-[#8B4513] shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200">
+            {/* Close Button */}
+            <button
+              onClick={closeForgotPasswordModal}
+              className="absolute top-3 right-3 text-white/60 hover:text-white transition-colors"
+            >
+              <X size={24} />
+            </button>
+            
+            {/* Title */}
+            <h2 className="text-white font-display font-bold text-xl mb-2 text-center">
+              Reset Password
+            </h2>
+            
+            {forgotSuccess ? (
+              <div className="text-center py-4">
+                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Mail className="text-green-400" size={32} />
+                </div>
+                <p className="text-white mb-2">Check your email!</p>
+                <p className="text-white/70 text-sm mb-4">
+                  If an account exists with <span className="text-[#FFD700]">{forgotEmail}</span>, you'll receive password reset instructions.
+                </p>
+                <p className="text-white/50 text-xs mb-4">
+                  Didn't receive an email? Check your spam folder or contact us at <span className="text-[#FFD700]">support@godlykids.com</span>
+                </p>
+                <WoodButton onClick={closeForgotPasswordModal} fullWidth>
+                  Back to Sign In
+                </WoodButton>
+              </div>
+            ) : (
+              <>
+                <p className="text-white/70 text-sm text-center mb-4">
+                  Enter your email address and we'll send you instructions to reset your password.
+                </p>
+                
+                {forgotError && (
+                  <div className="bg-red-500/20 border border-red-500/50 text-white text-sm px-3 py-2 rounded-lg mb-3">
+                    {forgotError}
+                  </div>
+                )}
+                
+                <div className="relative mb-4">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" size={18} />
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    disabled={forgotLoading}
+                    className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-white/60 focus:outline-none focus:bg-white/15 focus:border-white/30 transition-colors"
+                    autoFocus
+                  />
+                </div>
+                
+                <WoodButton 
+                  onClick={handleForgotPassword}
+                  fullWidth
+                  disabled={forgotLoading || !forgotEmail}
+                >
+                  {forgotLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Sending...
+                    </span>
+                  ) : (
+                    'Send Reset Link'
+                  )}
+                </WoodButton>
+                
+                <button
+                  onClick={closeForgotPasswordModal}
+                  className="w-full text-white/60 text-sm mt-3 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
