@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Check, Plus, Trash2, UserCircle, Mic, X, ChevronDown, ChevronUp, BookOpen, Music, Sparkles, Users, Loader2, Lock, Crown, ClipboardList } from 'lucide-react';
+import { ChevronLeft, Check, Plus, Trash2, UserCircle, Mic, X, ChevronDown, ChevronUp, BookOpen, Music, Sparkles, Users, Loader2, Lock, Crown, ClipboardList, RefreshCw } from 'lucide-react';
 import WoodButton from '../components/ui/WoodButton';
 import { useUser } from '../context/UserContext';
 import { useAudio } from '../context/AudioContext';
@@ -59,7 +59,7 @@ const PaywallStep: React.FC<{
   setSelectedPlan: (plan: 'annual' | 'monthly') => void;
   onSubscribe: (email: string, password: string) => void;
   onSkip: () => void;
-  onRestore: (email?: string) => void;
+  onRestore: (email: string, password: string) => void;
   isPurchasing?: boolean;
   isRestoring?: boolean;
   error?: string | null;
@@ -396,55 +396,43 @@ const PaywallStep: React.FC<{
           No charge until trial ends
         </p>
 
-        {/* Restore Purchases */}
+        {/* Restore Purchases - Uses the account creation fields above */}
         <div className="mt-4 pt-4 border-t border-gray-200">
-          {!showRestoreInput ? (
-            <button
-              onClick={() => setShowRestoreInput(true)}
-              className="w-full text-[#8B4513] text-sm font-medium py-2 hover:underline"
-            >
-              Already subscribed? Restore Purchases
-            </button>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-[#5D4037] text-xs font-medium text-center">Enter your subscription email:</p>
-              <input
-                type="email"
-                value={restoreEmail}
-                onChange={(e) => setRestoreEmail(e.target.value)}
-                placeholder="your@email.com"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#3E1F07] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#FFD700] focus:ring-2 focus:ring-[#FFD700]/30"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setShowRestoreInput(false); setRestoreEmail(''); }}
-                  className="flex-1 px-3 py-2 text-[#8B4513] text-sm font-medium border border-[#8B4513] rounded-lg hover:bg-[#8B4513]/10 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    if (isValidEmail(restoreEmail)) {
-                      onRestore(restoreEmail);
-                    } else {
-                      setFormError('Please enter a valid email');
-                    }
-                  }}
-                  disabled={isRestoring || !restoreEmail.trim()}
-                  className="flex-1 px-3 py-2 bg-[#8B4513] text-white text-sm font-semibold rounded-lg hover:bg-[#A0522D] disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                >
-                  {isRestoring ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Checking...
-                    </>
-                  ) : (
-                    'Restore'
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
+          <p className="text-[#5D4037] text-xs text-center mb-3">
+            Already subscribed in the old app? Create your account above with the <strong>same email</strong>, then:
+          </p>
+          <button
+            onClick={() => {
+              if (!email.trim() || !isValidEmail(email)) {
+                setFormError('Please enter your email address above first');
+                return;
+              }
+              if (!password || password.length < 6) {
+                setFormError('Please enter a password (6+ characters) above first');
+                return;
+              }
+              if (password !== confirmPassword) {
+                setFormError('Passwords do not match');
+                return;
+              }
+              // Create account first, then restore
+              onRestore(email, password);
+            }}
+            disabled={isRestoring}
+            className="w-full px-4 py-2.5 bg-[#5D4037] text-white text-sm font-semibold rounded-lg hover:bg-[#4E342E] disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+          >
+            {isRestoring ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Restoring...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4" />
+                Restore Previous Subscription
+              </>
+            )}
+          </button>
         </div>
         
         {formError && (
@@ -770,48 +758,73 @@ const OnboardingPage: React.FC = () => {
     setShowParentGate(true);
   };
 
-  const handleRestorePurchases = async (restoreEmail?: string) => {
+  const handleRestorePurchases = async (restoreEmail: string, restorePassword: string) => {
     setIsRestoring(true);
     setPurchaseError(null);
     
     try {
-      // First, check old backend for subscription by email
-      if (restoreEmail) {
-        console.log('🔍 Checking old backend for subscription:', restoreEmail);
-        
-        const migrationResponse = await fetch(`${import.meta.env.VITE_API_URL || 'https://backendgk2-0.onrender.com'}/api/migration/restore-subscription`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: restoreEmail }),
-        });
-        
-        const migrationResult = await migrationResponse.json();
-        console.log('📦 Migration result:', migrationResult);
-        
-        if (migrationResult.success && migrationResult.subscriptionRestored) {
-          playSuccess();
-          localStorage.setItem('godlykids_premium', 'true');
-          localStorage.setItem('godlykids_user_email', restoreEmail);
-          setSubscribedDuringOnboarding(true);
-          navigate('/home');
+      // Step 1: Create account in the new backend first
+      console.log('📧 Creating user account:', restoreEmail);
+      
+      const signUpResult = await ApiService.signUp(restoreEmail, restorePassword);
+      
+      if (signUpResult.success) {
+        console.log('✅ Account created successfully!');
+        localStorage.setItem('godlykids_user_email', restoreEmail);
+        window.dispatchEvent(new Event('authTokenUpdated'));
+      } else {
+        // If account already exists, try logging in instead
+        if (signUpResult.error?.includes('exists') || signUpResult.error?.includes('duplicate')) {
+          console.log('📧 Account exists, attempting login...');
+          const loginResult = await ApiService.login('email', { email: restoreEmail, password: restorePassword });
+          if (loginResult.success) {
+            console.log('✅ Logged in successfully!');
+            localStorage.setItem('godlykids_user_email', restoreEmail);
+            window.dispatchEvent(new Event('authTokenUpdated'));
+          } else {
+            setPurchaseError('Account exists but password is incorrect. Please use Sign In instead.');
+            setIsRestoring(false);
+            return;
+          }
+        } else {
+          console.error('❌ Account creation failed:', signUpResult.error);
+          setPurchaseError(signUpResult.error || 'Failed to create account. Please try again.');
+          setIsRestoring(false);
           return;
         }
       }
       
-      // Then try RevenueCat restore
+      // Step 2: Now try to restore subscription from old backend
+      console.log('🔍 Checking old backend for subscription:', restoreEmail);
+      
+      const migrationResponse = await fetch(`${import.meta.env.VITE_API_URL || 'https://backendgk2-0.onrender.com'}/api/migration/restore-subscription`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: restoreEmail }),
+      });
+      
+      const migrationResult = await migrationResponse.json();
+      console.log('📦 Migration result:', migrationResult);
+      
+      if (migrationResult.success && migrationResult.subscriptionRestored) {
+        playSuccess();
+        localStorage.setItem('godlykids_premium', 'true');
+        setSubscribedDuringOnboarding(true);
+        navigate('/home');
+        return;
+      }
+      
+      // Step 3: If no old subscription, try RevenueCat restore
       const revenueCatModule = await import('../services/revenueCatService');
       const revenueCatService = revenueCatModule.default;
       const result = await revenueCatService.restorePurchases();
       
       if (result.success && result.isPremium) {
         playSuccess();
-        if (restoreEmail) {
-          localStorage.setItem('godlykids_user_email', restoreEmail);
-        }
         setSubscribedDuringOnboarding(true);
         navigate('/home');
       } else {
-        setPurchaseError('No active subscription found with that email. Start a new subscription below.');
+        setPurchaseError('No active subscription found with that email. Your account was created - you can start a new subscription below.');
       }
     } catch (error: any) {
       console.error('Restore error:', error);
