@@ -293,27 +293,18 @@ const PaywallStep: React.FC<{
               )}
             </button>
             
-            {/* Restore Link */}
+            {/* Sign In Link */}
             <div className="text-center pt-2">
               <p className="text-[#8B4513] text-xs">
                 Already have an account?{' '}
                 <button
                   onClick={() => {
-                    console.log('🔄 Sign in & Restore clicked');
-                    console.log('🔄 Email from state:', email);
-                    console.log('🔄 Password from state:', password ? '(has password)' : '(no password)');
-                    
-                    if (!isAccountFormValid()) {
-                      setFormError('Please fill in your email and password first');
-                      return;
-                    }
-                    console.log('🔄 Calling onRestore with email:', email);
-                    onRestore(email, password);
+                    // Navigate to sign-in page
+                    window.location.href = '/sign-in';
                   }}
-                  disabled={isRestoring}
                   className="text-[#1976D2] font-semibold underline"
                 >
-                  {isRestoring ? 'Restoring...' : 'Sign in & Restore'}
+                  Sign In
                 </button>
               </p>
             </div>
@@ -542,6 +533,18 @@ const PaywallStep: React.FC<{
         >
           {accountCreated ? 'Continue with limited access' : 'Create account first to continue'}
         </button>
+        
+        {/* Restore Purchases Link */}
+        <div className="mt-3">
+          <button
+            onClick={() => onRestore(email, password)}
+            disabled={isRestoring || !accountCreated}
+            className={`text-xs transition-colors ${accountCreated ? 'text-[#FFD700]/70 hover:text-[#FFD700]' : 'text-white/20 cursor-not-allowed'}`}
+          >
+            {isRestoring ? 'Restoring...' : '🔄 Restore Previous Subscription'}
+          </button>
+        </div>
+        
         <p className="text-white/30 text-[10px] mt-3">
           Loved by 10,000+ Christian families 🙏
         </p>
@@ -848,53 +851,45 @@ const OnboardingPage: React.FC = () => {
     setShowParentGate(true);
   };
 
-  const handleRestorePurchases = async (restoreEmail: string, restorePassword: string) => {
+  const handleRestorePurchases = async (restoreEmail: string, _restorePassword: string) => {
     console.log('🔄 handleRestorePurchases called');
     console.log('🔄 restoreEmail received:', restoreEmail);
-    console.log('🔄 restorePassword received:', restorePassword ? '(has password)' : '(no password)');
     
     setIsRestoring(true);
     setPurchaseError(null);
     
     try {
-      // Step 1: Create account in the new backend first
-      console.log('📧 Creating user account:', restoreEmail);
+      // Account should already be created at this point
+      const emailToUse = restoreEmail || localStorage.getItem('godlykids_user_email');
       
-      const signUpResult = await ApiService.signUp(restoreEmail, restorePassword);
-      
-      if (signUpResult.success) {
-        console.log('✅ Account created successfully!');
-        localStorage.setItem('godlykids_user_email', restoreEmail);
-        window.dispatchEvent(new Event('authTokenUpdated'));
-      } else {
-        // If account already exists, try logging in instead
-        if (signUpResult.error?.includes('exists') || signUpResult.error?.includes('duplicate')) {
-          console.log('📧 Account exists, attempting login...');
-          const loginResult = await ApiService.login('email', { email: restoreEmail, password: restorePassword });
-          if (loginResult.success) {
-            console.log('✅ Logged in successfully!');
-            localStorage.setItem('godlykids_user_email', restoreEmail);
-            window.dispatchEvent(new Event('authTokenUpdated'));
-          } else {
-            setPurchaseError('Account exists but password is incorrect. Please use Sign In instead.');
-            setIsRestoring(false);
-            return;
-          }
-        } else {
-          console.error('❌ Account creation failed:', signUpResult.error);
-          setPurchaseError(signUpResult.error || 'Failed to create account. Please try again.');
-          setIsRestoring(false);
-          return;
-        }
+      if (!emailToUse) {
+        setPurchaseError('Please create your account first before restoring.');
+        setIsRestoring(false);
+        return;
       }
       
-      // Step 2: Now try to restore subscription from old backend
-      console.log('🔍 Checking old backend for subscription:', restoreEmail);
+      // Step 1: First try native RevenueCat/DeSpia restore (checks Apple/Google directly)
+      console.log('🔄 Attempting native restore first...');
+      const revenueCatModule = await import('../services/revenueCatService');
+      const revenueCatService = revenueCatModule.default;
+      const nativeResult = await revenueCatService.restorePurchases();
+      console.log('🔄 Native restore result:', nativeResult);
+      
+      if (nativeResult.success && nativeResult.isPremium) {
+        playSuccess();
+        localStorage.setItem('godlykids_premium', 'true');
+        setSubscribedDuringOnboarding(true);
+        navigate('/home');
+        return;
+      }
+      
+      // Step 2: Check old backend migration API
+      console.log('🔍 Checking old backend for subscription:', emailToUse);
       
       const migrationResponse = await fetch(`${import.meta.env.VITE_API_URL || 'https://backendgk2-0.onrender.com'}/api/migration/restore-subscription`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: restoreEmail }),
+        body: JSON.stringify({ email: emailToUse }),
       });
       
       const migrationResult = await migrationResponse.json();
@@ -908,18 +903,14 @@ const OnboardingPage: React.FC = () => {
         return;
       }
       
-      // Step 3: If no old subscription, try RevenueCat restore
-      const revenueCatModule = await import('../services/revenueCatService');
-      const revenueCatService = revenueCatModule.default;
-      const result = await revenueCatService.restorePurchases();
-      
-      if (result.success && result.isPremium) {
-        playSuccess();
-        setSubscribedDuringOnboarding(true);
-        navigate('/home');
+      // No subscription found anywhere
+      if (migrationResult.found) {
+        // Account exists in old backend but no active subscription
+        setPurchaseError(migrationResult.message || 'Account found but subscription has expired. Please subscribe below.');
       } else {
-        setPurchaseError('No active subscription found with that email. Your account was created - you can start a new subscription below.');
+        setPurchaseError('No active subscription found for this email or device. If you recently subscribed, please wait a moment and try again.');
       }
+      
     } catch (error: any) {
       console.error('Restore error:', error);
       setPurchaseError('Failed to restore purchases. Please try again.');
