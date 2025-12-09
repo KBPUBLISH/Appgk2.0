@@ -57,14 +57,30 @@ const isNativeApp = (): boolean => {
 };
 
 // Get the current user ID for RevenueCat external_id
+// IMPORTANT: We use email as the primary identifier so users show up with their email in RevenueCat
 const getUserId = (): string => {
-  // Try to get user ID from localStorage (set during login)
+  // First, check for email stored directly (most reliable)
+  const userEmail = localStorage.getItem('godlykids_user_email');
+  if (userEmail) {
+    console.log('🔑 RevenueCat using email as external_id:', userEmail);
+    return userEmail;
+  }
+  
+  // Try to get user data from localStorage (set during login)
   const userDataStr = localStorage.getItem('godlykids_user');
   if (userDataStr) {
     try {
       const userData = JSON.parse(userDataStr);
-      // Prefer MongoDB _id, fallback to email
-      return userData._id || userData.id || userData.email || `user_${Date.now()}`;
+      // Prefer email for RevenueCat identification
+      if (userData.email) {
+        console.log('🔑 RevenueCat using email from user data:', userData.email);
+        return userData.email;
+      }
+      // Fallback to _id if no email
+      if (userData._id || userData.id) {
+        console.log('🔑 RevenueCat using user ID:', userData._id || userData.id);
+        return userData._id || userData.id;
+      }
     } catch {
       // JSON parse error
     }
@@ -76,6 +92,7 @@ const getUserId = (): string => {
     deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     localStorage.setItem('godlykids_device_id', deviceId);
   }
+  console.log('🔑 RevenueCat using device ID:', deviceId);
   return deviceId;
 };
 
