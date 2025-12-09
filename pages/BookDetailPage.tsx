@@ -68,6 +68,10 @@ const BookDetailPage: React.FC = () => {
   const [favoriteCount, setFavoriteCount] = useState<number>(0);
   const [isFavorited, setIsFavorited] = useState<boolean>(false);
   const [isInLibrary, setIsInLibrary] = useState<boolean>(false);
+  const [isMembersOnly, setIsMembersOnly] = useState<boolean>(false);
+  
+  // Check if book is locked (members only and user not subscribed)
+  const isLocked = isMembersOnly && !isSubscribed;
 
   // Restore background music when returning from book reader
   useEffect(() => {
@@ -154,13 +158,9 @@ const BookDetailPage: React.FC = () => {
         // Fetch full book data from API
         const fullBook = await ApiService.getBookById(id);
         
-        // Check if book is members-only and user is not subscribed
+        // Store members-only status for UI display (don't redirect - show locked button instead)
         const bookIsMembersOnly = (fullBook as any)?.isMembersOnly === true;
-        if (bookIsMembersOnly && !isSubscribed) {
-          console.log('🔒 Book is members-only and user is not subscribed. Redirecting to paywall.');
-          navigate('/paywall', { state: { from: `/book-details/${id}` } });
-          return;
-        }
+        setIsMembersOnly(bookIsMembersOnly);
         
         if (fullBook && (fullBook as any).rawData) {
           const rawData = (fullBook as any).rawData;
@@ -380,30 +380,49 @@ const BookDetailPage: React.FC = () => {
             <div className="absolute bottom-3 left-4 text-white/80 text-xl animate-pulse delay-700 filter drop-shadow-md">✨</div>
           </div>
 
+          {/* Premium Badge for Members Only Content */}
+          {isMembersOnly && (
+            <div className="flex items-center gap-2 bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-[#5c2e0b] px-4 py-2 rounded-full shadow-lg border-2 border-[#B8860B]">
+              <Crown size={18} />
+              <span className="font-display font-bold text-sm">{t('premiumContent') || 'PREMIUM CONTENT'}</span>
+            </div>
+          )}
+
           {isAudio ? (
             // --- AUDIO BOOK SPECIFIC ACTIONS ---
             <>
-              {/* Add to Library Button */}
+              {/* Listen Button - Locked or Normal */}
               <div className="w-full max-w-sm">
-                <button
-                  onClick={handleSaveToLibrary}
-                  className={`w-full bg-gradient-to-b ${isInLibrary 
-                    ? 'from-[#6da34d] to-[#5a8a3f] hover:from-[#7db85b] hover:to-[#6a9a4f]' 
-                    : 'from-[#8B4513] to-[#5c2e0b] hover:from-[#A0522D] hover:to-[#70380d]'
-                  } text-[#f3e5ab] font-display font-bold text-xl py-3 rounded-full shadow-[0_4px_0_#3e1f07,0_8px_15px_rgba(0,0,0,0.4)] border-2 border-[#a05f2c] active:translate-y-[4px] active:shadow-[0_0_0_#3e1f07] transition-all text-center flex items-center justify-center gap-2`}
-                >
-                  {isInLibrary ? (
-                    <>
-                      <Bookmark size={20} fill="currentColor" />
-                      <span>{t('savedToLibrary') || 'Saved to Library'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={20} />
-                      <span>{t('saveToLibrary') || 'Save to Library'}</span>
-                    </>
-                  )}
-                </button>
+                {isLocked ? (
+                  <button
+                    onClick={() => navigate('/paywall', { state: { from: `/book-details/${id}` } })}
+                    className="w-full bg-gradient-to-b from-[#FFD700] to-[#FFA500] hover:from-[#FFE44D] hover:to-[#FFB733] text-[#5c2e0b] font-display font-bold text-xl py-3 rounded-full shadow-[0_4px_0_#B8860B,0_8px_15px_rgba(0,0,0,0.4)] border-2 border-[#B8860B] active:translate-y-[4px] active:shadow-[0_0_0_#B8860B] transition-all text-center flex items-center justify-center gap-2"
+                  >
+                    <Lock size={20} />
+                    <span>{t('unlockToListen') || 'Unlock to Listen'}</span>
+                    <Crown size={18} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSaveToLibrary}
+                    className={`w-full bg-gradient-to-b ${isInLibrary 
+                      ? 'from-[#6da34d] to-[#5a8a3f] hover:from-[#7db85b] hover:to-[#6a9a4f]' 
+                      : 'from-[#8B4513] to-[#5c2e0b] hover:from-[#A0522D] hover:to-[#70380d]'
+                    } text-[#f3e5ab] font-display font-bold text-xl py-3 rounded-full shadow-[0_4px_0_#3e1f07,0_8px_15px_rgba(0,0,0,0.4)] border-2 border-[#a05f2c] active:translate-y-[4px] active:shadow-[0_0_0_#3e1f07] transition-all text-center flex items-center justify-center gap-2`}
+                  >
+                    {isInLibrary ? (
+                      <>
+                        <Bookmark size={20} fill="currentColor" />
+                        <span>{t('savedToLibrary') || 'Saved to Library'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={20} />
+                        <span>{t('saveToLibrary') || 'Save to Library'}</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
 
               {/* Stats Row (Audio) */}
@@ -434,21 +453,36 @@ const BookDetailPage: React.FC = () => {
             <>
               {/* Read / Continue Buttons */}
               <div className="flex w-full gap-3 max-w-sm">
-                <button
-                  onClick={() => navigate(`/read/${id}`)}
-                  className="flex-1 bg-[#FCEBB6] hover:bg-[#fff5cc] text-[#5c2e0b] font-display font-bold text-xl py-3 rounded-2xl shadow-[0_4px_0_#D4B483] border-2 border-[#D4B483] active:translate-y-[4px] active:shadow-none transition-all text-center leading-none"
-                >
-                  {t('read')}
-                </button>
-                {savedPageIndex !== null && savedPageIndex >= 0 ? (
+                {isLocked ? (
+                  // Locked state - show premium button that goes to paywall
                   <button
-                    onClick={handleContinue}
-                    className="flex-1 bg-[#FCEBB6] hover:bg-[#fff5cc] text-[#5c2e0b] font-display font-bold text-xl py-3 rounded-2xl shadow-[0_4px_0_#D4B483] border-2 border-[#D4B483] active:translate-y-[4px] active:shadow-none transition-all text-center leading-none flex flex-col items-center justify-center gap-0.5"
+                    onClick={() => navigate('/paywall', { state: { from: `/book-details/${id}` } })}
+                    className="flex-1 bg-gradient-to-b from-[#FFD700] to-[#FFA500] hover:from-[#FFE44D] hover:to-[#FFB733] text-[#5c2e0b] font-display font-bold text-xl py-3 rounded-2xl shadow-[0_4px_0_#B8860B] border-2 border-[#B8860B] active:translate-y-[4px] active:shadow-none transition-all text-center leading-none flex items-center justify-center gap-2"
                   >
-                    <span>{t('continue')}</span>
-                    <span className="text-[10px] font-sans font-normal opacity-80">({t('pages') || 'Page'} {savedPageIndex + 1})</span>
+                    <Lock size={20} />
+                    <span>{t('unlockToRead') || 'Unlock to Read'}</span>
+                    <Crown size={18} className="text-[#8B4513]" />
                   </button>
-                ) : null}
+                ) : (
+                  // Normal unlocked state
+                  <>
+                    <button
+                      onClick={() => navigate(`/read/${id}`)}
+                      className="flex-1 bg-[#FCEBB6] hover:bg-[#fff5cc] text-[#5c2e0b] font-display font-bold text-xl py-3 rounded-2xl shadow-[0_4px_0_#D4B483] border-2 border-[#D4B483] active:translate-y-[4px] active:shadow-none transition-all text-center leading-none"
+                    >
+                      {t('read')}
+                    </button>
+                    {savedPageIndex !== null && savedPageIndex >= 0 ? (
+                      <button
+                        onClick={handleContinue}
+                        className="flex-1 bg-[#FCEBB6] hover:bg-[#fff5cc] text-[#5c2e0b] font-display font-bold text-xl py-3 rounded-2xl shadow-[0_4px_0_#D4B483] border-2 border-[#D4B483] active:translate-y-[4px] active:shadow-none transition-all text-center leading-none flex flex-col items-center justify-center gap-0.5"
+                      >
+                        <span>{t('continue')}</span>
+                        <span className="text-[10px] font-sans font-normal opacity-80">({t('pages') || 'Page'} {savedPageIndex + 1})</span>
+                      </button>
+                    ) : null}
+                  </>
+                )}
               </div>
 
               {/* Associated Games from Games Management */}

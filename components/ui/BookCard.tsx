@@ -56,11 +56,7 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
   return (
     <div 
       onClick={() => {
-        if (isLocked) {
-          // Could show a modal here to prompt subscription
-          console.log('🔒 Content is locked - subscription required');
-          return;
-        }
+        // Always allow clicking to see book details - button will be locked there
         onClick(book.id);
       }}
       className={`bg-white/10 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg border-2 border-white/20 hover:shadow-2xl hover:scale-105 transition-all cursor-pointer group ${isLocked ? 'opacity-80' : ''}`}

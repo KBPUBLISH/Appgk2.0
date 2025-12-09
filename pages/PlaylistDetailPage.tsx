@@ -224,12 +224,8 @@ const PlaylistDetailPage: React.FC = () => {
             }
             const data = await response.json();
             
-            // Check if playlist is members-only and user is not subscribed
-            if (data.isMembersOnly && !isSubscribed) {
-                console.log('🔒 Playlist is members-only and user is not subscribed. Redirecting to paywall.');
-                navigate('/paywall', { state: { from: `/playlist/${playlistId}` } });
-                return;
-            }
+            // NOTE: Individual items within the playlist can be marked as isMembersOnly
+            // The check is done in handleItemClick() when user tries to play a locked item
             
             // Sort items by order
             if (data.items && Array.isArray(data.items)) {
@@ -287,6 +283,17 @@ const PlaylistDetailPage: React.FC = () => {
     };
 
     const handleItemClick = (itemIndex: number) => {
+        const item = playlist?.items[itemIndex];
+        
+        // Check if this item is locked (members only and user not subscribed)
+        const itemIsLocked = item?.isMembersOnly && !isSubscribed;
+        
+        if (itemIsLocked) {
+            // Redirect to paywall
+            navigate('/paywall', { state: { from: `/playlist/${playlistId}` } });
+            return;
+        }
+        
         // Check if this exact track is already playing
         if (isThisPlaylistPlaying && currentTrackIndex === itemIndex) {
             // Toggle play/pause
@@ -478,27 +485,30 @@ const PlaylistDetailPage: React.FC = () => {
                     {playlist.items.map((item, index) => {
                         const trackPlaying = isTrackPlaying(index);
                         const isCurrent = isCurrentTrack(index);
+                        const itemIsLocked = (item as any).isMembersOnly && !isSubscribed;
                         
                         return (
                             <div
                                 key={item._id || index}
                                 onClick={() => handleItemClick(index)}
                                 className={`rounded-xl overflow-hidden shadow-md border-2 hover:shadow-xl hover:scale-[1.02] transition-all cursor-pointer group ${
-                                    isCurrent 
-                                        ? 'bg-[#FFF8E1] border-[#FFD700] ring-2 ring-[#FFD700]/50' 
-                                        : 'bg-white border-[#d4c5a0]'
+                                    itemIsLocked
+                                        ? 'bg-gray-100 border-gray-300 opacity-90'
+                                        : isCurrent 
+                                            ? 'bg-[#FFF8E1] border-[#FFD700] ring-2 ring-[#FFD700]/50' 
+                                            : 'bg-white border-[#d4c5a0]'
                                 }`}
                             >
                                 <div className="flex items-center gap-4 p-4">
                                     {/* Cover Image or Icon */}
                                     <div className={`w-16 h-16 rounded-lg overflow-hidden border-2 shrink-0 relative ${
-                                        isCurrent ? 'border-[#FFD700]' : 'border-[#d4c5a0]'
+                                        itemIsLocked ? 'border-gray-400' : isCurrent ? 'border-[#FFD700]' : 'border-[#d4c5a0]'
                                     }`}>
                                         {item.coverImage ? (
                                             <img
                                                 src={item.coverImage}
                                                 alt={item.title}
-                                                className="w-full h-full object-cover"
+                                                className={`w-full h-full object-cover ${itemIsLocked ? 'filter brightness-75' : ''}`}
                                             />
                                         ) : (
                                             <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
@@ -509,8 +519,14 @@ const PlaylistDetailPage: React.FC = () => {
                                                 )}
                                             </div>
                                         )}
+                                        {/* Locked indicator on cover */}
+                                        {itemIsLocked && (
+                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                                <Lock className="w-6 h-6 text-white" />
+                                            </div>
+                                        )}
                                         {/* Playing indicator on cover */}
-                                        {trackPlaying && (
+                                        {!itemIsLocked && trackPlaying && (
                                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                                                 <div className="flex items-end gap-0.5 h-4">
                                                     <div className="w-1 bg-[#FFD700] rounded-full animate-[soundBar1_0.5s_ease-in-out_infinite]" style={{ height: '100%' }} />
@@ -523,21 +539,30 @@ const PlaylistDetailPage: React.FC = () => {
 
                                     {/* Item Info */}
                                     <div className="flex-1 min-w-0">
-                                        <h3 className={`text-lg font-bold truncate font-display ${
-                                            isCurrent ? 'text-[#8B4513]' : 'text-[#3E1F07]'
-                                        }`}>
-                                            {item.title}
-                                        </h3>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className={`text-lg font-bold truncate font-display ${
+                                                itemIsLocked ? 'text-gray-600' : isCurrent ? 'text-[#8B4513]' : 'text-[#3E1F07]'
+                                            }`}>
+                                                {item.title}
+                                            </h3>
+                                            {/* Premium badge for locked items */}
+                                            {itemIsLocked && (
+                                                <span className="shrink-0 text-[10px] font-bold text-[#B8860B] bg-gradient-to-r from-[#FFD700] to-[#FFA500] px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                    <Crown className="w-3 h-3" />
+                                                    PREMIUM
+                                                </span>
+                                            )}
+                                        </div>
                                         {item.author && (
-                                            <p className="text-sm text-[#8B4513] truncate">{item.author}</p>
+                                            <p className={`text-sm truncate ${itemIsLocked ? 'text-gray-500' : 'text-[#8B4513]'}`}>{item.author}</p>
                                         )}
                                         <div className="flex items-center gap-2 mt-1">
                                             {item.duration && (
-                                                <p className="text-xs text-[#5c2e0b] opacity-75">
+                                                <p className={`text-xs opacity-75 ${itemIsLocked ? 'text-gray-500' : 'text-[#5c2e0b]'}`}>
                                                     {formatDuration(item.duration)}
                                                 </p>
                                             )}
-                                            {isCurrent && (
+                                            {!itemIsLocked && isCurrent && (
                                                 <span className="text-xs font-bold text-[#8B4513] bg-[#FFD700]/30 px-2 py-0.5 rounded-full">
                                                     {trackPlaying ? 'Now Playing' : 'Paused'}
                                                 </span>
@@ -545,18 +570,24 @@ const PlaylistDetailPage: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {/* Play/Pause Button */}
-                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-colors shrink-0 ${
-                                        trackPlaying 
-                                            ? 'bg-[#FFD700] group-hover:bg-[#FFC107]' 
-                                            : 'bg-[#8B4513] group-hover:bg-[#6B3410]'
-                                    }`}>
-                                        {trackPlaying ? (
-                                            <Pause className="w-6 h-6 text-[#3E1F07]" fill="#3E1F07" />
-                                        ) : (
-                                            <Play className="w-6 h-6 text-white ml-1" fill="white" />
-                                        )}
-                                    </div>
+                                    {/* Play/Pause or Lock Button */}
+                                    {itemIsLocked ? (
+                                        <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-colors shrink-0 bg-gradient-to-br from-[#FFD700] to-[#FFA500] group-hover:from-[#FFE44D] group-hover:to-[#FFB733]">
+                                            <Lock className="w-5 h-5 text-[#5c2e0b]" />
+                                        </div>
+                                    ) : (
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-colors shrink-0 ${
+                                            trackPlaying 
+                                                ? 'bg-[#FFD700] group-hover:bg-[#FFC107]' 
+                                                : 'bg-[#8B4513] group-hover:bg-[#6B3410]'
+                                        }`}>
+                                            {trackPlaying ? (
+                                                <Pause className="w-6 h-6 text-[#3E1F07]" fill="#3E1F07" />
+                                            ) : (
+                                                <Play className="w-6 h-6 text-white ml-1" fill="white" />
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         );
