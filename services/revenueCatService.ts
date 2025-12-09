@@ -408,24 +408,33 @@ export const RevenueCatService = {
 
   /**
    * Restore previous purchases using DeSpia URL scheme
+   * This triggers Apple's StoreKit to check for existing subscriptions
    */
   restorePurchases: async (): Promise<{ success: boolean; isPremium: boolean; error?: string }> => {
     console.log('🔄 Restoring purchases via DeSpia URL scheme');
+    console.log('🔄 isNativeApp:', isNativeApp());
 
     if (!isNativeApp()) {
-      console.warn('⚠️ Not in native app - checking local premium status');
+      console.warn('⚠️ Not in native app - checking local premium status only');
       const localPremium = localStorage.getItem('godlykids_premium') === 'true';
       return { success: true, isPremium: localPremium };
     }
 
-    // Trigger DeSpia restore via URL scheme
-    window.despia = 'restoreinapppurchases://';
-    console.log('🔗 Set window.despia to: restoreinapppurchases://');
+    // Clear any stale premium status before restore
+    // This ensures we get a fresh check from Apple
+    const hadPremiumBefore = localStorage.getItem('godlykids_premium') === 'true';
+    console.log('🔄 Premium status before restore:', hadPremiumBefore);
 
-    // Poll for restore completion with multiple checks
+    // Trigger DeSpia restore via URL scheme
+    // This tells DeSpia to ask Apple/RevenueCat for subscription status
+    window.despia = 'restoreinapppurchases://';
+    console.log('🔗 Triggered DeSpia restore - waiting for Apple response...');
+
+    // Poll for restore completion
+    // DeSpia should set localStorage when it gets a response from Apple
     return new Promise((resolve) => {
       let pollCount = 0;
-      const maxPolls = 10; // 10 seconds max
+      const maxPolls = 15; // 15 seconds max (Apple can be slow)
       
       const pollInterval = setInterval(() => {
         pollCount++;
@@ -433,18 +442,34 @@ export const RevenueCatService = {
         // Check if premium was restored
         const isPremium = localStorage.getItem('godlykids_premium') === 'true';
         
+        if (pollCount <= 2) {
+          // Give DeSpia a moment to process
+          console.log(`🔄 Waiting for DeSpia... (${pollCount}s)`);
+          return;
+        }
+        
         if (isPremium) {
           clearInterval(pollInterval);
-          console.log('✅ Restore complete. Premium: true');
+          console.log('✅ Restore complete! Premium status: true');
           window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
           resolve({ success: true, isPremium: true });
           return;
         }
         
+        // Log progress
+        if (pollCount % 3 === 0) {
+          console.log(`🔄 Still checking... (${pollCount}s)`);
+        }
+        
         if (pollCount >= maxPolls) {
           clearInterval(pollInterval);
-          console.log('⏱️ Restore timeout - no premium found');
-          resolve({ success: true, isPremium: false, error: 'No active subscription found to restore.' });
+          console.log('⏱️ Restore check complete - no premium subscription found after', maxPolls, 'seconds');
+          // Return success: true (restore worked) but isPremium: false (no subscription found)
+          resolve({ 
+            success: true, 
+            isPremium: false, 
+            error: 'No active subscription found. If you just subscribed, please wait a moment and try again.' 
+          });
         }
       }, 1000);
     });

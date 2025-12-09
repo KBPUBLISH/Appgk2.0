@@ -73,17 +73,36 @@ const PaywallPage: React.FC = () => {
     setMigrationResult(null);
 
     try {
-      // First, try native RevenueCat restore
+      console.log('🔄 Starting restore purchases...');
+      
+      // First, try native RevenueCat/DeSpia restore (this asks Apple directly)
       const result = await restorePurchases();
+      console.log('🔄 Native restore result:', result);
 
-      if (result.success && isPremium) {
+      // Check if premium was set (either by restore or by checking localStorage)
+      // Give a moment for state to propagate
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Check localStorage directly since state might not have updated yet
+      const localPremium = localStorage.getItem('godlykids_premium') === 'true';
+      console.log('🔄 Local premium after restore:', localPremium);
+      
+      if (result.success && (result.isPremium || localPremium)) {
         // Native restore worked!
+        console.log('✅ Restore successful - user has premium!');
+        subscribe(); // Update context
+        setMigrationResult({
+          type: 'success',
+          message: 'Your subscription has been restored! 🎉',
+        });
+        setTimeout(() => navigate('/home'), 1500);
         return;
       }
 
-      // If native restore didn't find purchases, try migration API for old app users
+      // If native restore didn't find purchases, also try migration API for old app users
       const user = authService.getUser();
       if (user?.email) {
+        console.log('🔄 Checking migration API for:', user.email);
         const baseUrl = getApiBaseUrl();
         const migrationResponse = await fetch(`${baseUrl}migration/restore-subscription`, {
           method: 'POST',
@@ -92,6 +111,7 @@ const PaywallPage: React.FC = () => {
         });
 
         const migrationData = await migrationResponse.json();
+        console.log('🔄 Migration result:', migrationData);
 
         if (migrationData.subscriptionRestored) {
           // Successfully restored from old app!
@@ -100,7 +120,6 @@ const PaywallPage: React.FC = () => {
             type: 'success',
             message: 'Welcome back! Your subscription from the old app has been restored! 🎉',
           });
-          // Redirect after a short delay to show message
           setTimeout(() => navigate('/home'), 2000);
           return;
         } else if (migrationData.found) {
@@ -112,11 +131,12 @@ const PaywallPage: React.FC = () => {
         }
       }
 
-      // No purchases found from either source
-      setError('No previous purchases found');
+      // No purchases found - but Apple might still know about it
+      // This could happen if the subscription is valid in Apple but not linked to our user
+      setError('No subscription found. If you just subscribed, please try again in a few seconds or contact support.');
     } catch (err: any) {
       console.error('Restore error:', err);
-      setError(err.message || 'Failed to restore purchases');
+      setError(err.message || 'Failed to restore purchases. Please try again.');
     } finally {
       setIsRestoring(false);
     }
