@@ -20,6 +20,7 @@ import BookReaderPage from './pages/BookReaderPage';
 import AudioPage from './pages/AudioPage';
 import PlaylistPlayerPage from './pages/PlaylistPlayerPage';
 import PlaylistDetailPage from './pages/PlaylistDetailPage';
+import BookSeriesDetailPage from './pages/BookSeriesDetailPage';
 import LessonsPage from './pages/LessonsPage';
 import LessonPlayerPage from './pages/LessonPlayerPage';
 import VideoLessonDemo from './pages/VideoLessonDemo';
@@ -228,6 +229,7 @@ const App: React.FC = () => {
                 <Route path="/audio" element={<AudioPage />} />
                 <Route path="/audio/playlist/:playlistId" element={<PlaylistDetailPage />} />
                 <Route path="/audio/playlist/:playlistId/play/:itemIndex" element={<PlaylistPlayerPage />} />
+                <Route path="/book-series/:seriesId" element={<BookSeriesDetailPage />} />
                 <Route path="/lessons" element={<LessonsPage />} />
                 <Route path="/lesson/:lessonId" element={<LessonPlayerPage />} />
                 <Route path="/profile" element={<ProfileSelectionPage />} />

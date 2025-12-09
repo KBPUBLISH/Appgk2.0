@@ -1,7 +1,8 @@
-// Favorites Service - Manages user's favorite books and playlists
+// Favorites Service - Manages user's favorite books, playlists, and book series
 const FAVORITES_KEY = 'godlykids_favorites';
 const LIKES_KEY = 'godlykids_likes';
 const PLAYLIST_FAVORITES_KEY = 'godlykids_playlist_favorites';
+const BOOK_SERIES_FAVORITES_KEY = 'godlykids_book_series_favorites';
 
 export interface FavoriteBook {
   bookId: string;
@@ -10,6 +11,11 @@ export interface FavoriteBook {
 
 export interface FavoritePlaylist {
   playlistId: string;
+  addedAt: number; // timestamp
+}
+
+export interface FavoriteBookSeries {
+  seriesId: string;
   addedAt: number; // timestamp
 }
 
@@ -176,6 +182,70 @@ class FavoritesService {
       return false;
     } else {
       this.addPlaylistFavorite(playlistId);
+      return true;
+    }
+  }
+
+  // ============ BOOK SERIES FAVORITES ============
+
+  // Get all favorite book series IDs
+  getBookSeriesFavorites(): string[] {
+    try {
+      const stored = localStorage.getItem(BOOK_SERIES_FAVORITES_KEY);
+      if (!stored) return [];
+      const favorites: FavoriteBookSeries[] = JSON.parse(stored);
+      return favorites.map(fav => fav.seriesId);
+    } catch (error) {
+      console.error('Error reading book series favorites:', error);
+      return [];
+    }
+  }
+
+  // Check if a book series is favorited
+  isBookSeriesFavorite(seriesId: string): boolean {
+    const favorites = this.getBookSeriesFavorites();
+    return favorites.includes(seriesId);
+  }
+
+  // Add book series to favorites
+  addBookSeriesFavorite(seriesId: string): void {
+    try {
+      const stored = localStorage.getItem(BOOK_SERIES_FAVORITES_KEY);
+      const favorites: FavoriteBookSeries[] = stored ? JSON.parse(stored) : [];
+      
+      // Check if already favorited
+      if (favorites.some(fav => fav.seriesId === seriesId)) {
+        return; // Already favorited
+      }
+      
+      favorites.push({ seriesId, addedAt: Date.now() });
+      localStorage.setItem(BOOK_SERIES_FAVORITES_KEY, JSON.stringify(favorites));
+    } catch (error) {
+      console.error('Error saving book series favorite:', error);
+    }
+  }
+
+  // Remove book series from favorites
+  removeBookSeriesFavorite(seriesId: string): void {
+    try {
+      const stored = localStorage.getItem(BOOK_SERIES_FAVORITES_KEY);
+      if (!stored) return;
+      
+      const favorites: FavoriteBookSeries[] = JSON.parse(stored);
+      const updated = favorites.filter(fav => fav.seriesId !== seriesId);
+      localStorage.setItem(BOOK_SERIES_FAVORITES_KEY, JSON.stringify(updated));
+    } catch (error) {
+      console.error('Error removing book series favorite:', error);
+    }
+  }
+
+  // Toggle book series favorite status
+  toggleBookSeriesFavorite(seriesId: string): boolean {
+    if (this.isBookSeriesFavorite(seriesId)) {
+      this.removeBookSeriesFavorite(seriesId);
+      return false;
+    } else {
+      this.addBookSeriesFavorite(seriesId);
       return true;
     }
   }
