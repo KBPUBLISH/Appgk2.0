@@ -958,7 +958,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const subscribe = () => {
+    // Update both localStorage (source of truth) and React state
+    localStorage.setItem('godlykids_premium', 'true');
     setIsSubscribed(true);
+    // Dispatch event so other components can react
+    window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
+    console.log('✅ Subscribe: Set premium to true in localStorage and state');
   };
 
   // Get parent's avatar regardless of which profile is active
