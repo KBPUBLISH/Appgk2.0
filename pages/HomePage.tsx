@@ -562,7 +562,8 @@ const HomePage: React.FC = () => {
     ? featuredContent.map(item => ({
         ...item,
         id: item._id || item.id,
-        coverUrl: item.coverImage || (item as any).files?.coverImage || '',
+        // coverUrl is already set by transformBook, fallback to coverImage if not
+        coverUrl: item.coverUrl || item.coverImage || (item as any).files?.coverImage || '',
       }))
     : books.slice(0, 5);
 

@@ -18,17 +18,14 @@ interface FeaturedCarouselProps {
   onBookClick: (id: string, isPlaylist?: boolean) => void;
 }
 
-// Default placeholder image
-const DEFAULT_COVER = 'https://via.placeholder.com/400x400/8B4513/FFFFFF?text=Book+Cover';
-
 // Page flip preview component for books
 const PageFlipPreview: React.FC<{
   bookId: string;
   coverUrl: string;
-  onError: () => void;
+  title: string;
   onCycleComplete: () => void;
   isActive: boolean;
-}> = ({ bookId, coverUrl, onError, onCycleComplete, isActive }) => {
+}> = ({ bookId, coverUrl, title, onCycleComplete, isActive }) => {
   const [pages, setPages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isFlipping, setIsFlipping] = useState(false);
@@ -36,64 +33,41 @@ const PageFlipPreview: React.FC<{
   const cycleCompleteRef = useRef(false);
   const hasFetchedRef = useRef(false);
 
-  console.log('📖 PageFlipPreview rendered - bookId:', bookId, 'isActive:', isActive);
-
   // All images: cover + first 2 pages (3 total for ~3 second cycle)
   const allImages = pagesLoaded && pages.length > 0 
     ? [coverUrl, ...pages.slice(0, 2)] 
     : [coverUrl];
-  
-  console.log('📖 allImages constructed:', allImages.length, 'pages:', pages.length);
 
-  // Fetch first 2 pages of the book (just background images, no text)
+  // Fetch first 2 pages of the book (just background images)
   useEffect(() => {
-    console.log('📖 Fetch useEffect triggered - bookId:', bookId, 'hasFetched:', hasFetchedRef.current);
-    
-    if (!bookId) {
-      console.log('📖 No bookId, skipping fetch');
-      setPagesLoaded(true);
-      return;
-    }
-    
-    if (hasFetchedRef.current) {
-      console.log('📖 Already fetched, skipping');
-      return;
-    }
+    if (!bookId || hasFetchedRef.current) return;
     
     const fetchPages = async () => {
       hasFetchedRef.current = true;
       try {
-        console.log('📖 FETCHING pages for featured book:', bookId);
         const bookPages = await ApiService.getBookPages(bookId);
-        console.log('📖 Got pages:', bookPages?.length, bookPages?.[0]);
         
         if (bookPages && bookPages.length > 0) {
-          // Get first 2 pages' background images only
-          // The image is at files.background.url (nested object)
+          // Path is: files.background.url
           const pageImages = bookPages
             .slice(0, 2)
-            .map((p: any) => {
-              // Path is: files.background.url (same as BookReaderPage uses)
-              const img = p.files?.background?.url || p.backgroundUrl || p.backgroundImage;
-              console.log('📖 Page background url:', img);
-              return img;
-            })
+            .map((p: any) => p.files?.background?.url || p.backgroundUrl)
             .filter(Boolean);
           
-          console.log('📖 Final page images:', pageImages.length, pageImages);
-          setPages(pageImages);
-        } else {
-          console.log('📖 No pages array returned');
+          if (pageImages.length > 0) {
+            console.log('📖 Got page images for', title, ':', pageImages.length);
+            setPages(pageImages);
+          }
         }
         setPagesLoaded(true);
       } catch (error) {
-        console.log('📖 Error fetching pages:', bookId, error);
+        console.log('📖 Could not fetch pages for:', title);
         setPagesLoaded(true);
       }
     };
     
     fetchPages();
-  }, [bookId]);
+  }, [bookId, title]);
 
   // Reset when becoming active
   useEffect(() => {
@@ -105,49 +79,41 @@ const PageFlipPreview: React.FC<{
 
   // Auto-flip animation - 1 second per image
   useEffect(() => {
-    console.log('📖 Flip effect - isActive:', isActive, 'pagesLoaded:', pagesLoaded, 'allImages:', allImages.length);
-    
     if (!isActive || !pagesLoaded) return;
     
     const totalImages = allImages.length;
-    console.log('📖 Total images for flip:', totalImages);
     
     if (totalImages <= 1) {
       // No pages to flip, just wait and advance
-      console.log('📖 Only 1 image, waiting 3s then advancing');
       const timeout = setTimeout(() => {
         onCycleComplete();
       }, 3000);
       return () => clearTimeout(timeout);
     }
     
-    console.log('📖 Starting flip interval for', totalImages, 'images');
     const interval = setInterval(() => {
-      console.log('📖 Flipping! Current index:', currentImageIndex);
       setIsFlipping(true);
       
-      // After flip animation, change image
       setTimeout(() => {
         setCurrentImageIndex((prev) => {
           const next = prev + 1;
-          console.log('📖 Advancing from', prev, 'to', next);
           if (next >= totalImages) {
-            // Cycle complete - trigger carousel advance
             if (!cycleCompleteRef.current) {
               cycleCompleteRef.current = true;
-              console.log('📖 Cycle complete, advancing carousel');
               setTimeout(() => onCycleComplete(), 500);
             }
-            return 0; // Reset to cover
+            return 0;
           }
           return next;
         });
         setIsFlipping(false);
-      }, 200); // Flip animation duration
-    }, 1000); // 1 second per image
+      }, 200);
+    }, 1000);
     
     return () => clearInterval(interval);
   }, [isActive, pagesLoaded, allImages.length, onCycleComplete]);
+
+  const currentImage = allImages[currentImageIndex] || coverUrl;
 
   return (
     <div className="w-full h-full relative" style={{ perspective: '1000px' }}>
@@ -160,10 +126,9 @@ const PageFlipPreview: React.FC<{
         }}
       >
         <img
-          src={allImages[currentImageIndex] || coverUrl}
-          alt="Book preview"
+          src={currentImage}
+          alt={title}
           className="w-full h-full object-cover rounded-lg border-2 border-white/10"
-          onError={onError}
         />
         
         {/* Page edge effect when showing pages (not cover) */}
@@ -177,20 +142,11 @@ const PageFlipPreview: React.FC<{
 
 const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick }) => {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const handleImageError = (itemId: string) => {
-    setImageErrors(prev => ({ ...prev, [itemId]: true }));
-  };
-
   const getImageSrc = (item: FeaturedItem) => {
-    const id = item.id || item._id || '';
-    const coverUrl = item.coverUrl || item.coverImage || '';
-    if (imageErrors[id] || !coverUrl) {
-      return DEFAULT_COVER;
-    }
-    return coverUrl;
+    // Try multiple possible cover image fields
+    return item.coverUrl || item.coverImage || (item as any).files?.coverImage || '';
   };
 
   const isPlaylist = (item: FeaturedItem) => {
@@ -243,7 +199,6 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
   if (books.length === 0) return null;
 
   return (
-    // Aspect ratio set to square 1:1
     <div className="relative w-full aspect-square max-h-[500px] md:max-h-[550px] rounded-2xl overflow-hidden shadow-[0_8px_16px_rgba(0,0,0,0.4)] mb-6 mx-auto border-b-4 border-[#5c2e0b] bg-[#3e1f07]">
 
       {/* Scroll Container */}
@@ -256,6 +211,7 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
           const itemId = item.id || item._id || '';
           const itemIsPlaylist = isPlaylist(item);
           const isActive = index === activeIndex;
+          const coverUrl = getImageSrc(item);
           
           return (
           <div
@@ -290,19 +246,18 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
             <div className="relative z-10 transform transition-transform active:scale-95 duration-200 px-4">
               {/* Cover - Aspect Square */}
               <div className="w-[17rem] md:w-[21rem] aspect-square rounded-lg shadow-2xl relative overflow-visible">
-                {/* Use PageFlipPreview for books, static image for playlists */}
-                {itemIsPlaylist ? (
+                {/* Use PageFlipPreview for books with cover, static image for playlists */}
+                {itemIsPlaylist || !coverUrl ? (
                   <img
-                    src={getImageSrc(item)}
+                    src={coverUrl || '/assets/images/placeholder-book.png'}
                     alt={item.title}
                     className="w-full h-full object-cover rounded-lg border-2 border-white/10"
-                    onError={() => handleImageError(itemId)}
                   />
                 ) : (
                   <PageFlipPreview
                     bookId={itemId}
-                    coverUrl={getImageSrc(item)}
-                    onError={() => handleImageError(itemId)}
+                    coverUrl={coverUrl}
+                    title={item.title}
                     onCycleComplete={handleCycleComplete}
                     isActive={isActive}
                   />
