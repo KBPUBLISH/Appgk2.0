@@ -69,12 +69,13 @@ const PageFlipPreview: React.FC<{
         
         if (bookPages && bookPages.length > 0) {
           // Get first 2 pages' background images only
-          // Check multiple possible field names
+          // The image is at files.backgroundImage
           const pageImages = bookPages
             .slice(0, 2)
             .map((p: any) => {
-              const img = p.backgroundImage || p.background || p.imageUrl || p.image;
-              console.log('📖 Page has backgroundImage:', !!p.backgroundImage, 'image:', !!p.image);
+              // Check nested files object first, then top-level
+              const img = p.files?.backgroundImage || p.backgroundImage || p.background || p.imageUrl || p.image;
+              console.log('📖 Page files:', p.files, 'img found:', !!img);
               return img;
             })
             .filter(Boolean);
