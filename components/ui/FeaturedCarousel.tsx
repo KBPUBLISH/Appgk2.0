@@ -33,10 +33,19 @@ const PageFlipPreview: React.FC<{
   const cycleCompleteRef = useRef(false);
   const hasFetchedRef = useRef(false);
   const flipIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
 
   // All images: cover + pages
   const allImages = [coverUrl, ...pages];
   const totalImages = allImages.length;
+
+  // Track mounted state
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Fetch first 2 pages of the book (just background images)
   useEffect(() => {
@@ -47,6 +56,9 @@ const PageFlipPreview: React.FC<{
       try {
         const bookPages = await ApiService.getBookPages(bookId);
         
+        // Check if still mounted before updating state
+        if (!isMountedRef.current) return;
+        
         if (bookPages && bookPages.length > 0) {
           // Path is: files.background.url
           const pageImages = bookPages
@@ -54,15 +66,18 @@ const PageFlipPreview: React.FC<{
             .map((p: any) => p.files?.background?.url || p.backgroundUrl)
             .filter(Boolean);
           
-          if (pageImages.length > 0) {
-            console.log('📖 Got page images for', title, ':', pageImages.length, pageImages);
+          if (pageImages.length > 0 && isMountedRef.current) {
             setPages(pageImages);
           }
         }
-        setPagesLoaded(true);
+        if (isMountedRef.current) {
+          setPagesLoaded(true);
+        }
       } catch (error) {
         console.log('📖 Could not fetch pages for:', title);
-        setPagesLoaded(true);
+        if (isMountedRef.current) {
+          setPagesLoaded(true);
+        }
       }
     };
     
@@ -109,16 +124,24 @@ const PageFlipPreview: React.FC<{
     console.log('📖 Starting flip animation for', title, 'with', totalImages, 'images');
     
     flipIntervalRef.current = setInterval(() => {
+      if (!isMountedRef.current) return;
+      
       setIsFlipping(true);
       
       setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
         setCurrentImageIndex((prev) => {
           const next = prev + 1;
           if (next >= totalImages) {
             // Completed one cycle through all images
             if (!cycleCompleteRef.current) {
               cycleCompleteRef.current = true;
-              setTimeout(() => onCycleComplete(), 300);
+              setTimeout(() => {
+                if (isMountedRef.current) {
+                  onCycleComplete();
+                }
+              }, 300);
             }
             return 0;
           }
@@ -137,6 +160,16 @@ const PageFlipPreview: React.FC<{
   }, [isActive, pagesLoaded, totalImages, title, onCycleComplete]);
 
   const currentImage = allImages[currentImageIndex] || coverUrl;
+  const [imageError, setImageError] = useState(false);
+
+  // Handle image load error - fallback to cover
+  const handleImageError = useCallback(() => {
+    if (currentImageIndex > 0) {
+      // If a page image fails, skip to next or back to cover
+      setCurrentImageIndex(0);
+    }
+    setImageError(true);
+  }, [currentImageIndex]);
 
   return (
     <div className="w-full h-full relative" style={{ perspective: '1000px' }}>
@@ -149,9 +182,10 @@ const PageFlipPreview: React.FC<{
         }}
       >
         <img
-          src={currentImage}
+          src={imageError ? coverUrl : currentImage}
           alt={title}
           className="w-full h-full object-cover rounded-lg border-2 border-white/10"
+          onError={handleImageError}
         />
         
         {/* Page edge effect when showing pages (not cover) */}
@@ -308,7 +342,7 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
       </div>
 
       {/* Pagination Dots */}
-      <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-20 pointer-events-none">
+      <div className="absolute bottom-1 left-0 right-0 flex justify-center gap-2 z-20 pointer-events-none">
         {books.map((_, index) => (
           <div
             key={index}
