@@ -18,7 +18,7 @@ interface FeaturedCarouselProps {
   onBookClick: (id: string, isPlaylist?: boolean) => void;
 }
 
-// Page flip preview component for books
+// 3D Page flip preview component for books
 const PageFlipPreview: React.FC<{
   bookId: string;
   coverUrl: string;
@@ -27,18 +27,19 @@ const PageFlipPreview: React.FC<{
   isActive: boolean;
 }> = ({ bookId, coverUrl, title, onCycleComplete, isActive }) => {
   const [pages, setPages] = useState<string[]>([]);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isFlipping, setIsFlipping] = useState(false);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [flipProgress, setFlipProgress] = useState(0); // 0 to 180 degrees
+  const [isAnimating, setIsAnimating] = useState(false);
   const [pagesLoaded, setPagesLoaded] = useState(false);
   const cycleCompleteRef = useRef(false);
   const hasFetchedRef = useRef(false);
-  const flipIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const animationRef = useRef<number | null>(null);
 
   // All images: cover + pages
   const allImages = [coverUrl, ...pages];
   const totalImages = allImages.length;
 
-  // Fetch first 2 pages of the book (just background images)
+  // Fetch first 3 pages of the book
   useEffect(() => {
     if (!bookId || hasFetchedRef.current) return;
     
@@ -48,14 +49,13 @@ const PageFlipPreview: React.FC<{
         const bookPages = await ApiService.getBookPages(bookId);
         
         if (bookPages && bookPages.length > 0) {
-          // Path is: files.background.url
           const pageImages = bookPages
-            .slice(0, 2)
+            .slice(0, 3)
             .map((p: any) => p.files?.background?.url || p.backgroundUrl)
             .filter(Boolean);
           
           if (pageImages.length > 0) {
-            console.log('📖 Got page images for', title, ':', pageImages.length, pageImages);
+            console.log('📖 Got page images for', title, ':', pageImages.length);
             setPages(pageImages);
           }
         }
@@ -69,30 +69,66 @@ const PageFlipPreview: React.FC<{
     fetchPages();
   }, [bookId, title]);
 
+  // Preload images
+  useEffect(() => {
+    allImages.forEach((url) => {
+      const img = new Image();
+      img.src = url;
+    });
+  }, [allImages]);
+
   // Reset when becoming active
   useEffect(() => {
     if (isActive) {
-      setCurrentImageIndex(0);
+      setCurrentPageIndex(0);
+      setFlipProgress(0);
+      setIsAnimating(false);
       cycleCompleteRef.current = false;
     }
   }, [isActive]);
 
-  // Auto-flip animation - runs when active AND has pages
+  // Animate page flip
+  const animateFlip = useCallback(() => {
+    const duration = 600; // ms for flip animation
+    const startTime = performance.now();
+    
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Easing function for smooth flip
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setFlipProgress(eased * 180);
+      
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      } else {
+        // Flip complete
+        setFlipProgress(0);
+        setCurrentPageIndex((prev) => {
+          const next = prev + 1;
+          if (next >= totalImages - 1) {
+            if (!cycleCompleteRef.current) {
+              cycleCompleteRef.current = true;
+              setTimeout(() => onCycleComplete(), 500);
+            }
+            return 0;
+          }
+          return next;
+        });
+        setIsAnimating(false);
+      }
+    };
+    
+    animationRef.current = requestAnimationFrame(animate);
+  }, [totalImages, onCycleComplete]);
+
+  // Auto-flip timer
   useEffect(() => {
-    // Clear any existing interval
-    if (flipIntervalRef.current) {
-      clearInterval(flipIntervalRef.current);
-      flipIntervalRef.current = null;
-    }
+    if (!isActive || isAnimating) return;
 
-    if (!isActive) return;
-
-    console.log('📖 Flip effect starting for', title, '- total images:', totalImages, 'pagesLoaded:', pagesLoaded);
-
-    // If only cover (no pages yet or pages failed to load), wait and advance
     if (totalImages <= 1) {
       if (pagesLoaded) {
-        // Pages loaded but none found, wait 3s then advance
         const timeout = setTimeout(() => {
           if (!cycleCompleteRef.current) {
             cycleCompleteRef.current = true;
@@ -101,64 +137,107 @@ const PageFlipPreview: React.FC<{
         }, 3000);
         return () => clearTimeout(timeout);
       }
-      // Still loading, don't do anything yet
       return;
     }
     
-    // We have pages! Start flipping
-    console.log('📖 Starting flip animation for', title, 'with', totalImages, 'images');
-    
-    flipIntervalRef.current = setInterval(() => {
-      setIsFlipping(true);
-      
-      setTimeout(() => {
-        setCurrentImageIndex((prev) => {
-          const next = prev + 1;
-          if (next >= totalImages) {
-            // Completed one cycle through all images
-            if (!cycleCompleteRef.current) {
-              cycleCompleteRef.current = true;
-              setTimeout(() => onCycleComplete(), 300);
-            }
-            return 0;
-          }
-          return next;
-        });
-        setIsFlipping(false);
-      }, 200);
-    }, 1200); // Show each image for 1.2 seconds
+    const timeout = setTimeout(() => {
+      setIsAnimating(true);
+      animateFlip();
+    }, 1500); // Wait 1.5s before flipping
     
     return () => {
-      if (flipIntervalRef.current) {
-        clearInterval(flipIntervalRef.current);
-        flipIntervalRef.current = null;
+      clearTimeout(timeout);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isActive, pagesLoaded, totalImages, title, onCycleComplete]);
+  }, [isActive, pagesLoaded, totalImages, isAnimating, animateFlip, onCycleComplete]);
 
-  const currentImage = allImages[currentImageIndex] || coverUrl;
+  const currentImage = allImages[currentPageIndex] || coverUrl;
+  const nextImage = allImages[currentPageIndex + 1] || allImages[0] || coverUrl;
 
   return (
-    <div className="w-full h-full relative" style={{ perspective: '1000px' }}>
+    <div 
+      className="w-full h-full relative"
+      style={{ perspective: '1200px' }}
+    >
+      {/* Book spine shadow */}
+      <div className="absolute left-0 top-0 bottom-0 w-3 bg-gradient-to-r from-black/40 to-transparent z-10 rounded-l-lg" />
+      
+      {/* Bottom page (next page) - always visible behind */}
+      <div className="absolute inset-0 rounded-lg overflow-hidden">
+        <img
+          src={nextImage}
+          alt={`${title} - next`}
+          className="w-full h-full object-cover"
+        />
+      </div>
+      
+      {/* Current page (flips up to reveal next) */}
       <div 
-        className="w-full h-full"
+        className="absolute inset-0 rounded-lg overflow-hidden"
         style={{
           transformStyle: 'preserve-3d',
-          transform: isFlipping ? 'rotateY(-20deg) scale(0.96)' : 'rotateY(0deg) scale(1)',
-          transition: 'transform 0.2s ease-in-out',
+          transformOrigin: 'left center',
+          transform: `rotateY(-${flipProgress}deg)`,
+          backfaceVisibility: 'hidden',
         }}
       >
         <img
           src={currentImage}
           alt={title}
-          className="w-full h-full object-cover rounded-lg border-2 border-white/10"
+          className="w-full h-full object-cover"
         />
-        
-        {/* Page edge effect when showing pages (not cover) */}
-        {currentImageIndex > 0 && (
-          <div className="absolute left-0 top-2 bottom-2 w-1.5 bg-gradient-to-r from-black/30 to-transparent rounded-l pointer-events-none" />
-        )}
+        {/* Page shadow during flip */}
+        <div 
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-black/30 pointer-events-none"
+          style={{ opacity: flipProgress / 180 }}
+        />
       </div>
+      
+      {/* Back of flipping page */}
+      <div 
+        className="absolute inset-0 rounded-lg overflow-hidden"
+        style={{
+          transformStyle: 'preserve-3d',
+          transformOrigin: 'left center',
+          transform: `rotateY(${180 - flipProgress}deg)`,
+          backfaceVisibility: 'hidden',
+        }}
+      >
+        <div className="w-full h-full bg-gradient-to-l from-[#f5f0e6] to-[#e8e0d0]">
+          {/* Paper texture on back of page */}
+          <div className="absolute inset-0 opacity-20" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E")`
+          }} />
+        </div>
+        {/* Shadow on back of page */}
+        <div 
+          className="absolute inset-0 bg-gradient-to-l from-black/20 to-transparent pointer-events-none"
+        />
+      </div>
+      
+      {/* Dynamic shadow under flipping page */}
+      {flipProgress > 0 && (
+        <div 
+          className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/30 to-transparent rounded-b-lg pointer-events-none"
+          style={{ 
+            opacity: Math.sin((flipProgress / 180) * Math.PI) * 0.5,
+            transform: `scaleX(${1 - (flipProgress / 180) * 0.3})`
+          }}
+        />
+      )}
+      
+      {/* Page curl effect on right edge */}
+      {totalImages > 1 && flipProgress === 0 && (
+        <div className="absolute right-0 top-4 bottom-4 w-4 pointer-events-none">
+          <div className="w-full h-full bg-gradient-to-l from-black/10 to-transparent rounded-r" />
+          <div className="absolute right-0 top-0 bottom-0 w-1 bg-gradient-to-l from-white/20 to-transparent" />
+        </div>
+      )}
+      
+      {/* Border */}
+      <div className="absolute inset-0 rounded-lg border-2 border-white/10 pointer-events-none" />
     </div>
   );
 };
