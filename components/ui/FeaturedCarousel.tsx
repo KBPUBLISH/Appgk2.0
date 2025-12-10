@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Book } from '../../types';
 import { BookOpen, Music } from 'lucide-react';
 import { ApiService } from '../../services/apiService';
@@ -26,24 +26,27 @@ const PageFlipPreview: React.FC<{
   bookId: string;
   coverUrl: string;
   onError: () => void;
-}> = ({ bookId, coverUrl, onError }) => {
+  onCycleComplete: () => void;
+  isActive: boolean;
+}> = ({ bookId, coverUrl, onError, onCycleComplete, isActive }) => {
   const [pages, setPages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isFlipping, setIsFlipping] = useState(false);
   const [pagesLoaded, setPagesLoaded] = useState(false);
+  const cycleCompleteRef = useRef(false);
 
-  // All images: cover + first 3 pages
-  const allImages = [coverUrl, ...pages];
+  // All images: cover + first 2 pages (3 total for ~3 second cycle)
+  const allImages = [coverUrl, ...pages.slice(0, 2)];
   
-  // Fetch first 3 pages of the book
+  // Fetch first 2 pages of the book (just background images, no text)
   useEffect(() => {
     const fetchPages = async () => {
       try {
         const bookPages = await ApiService.getBookPages(bookId);
         if (bookPages && bookPages.length > 0) {
-          // Get first 3 pages' background images
+          // Get first 2 pages' background images only
           const pageImages = bookPages
-            .slice(0, 3)
+            .slice(0, 2)
             .map((p: any) => p.backgroundImage)
             .filter(Boolean);
           setPages(pageImages);
@@ -51,6 +54,7 @@ const PageFlipPreview: React.FC<{
         }
       } catch (error) {
         console.log('Could not fetch pages for preview:', bookId);
+        setPagesLoaded(true); // Mark as loaded even on error
       }
     };
     
@@ -59,33 +63,59 @@ const PageFlipPreview: React.FC<{
     }
   }, [bookId]);
 
-  // Auto-flip animation every 2.5 seconds
+  // Reset when becoming active
   useEffect(() => {
-    if (!pagesLoaded || allImages.length <= 1) return;
+    if (isActive) {
+      setCurrentImageIndex(0);
+      cycleCompleteRef.current = false;
+    }
+  }, [isActive]);
+
+  // Auto-flip animation - 1 second per image
+  useEffect(() => {
+    if (!isActive || !pagesLoaded) return;
+    
+    const totalImages = allImages.length;
+    if (totalImages <= 1) {
+      // No pages to flip, just wait and advance
+      const timeout = setTimeout(() => {
+        onCycleComplete();
+      }, 3000);
+      return () => clearTimeout(timeout);
+    }
     
     const interval = setInterval(() => {
       setIsFlipping(true);
       
-      // After flip animation starts, change image
+      // After flip animation, change image
       setTimeout(() => {
-        setCurrentImageIndex((prev) => (prev + 1) % allImages.length);
+        setCurrentImageIndex((prev) => {
+          const next = prev + 1;
+          if (next >= totalImages) {
+            // Cycle complete - trigger carousel advance
+            if (!cycleCompleteRef.current) {
+              cycleCompleteRef.current = true;
+              setTimeout(() => onCycleComplete(), 500);
+            }
+            return 0; // Reset to cover
+          }
+          return next;
+        });
         setIsFlipping(false);
-      }, 300); // Half of flip animation
-    }, 2500); // Change every 2.5 seconds
+      }, 200); // Flip animation duration
+    }, 1000); // 1 second per image
     
     return () => clearInterval(interval);
-  }, [pagesLoaded, allImages.length]);
+  }, [isActive, pagesLoaded, allImages.length, onCycleComplete]);
 
   return (
-    <div className="w-full h-full relative perspective-1000">
+    <div className="w-full h-full relative" style={{ perspective: '1000px' }}>
       <div 
-        className={`w-full h-full transition-transform duration-500 transform-style-preserve-3d ${
-          isFlipping ? 'rotate-y-90' : 'rotate-y-0'
-        }`}
+        className="w-full h-full"
         style={{
           transformStyle: 'preserve-3d',
-          transform: isFlipping ? 'rotateY(-15deg) scale(0.95)' : 'rotateY(0deg) scale(1)',
-          transition: 'transform 0.3s ease-in-out',
+          transform: isFlipping ? 'rotateY(-20deg) scale(0.96)' : 'rotateY(0deg) scale(1)',
+          transition: 'transform 0.2s ease-in-out',
         }}
       >
         <img
@@ -97,25 +127,9 @@ const PageFlipPreview: React.FC<{
         
         {/* Page edge effect when showing pages (not cover) */}
         {currentImageIndex > 0 && (
-          <div className="absolute left-0 top-2 bottom-2 w-1 bg-gradient-to-r from-black/20 to-transparent rounded-l pointer-events-none" />
+          <div className="absolute left-0 top-2 bottom-2 w-1.5 bg-gradient-to-r from-black/30 to-transparent rounded-l pointer-events-none" />
         )}
       </div>
-      
-      {/* Page indicator dots */}
-      {pagesLoaded && allImages.length > 1 && (
-        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1 z-10">
-          {allImages.map((_, idx) => (
-            <div
-              key={idx}
-              className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-                idx === currentImageIndex 
-                  ? 'bg-white scale-125' 
-                  : 'bg-white/40'
-              }`}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 };
@@ -142,6 +156,24 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
     return item._itemType === 'playlist';
   };
 
+  // Scroll to specific index
+  const scrollToIndex = useCallback((index: number) => {
+    if (scrollRef.current) {
+      const width = scrollRef.current.offsetWidth;
+      scrollRef.current.scrollTo({
+        left: width * index,
+        behavior: 'smooth'
+      });
+    }
+  }, []);
+
+  // Handle page flip cycle complete - advance to next book
+  const handleCycleComplete = useCallback(() => {
+    const nextIndex = (activeIndex + 1) % books.length;
+    setActiveIndex(nextIndex);
+    scrollToIndex(nextIndex);
+  }, [activeIndex, books.length, scrollToIndex]);
+
   const handleScroll = () => {
     if (scrollRef.current) {
       const scrollLeft = scrollRef.current.scrollLeft;
@@ -152,6 +184,20 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
       }
     }
   };
+
+  // Auto-advance for playlists (no page flip, just 3 seconds)
+  useEffect(() => {
+    const currentItem = books[activeIndex];
+    if (!currentItem) return;
+    
+    const itemIsPlaylist = currentItem._itemType === 'playlist';
+    if (itemIsPlaylist) {
+      const timeout = setTimeout(() => {
+        handleCycleComplete();
+      }, 3000);
+      return () => clearTimeout(timeout);
+    }
+  }, [activeIndex, books, handleCycleComplete]);
 
   if (books.length === 0) return null;
 
@@ -165,14 +211,15 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
         onScroll={handleScroll}
         className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar h-full w-full"
       >
-        {books.map((item) => {
+        {books.map((item, index) => {
           const itemId = item.id || item._id || '';
           const itemIsPlaylist = isPlaylist(item);
+          const isActive = index === activeIndex;
           
           return (
           <div
             key={itemId}
-            className="flex-shrink-0 w-full h-full snap-center relative flex items-center justify-center"
+            className="flex-shrink-0 w-full h-full snap-center relative flex flex-col items-center justify-center"
             onClick={() => onBookClick(itemId, itemIsPlaylist)}
           >
             {/* Vertical Wood Plank Background */}
@@ -191,10 +238,17 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
             {/* Vignette / Shadow Overlay */}
             <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.6)_100%)]"></div>
 
+            {/* NEW! Badge - Above the book on wood background */}
+            <div className="relative z-20 mb-3">
+              <div className="bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-[#3E1F07] font-display font-extrabold text-sm md:text-base px-5 py-1.5 rounded-full shadow-lg border-2 border-white/30 animate-pulse">
+                ✨ NEW! ✨
+              </div>
+            </div>
+
             {/* Content Container */}
             <div className="relative z-10 transform transition-transform active:scale-95 duration-200 px-4">
-              {/* Cover - Aspect Square - Increased size by 15% */}
-              <div className="w-[18.5rem] md:w-[23rem] aspect-square rounded-lg shadow-2xl relative overflow-visible">
+              {/* Cover - Aspect Square */}
+              <div className="w-[17rem] md:w-[21rem] aspect-square rounded-lg shadow-2xl relative overflow-visible">
                 {/* Use PageFlipPreview for books, static image for playlists */}
                 {itemIsPlaylist ? (
                   <img
@@ -208,24 +262,21 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
                     bookId={itemId}
                     coverUrl={getImageSrc(item)}
                     onError={() => handleImageError(itemId)}
+                    onCycleComplete={handleCycleComplete}
+                    isActive={isActive}
                   />
                 )}
 
-                {/* NEW! Badge */}
-                <div className="absolute -top-3 -right-5 bg-white text-black font-display font-extrabold text-xs md:text-sm px-3 py-1.5 rounded-full shadow-lg transform rotate-12 border-2 border-gray-100 z-20">
-                  NEW!
-                </div>
-
                 {/* Action Button Overlay */}
-                <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-md text-black text-[10px] md:text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg hover:bg-white transition-colors z-30">
+                <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-md text-black text-xs md:text-sm font-bold px-4 py-1.5 rounded-full flex items-center gap-2 shadow-lg hover:bg-white transition-colors z-30">
                   {itemIsPlaylist ? (
                     <>
-                      <Music size={12} fill="currentColor" className="md:w-4 md:h-4" />
+                      <Music size={14} fill="currentColor" className="md:w-4 md:h-4" />
                       <span>Listen</span>
                     </>
                   ) : (
                     <>
-                      <BookOpen size={12} fill="currentColor" className="md:w-4 md:h-4" />
+                      <BookOpen size={14} fill="currentColor" className="md:w-4 md:h-4" />
                       <span>Read</span>
                     </>
                   )}
