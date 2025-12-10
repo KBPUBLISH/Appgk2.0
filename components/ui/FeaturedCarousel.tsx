@@ -121,34 +121,44 @@ const PageFlipPreview: React.FC<{
     }
     
     // We have pages! Start flipping
-    console.log('📖 Starting flip animation for', title, 'with', totalImages, 'images');
     
     flipIntervalRef.current = setInterval(() => {
-      if (!isMountedRef.current) return;
-      
-      setIsFlipping(true);
-      
-      setTimeout(() => {
-        if (!isMountedRef.current) return;
-        
-        setCurrentImageIndex((prev) => {
-          const next = prev + 1;
-          if (next >= totalImages) {
-            // Completed one cycle through all images
-            if (!cycleCompleteRef.current) {
-              cycleCompleteRef.current = true;
-              setTimeout(() => {
-                if (isMountedRef.current) {
-                  onCycleComplete();
-                }
-              }, 300);
-            }
-            return 0;
+      try {
+        if (!isMountedRef.current) {
+          if (flipIntervalRef.current) {
+            clearInterval(flipIntervalRef.current);
+            flipIntervalRef.current = null;
           }
-          return next;
-        });
-        setIsFlipping(false);
-      }, 200);
+          return;
+        }
+        
+        setIsFlipping(true);
+        
+        setTimeout(() => {
+          if (!isMountedRef.current) return;
+          
+          setCurrentImageIndex((prev) => {
+            const next = prev + 1;
+            if (next >= totalImages) {
+              // Completed one cycle through all images
+              if (!cycleCompleteRef.current) {
+                cycleCompleteRef.current = true;
+                setTimeout(() => {
+                  if (isMountedRef.current) {
+                    onCycleComplete();
+                  }
+                }, 300);
+              }
+              return 0;
+            }
+            return next;
+          });
+          setIsFlipping(false);
+        }, 200);
+      } catch (e) {
+        // Silently handle any errors during flip
+        console.warn('Flip animation error:', e);
+      }
     }, 1200); // Show each image for 1.2 seconds
     
     return () => {
@@ -273,7 +283,7 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
           return (
           <div
             key={itemId}
-            className="flex-shrink-0 w-full h-full snap-center relative flex flex-col items-center justify-center"
+            className="flex-shrink-0 w-full h-full snap-center relative flex flex-col items-center justify-center pb-8"
             onClick={() => onBookClick(itemId, itemIsPlaylist)}
           >
             {/* Vertical Wood Plank Background */}
