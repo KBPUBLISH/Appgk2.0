@@ -32,11 +32,11 @@ const PageFlipPreview: React.FC<{
   const [pagesLoaded, setPagesLoaded] = useState(false);
   const cycleCompleteRef = useRef(false);
   const hasFetchedRef = useRef(false);
+  const flipIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // All images: cover + first 2 pages (3 total for ~3 second cycle)
-  const allImages = pagesLoaded && pages.length > 0 
-    ? [coverUrl, ...pages.slice(0, 2)] 
-    : [coverUrl];
+  // All images: cover + pages
+  const allImages = [coverUrl, ...pages];
+  const totalImages = allImages.length;
 
   // Fetch first 2 pages of the book (just background images)
   useEffect(() => {
@@ -55,7 +55,7 @@ const PageFlipPreview: React.FC<{
             .filter(Boolean);
           
           if (pageImages.length > 0) {
-            console.log('📖 Got page images for', title, ':', pageImages.length);
+            console.log('📖 Got page images for', title, ':', pageImages.length, pageImages);
             setPages(pageImages);
           }
         }
@@ -77,30 +77,48 @@ const PageFlipPreview: React.FC<{
     }
   }, [isActive]);
 
-  // Auto-flip animation - 1 second per image
+  // Auto-flip animation - runs when active AND has pages
   useEffect(() => {
-    if (!isActive || !pagesLoaded) return;
-    
-    const totalImages = allImages.length;
-    
+    // Clear any existing interval
+    if (flipIntervalRef.current) {
+      clearInterval(flipIntervalRef.current);
+      flipIntervalRef.current = null;
+    }
+
+    if (!isActive) return;
+
+    console.log('📖 Flip effect starting for', title, '- total images:', totalImages, 'pagesLoaded:', pagesLoaded);
+
+    // If only cover (no pages yet or pages failed to load), wait and advance
     if (totalImages <= 1) {
-      // No pages to flip, just wait and advance
-      const timeout = setTimeout(() => {
-        onCycleComplete();
-      }, 3000);
-      return () => clearTimeout(timeout);
+      if (pagesLoaded) {
+        // Pages loaded but none found, wait 3s then advance
+        const timeout = setTimeout(() => {
+          if (!cycleCompleteRef.current) {
+            cycleCompleteRef.current = true;
+            onCycleComplete();
+          }
+        }, 3000);
+        return () => clearTimeout(timeout);
+      }
+      // Still loading, don't do anything yet
+      return;
     }
     
-    const interval = setInterval(() => {
+    // We have pages! Start flipping
+    console.log('📖 Starting flip animation for', title, 'with', totalImages, 'images');
+    
+    flipIntervalRef.current = setInterval(() => {
       setIsFlipping(true);
       
       setTimeout(() => {
         setCurrentImageIndex((prev) => {
           const next = prev + 1;
           if (next >= totalImages) {
+            // Completed one cycle through all images
             if (!cycleCompleteRef.current) {
               cycleCompleteRef.current = true;
-              setTimeout(() => onCycleComplete(), 500);
+              setTimeout(() => onCycleComplete(), 300);
             }
             return 0;
           }
@@ -108,10 +126,15 @@ const PageFlipPreview: React.FC<{
         });
         setIsFlipping(false);
       }, 200);
-    }, 1000);
+    }, 1200); // Show each image for 1.2 seconds
     
-    return () => clearInterval(interval);
-  }, [isActive, pagesLoaded, allImages.length, onCycleComplete]);
+    return () => {
+      if (flipIntervalRef.current) {
+        clearInterval(flipIntervalRef.current);
+        flipIntervalRef.current = null;
+      }
+    };
+  }, [isActive, pagesLoaded, totalImages, title, onCycleComplete]);
 
   const currentImage = allImages[currentImageIndex] || coverUrl;
 
