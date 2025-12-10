@@ -18,7 +18,7 @@ interface FeaturedCarouselProps {
   onBookClick: (id: string, isPlaylist?: boolean) => void;
 }
 
-// Page flip preview with shift + fade animation
+// Page flip preview component for books
 const PageFlipPreview: React.FC<{
   bookId: string;
   coverUrl: string;
@@ -27,161 +27,138 @@ const PageFlipPreview: React.FC<{
   isActive: boolean;
 }> = ({ bookId, coverUrl, title, onCycleComplete, isActive }) => {
   const [pages, setPages] = useState<string[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [prevIndex, setPrevIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isFlipping, setIsFlipping] = useState(false);
   const [pagesLoaded, setPagesLoaded] = useState(false);
   const cycleCompleteRef = useRef(false);
   const hasFetchedRef = useRef(false);
+  const flipIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // All images: cover + pages
   const allImages = [coverUrl, ...pages];
   const totalImages = allImages.length;
 
-  // Fetch pages
+  // Fetch first 2 pages of the book (just background images)
   useEffect(() => {
     if (!bookId || hasFetchedRef.current) return;
-    hasFetchedRef.current = true;
     
-    ApiService.getBookPages(bookId)
-      .then((bookPages) => {
-        if (bookPages?.length > 0) {
+    const fetchPages = async () => {
+      hasFetchedRef.current = true;
+      try {
+        const bookPages = await ApiService.getBookPages(bookId);
+        
+        if (bookPages && bookPages.length > 0) {
+          // Path is: files.background.url
           const pageImages = bookPages
-            .slice(0, 3)
+            .slice(0, 2)
             .map((p: any) => p.files?.background?.url || p.backgroundUrl)
             .filter(Boolean);
+          
           if (pageImages.length > 0) {
+            console.log('📖 Got page images for', title, ':', pageImages.length, pageImages);
             setPages(pageImages);
           }
         }
         setPagesLoaded(true);
-      })
-      .catch(() => setPagesLoaded(true));
-  }, [bookId]);
+      } catch (error) {
+        console.log('📖 Could not fetch pages for:', title);
+        setPagesLoaded(true);
+      }
+    };
+    
+    fetchPages();
+  }, [bookId, title]);
 
-  // Preload all images
-  useEffect(() => {
-    allImages.forEach((url) => {
-      const img = new Image();
-      img.src = url;
-    });
-  }, [allImages]);
-
-  // Reset on active
+  // Reset when becoming active
   useEffect(() => {
     if (isActive) {
-      setCurrentIndex(0);
-      setPrevIndex(0);
-      setIsTransitioning(false);
+      setCurrentImageIndex(0);
       cycleCompleteRef.current = false;
     }
   }, [isActive]);
 
-  // Auto-advance through images with transition
+  // Auto-flip animation - runs when active AND has pages
   useEffect(() => {
-    if (!isActive) return;
-    if (!pagesLoaded) return;
-
-    // If only 1 image, wait then advance carousel
-    if (totalImages <= 1) {
-      const timeout = setTimeout(() => {
-        if (!cycleCompleteRef.current) {
-          cycleCompleteRef.current = true;
-          onCycleComplete();
-        }
-      }, 2500);
-      return () => clearTimeout(timeout);
+    // Clear any existing interval
+    if (flipIntervalRef.current) {
+      clearInterval(flipIntervalRef.current);
+      flipIntervalRef.current = null;
     }
 
-    // Cycle through images
-    const interval = setInterval(() => {
-      setPrevIndex(currentIndex);
-      setIsTransitioning(true);
-      
-      const next = currentIndex + 1;
-      if (next >= totalImages) {
-        // Completed cycle, advance carousel
-        if (!cycleCompleteRef.current) {
-          cycleCompleteRef.current = true;
-          setTimeout(() => onCycleComplete(), 400);
-        }
-        setCurrentIndex(0);
-      } else {
-        setCurrentIndex(next);
-      }
-      
-      // Reset transition state after animation
-      setTimeout(() => setIsTransitioning(false), 600);
-    }, 1400);
+    if (!isActive) return;
 
-    return () => clearInterval(interval);
-  }, [isActive, pagesLoaded, totalImages, currentIndex, onCycleComplete]);
+    console.log('📖 Flip effect starting for', title, '- total images:', totalImages, 'pagesLoaded:', pagesLoaded);
+
+    // If only cover (no pages yet or pages failed to load), wait and advance
+    if (totalImages <= 1) {
+      if (pagesLoaded) {
+        // Pages loaded but none found, wait 3s then advance
+        const timeout = setTimeout(() => {
+          if (!cycleCompleteRef.current) {
+            cycleCompleteRef.current = true;
+            onCycleComplete();
+          }
+        }, 3000);
+        return () => clearTimeout(timeout);
+      }
+      // Still loading, don't do anything yet
+      return;
+    }
+    
+    // We have pages! Start flipping
+    console.log('📖 Starting flip animation for', title, 'with', totalImages, 'images');
+    
+    flipIntervalRef.current = setInterval(() => {
+      setIsFlipping(true);
+      
+      setTimeout(() => {
+        setCurrentImageIndex((prev) => {
+          const next = prev + 1;
+          if (next >= totalImages) {
+            // Completed one cycle through all images
+            if (!cycleCompleteRef.current) {
+              cycleCompleteRef.current = true;
+              setTimeout(() => onCycleComplete(), 300);
+            }
+            return 0;
+          }
+          return next;
+        });
+        setIsFlipping(false);
+      }, 200);
+    }, 1200); // Show each image for 1.2 seconds
+    
+    return () => {
+      if (flipIntervalRef.current) {
+        clearInterval(flipIntervalRef.current);
+        flipIntervalRef.current = null;
+      }
+    };
+  }, [isActive, pagesLoaded, totalImages, title, onCycleComplete]);
+
+  const currentImage = allImages[currentImageIndex] || coverUrl;
 
   return (
-    <div className="w-full h-full relative rounded-lg overflow-hidden" style={{ perspective: '800px' }}>
-      {/* Stack all images */}
-      {allImages.map((src, index) => {
-        const isCurrent = index === currentIndex;
-        const isPrev = index === prevIndex && isTransitioning;
+    <div className="w-full h-full relative" style={{ perspective: '1000px' }}>
+      <div 
+        className="w-full h-full"
+        style={{
+          transformStyle: 'preserve-3d',
+          transform: isFlipping ? 'rotateY(-20deg) scale(0.96)' : 'rotateY(0deg) scale(1)',
+          transition: 'transform 0.2s ease-in-out',
+        }}
+      >
+        <img
+          src={currentImage}
+          alt={title}
+          className="w-full h-full object-cover rounded-lg border-2 border-white/10"
+        />
         
-        return (
-          <div
-            key={src}
-            className="absolute inset-0"
-            style={{
-              zIndex: isCurrent ? 2 : isPrev ? 1 : 0,
-              opacity: isCurrent || isPrev ? 1 : 0,
-              transform: isPrev 
-                ? 'rotateY(-25deg) translateX(-15%) scale(0.95)' 
-                : isCurrent && isTransitioning 
-                  ? 'rotateY(0deg) translateX(0) scale(1)' 
-                  : 'rotateY(0deg) translateX(0) scale(1)',
-              transformOrigin: 'left center',
-              transition: 'transform 0.5s ease-out, opacity 0.5s ease-out',
-            }}
-          >
-            <img
-              src={src}
-              alt={`${title} ${index === 0 ? 'cover' : `page ${index}`}`}
-              className="w-full h-full object-cover rounded-lg"
-            />
-            {/* Page shadow gradient when flipping away */}
-            {isPrev && (
-              <div 
-                className="absolute inset-0 bg-gradient-to-l from-black/40 via-black/20 to-transparent rounded-lg pointer-events-none"
-                style={{ opacity: isTransitioning ? 1 : 0, transition: 'opacity 0.3s' }}
-              />
-            )}
-          </div>
-        );
-      })}
-      
-      {/* Page indicator dots */}
-      {totalImages > 1 && (
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-          {allImages.map((_, index) => (
-            <div
-              key={index}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                index === currentIndex 
-                  ? 'bg-white w-4' 
-                  : 'bg-white/50 w-1.5'
-              }`}
-            />
-          ))}
-        </div>
-      )}
-      
-      {/* Book spine shadow */}
-      <div className="absolute left-0 top-0 bottom-0 w-3 bg-gradient-to-r from-black/30 to-transparent pointer-events-none rounded-l-lg" />
-      
-      {/* Page edge hint on right */}
-      {totalImages > 1 && (
-        <div className="absolute right-0 top-2 bottom-2 w-1 bg-gradient-to-l from-white/10 to-transparent pointer-events-none" />
-      )}
-      
-      {/* Border */}
-      <div className="absolute inset-0 rounded-lg border-2 border-white/10 pointer-events-none" />
+        {/* Page edge effect when showing pages (not cover) */}
+        {currentImageIndex > 0 && (
+          <div className="absolute left-0 top-2 bottom-2 w-1.5 bg-gradient-to-r from-black/30 to-transparent rounded-l pointer-events-none" />
+        )}
+      </div>
     </div>
   );
 };
@@ -282,15 +259,15 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
             <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.6)_100%)]"></div>
 
             {/* Tap to Read/Listen text above cover */}
-            <div className="relative z-20 mb-2 -mt-4">
-              <p className="text-white/90 font-display font-bold text-base md:text-lg drop-shadow-lg">
+            <div className="relative z-20 mb-3">
+              <p className="text-white font-display font-bold text-lg md:text-xl drop-shadow-lg">
                 {itemIsPlaylist ? '🎧 Tap to listen' : '📖 Tap to read'}
               </p>
             </div>
 
             {/* Content Container */}
-            <div className="relative z-10 transform transition-transform active:scale-95 duration-200 px-2">
-              {/* Cover - Aspect Square - BIGGER */}
+            <div className="relative z-10 transform transition-transform active:scale-95 duration-200 px-4">
+              {/* Cover - Aspect Square - Bigger */}
               <div className="w-[19rem] md:w-[24rem] aspect-square rounded-lg shadow-2xl relative overflow-visible">
                 {/* Use PageFlipPreview for books with cover, static image for playlists */}
                 {itemIsPlaylist || !coverUrl ? (
