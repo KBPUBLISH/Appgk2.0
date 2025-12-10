@@ -16,43 +16,33 @@ const ReviewPromptModal: React.FC<ReviewPromptModalProps> = ({ isOpen, onReviewS
     
     try {
       console.log('🌟 Review button clicked');
-      console.log('🌟 Is native platform:', Capacitor.isNativePlatform());
-      console.log('🌟 Platform:', Capacitor.getPlatform());
       
-      // Check if running on native platform (DeSpia wraps as native)
-      const isNative = Capacitor.isNativePlatform() || 
-                       window.hasOwnProperty('webkit') || 
-                       (window as any).despia;
-      
-      if (isNative) {
-        console.log('🌟 Attempting native review request...');
+      // Try DeSpia's rateapp:// URL scheme FIRST (recommended by DeSpia)
+      if ((window as any).despia !== undefined) {
+        console.log('🌟 Using DeSpia rateapp:// URL scheme');
+        (window as any).despia = 'rateapp://';
+        console.log('🌟 DeSpia rateapp request sent!');
+      } else {
+        // Fallback for Capacitor or web
+        console.log('🌟 DeSpia not available, trying Capacitor...');
         
-        // Try Capacitor Rate App plugin
-        try {
-          const { RateApp } = await import('capacitor-rate-app');
-          console.log('🌟 RateApp plugin loaded, requesting review...');
-          await RateApp.requestReview();
-          console.log('🌟 Native review request sent!');
-        } catch (e) {
-          console.log('🌟 RateApp plugin not available, trying DeSpia...', e);
-          
-          // Try DeSpia URL scheme for reviews (if DeSpia supports it)
-          if ((window as any).despia !== undefined) {
-            (window as any).despia = 'requestreview://';
-            console.log('🌟 DeSpia review request sent');
-          } else {
-            // Final fallback - iOS StoreKit review via webkit
+        if (Capacitor.isNativePlatform()) {
+          try {
+            const { RateApp } = await import('capacitor-rate-app');
+            console.log('🌟 RateApp plugin loaded, requesting review...');
+            await RateApp.requestReview();
+            console.log('🌟 Native review request sent!');
+          } catch (e) {
+            console.log('🌟 RateApp plugin not available:', e);
+            // Try webkit as last resort
             if ((window as any).webkit?.messageHandlers?.requestReview) {
               (window as any).webkit.messageHandlers.requestReview.postMessage({});
               console.log('🌟 Webkit review request sent');
-            } else {
-              console.log('🌟 No native review API available');
             }
           }
+        } else {
+          console.log('🌟 Review requested (web mode - no native API)');
         }
-      } else {
-        // Web fallback - just show thank you
-        console.log('🌟 Review requested (web mode - no native API)');
       }
       
       // Mark review as submitted in localStorage
@@ -193,23 +183,22 @@ export const shouldShowReviewPrompt = (): boolean => {
     }
   }
   
-  // Check if user has completed enough activities
-  const lessonsCompleted = parseInt(localStorage.getItem('godlykids_lessons_completed') || '0', 10);
-  const booksRead = parseInt(localStorage.getItem('godlykids_books_read') || '0', 10);
-  const daysActive = parseInt(localStorage.getItem('godlykids_days_active') || '0', 10);
+  // Check if user has opened any content (just 1 activity triggers the prompt!)
+  const booksOpened = parseInt(localStorage.getItem('godlykids_books_opened') || '0', 10);
+  const lessonsWatched = parseInt(localStorage.getItem('godlykids_lessons_watched') || '0', 10);
+  const songsPlayed = parseInt(localStorage.getItem('godlykids_songs_played') || '0', 10);
   
-  // Show review prompt if user has engaged enough
-  // (completed at least 3 lessons OR read 2 books OR been active for 3+ days)
-  return lessonsCompleted >= 3 || booksRead >= 2 || daysActive >= 3;
+  // Show review prompt after ANY of these activities (just 1!)
+  return booksOpened >= 1 || lessonsWatched >= 1 || songsPlayed >= 1;
 };
 
 // Helper to increment activity counters
-export const incrementActivityCounter = (type: 'lesson' | 'book' | 'day') => {
+export const incrementActivityCounter = (type: 'lesson' | 'book' | 'song') => {
   const key = type === 'lesson' 
-    ? 'godlykids_lessons_completed' 
+    ? 'godlykids_lessons_watched' 
     : type === 'book' 
-      ? 'godlykids_books_read' 
-      : 'godlykids_days_active';
+      ? 'godlykids_books_opened' 
+      : 'godlykids_songs_played';
   
   const current = parseInt(localStorage.getItem(key) || '0', 10);
   localStorage.setItem(key, String(current + 1));

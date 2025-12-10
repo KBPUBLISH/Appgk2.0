@@ -7,6 +7,7 @@ import { useUser } from '../context/UserContext';
 import { useAudio } from '../context/AudioContext';
 import { useLanguage } from '../context/LanguageContext';
 import { analyticsService } from '../services/analyticsService';
+import { incrementActivityCounter } from '../components/features/ReviewPromptModal';
 import { voiceCloningService, ClonedVoice } from '../services/voiceCloningService';
 import DrawingCanvas from '../components/features/DrawingCanvas';
 import { filterVisibleVoices } from '../services/voiceManagementService';
@@ -941,6 +942,8 @@ const LessonPlayerPage: React.FC = () => {
                             onPause={() => setIsVideoPlaying(false)}
                             onEnded={() => {
                                 setIsVideoPlaying(false);
+                                // Increment lesson watched counter for review prompt
+                                incrementActivityCounter('lesson');
                                 if (hasEpisodes && currentEpisodeIndex < totalEpisodes - 1) {
                                     // More episodes to go - auto advance
                                     goToNextEpisode();

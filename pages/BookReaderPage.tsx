@@ -13,6 +13,7 @@ import { readingProgressService } from '../services/readingProgressService';
 import { favoritesService } from '../services/favoritesService';
 import { readCountService } from '../services/readCountService';
 import { analyticsService } from '../services/analyticsService';
+import { incrementActivityCounter } from '../components/features/ReviewPromptModal';
 import { BookPageRenderer, ScrollState } from '../components/features/BookPageRenderer';
 import { processTextWithEmotionalCues, removeEmotionalCues } from '../utils/textProcessing';
 import { activityTrackingService } from '../services/activityTrackingService';
@@ -338,6 +339,9 @@ const BookReaderPage: React.FC = () => {
                     
                     // Track book read for Report Card
                     activityTrackingService.trackBookRead(bookId, book.title);
+                    
+                    // Increment book opened counter for review prompt
+                    incrementActivityCounter('book');
                     
                 // Set book orientation
                 const rawData = (book as any)?.rawData;

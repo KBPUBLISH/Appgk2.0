@@ -4,6 +4,7 @@ import { ApiService } from '../services/apiService';
 import { playHistoryService } from '../services/playHistoryService';
 import { analyticsService } from '../services/analyticsService';
 import { activityTrackingService } from '../services/activityTrackingService';
+import { incrementActivityCounter } from '../components/features/ReviewPromptModal';
 
 // --- Interfaces ---
 export interface AudioItem {
@@ -898,6 +899,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 analyticsService.audioPlay(trackId || `${playlistId}_${startIndex}`, track.title, playlistId);
                 // Track for Report Card
                 activityTrackingService.trackSongPlayed(trackId || `${playlistId}_${startIndex}`, track.title);
+                // Increment song played counter for review prompt
+                incrementActivityCounter('song');
             }
             
             // Increment server-side counts (for portal analytics)

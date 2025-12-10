@@ -12,6 +12,7 @@ import DailyRewardModal from '../components/features/DailyRewardModal';
 import ChallengeGameModal from '../components/features/ChallengeGameModal';
 import StrengthGameModal from '../components/features/StrengthGameModal';
 import PrayerGameModal from '../components/features/PrayerGameModal';
+import ReviewPromptModal, { shouldShowReviewPrompt } from '../components/features/ReviewPromptModal';
 import { Key, Brain, Dumbbell, Heart, Video, Lock, Check, Play, CheckCircle, Clock, Coins } from 'lucide-react';
 import { ApiService } from '../services/apiService';
 import { 
@@ -72,6 +73,7 @@ const HomePage: React.FC = () => {
   const [showChallengeGame, setShowChallengeGame] = useState(false);
   const [showStrengthGame, setShowStrengthGame] = useState(false);
   const [showPrayerGame, setShowPrayerGame] = useState(false);
+  const [showReviewPrompt, setShowReviewPrompt] = useState(false);
   const [hasEngagedMemory, setHasEngagedMemory] = useState(false);
   const [hasEngagedDailyKey, setHasEngagedDailyKey] = useState(false);
   const [hasEngagedStrength, setHasEngagedStrength] = useState(false);
@@ -124,6 +126,19 @@ const HomePage: React.FC = () => {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
+
+  // Check if we should show the review prompt (after 1 book/lesson/song)
+  useEffect(() => {
+    // Small delay to let the page load first
+    const timer = setTimeout(() => {
+      if (shouldShowReviewPrompt()) {
+        console.log('🌟 Showing review prompt - user has engaged with content!');
+        setShowReviewPrompt(true);
+      }
+    }, 2000); // 2 second delay after page load
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   // Check if games have been engaged today (per-profile) - resets daily
   useEffect(() => {
@@ -577,6 +592,11 @@ const HomePage: React.FC = () => {
       <PrayerGameModal
         isOpen={showPrayerGame}
         onClose={() => setShowPrayerGame(false)}
+      />
+
+      <ReviewPromptModal
+        isOpen={showReviewPrompt}
+        onReviewSubmitted={() => setShowReviewPrompt(false)}
       />
 
       <div className="px-4 pt-28 space-y-2 pb-52">
