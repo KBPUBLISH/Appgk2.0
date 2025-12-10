@@ -427,30 +427,36 @@ const BookReaderPage: React.FC = () => {
         };
     }, [bookId, setGameMode, setMusicPaused]); // Removed bookMusicEnabled from dependencies
 
-    // Effect: Stop TTS audio when component unmounts or user navigates away
+    // Ref to track current audio for cleanup (avoids stale closure issues)
+    const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+    useEffect(() => {
+        currentAudioRef.current = currentAudio;
+    }, [currentAudio]);
+
+    // Effect: Stop TTS audio ONLY when component unmounts (empty dependency array)
     useEffect(() => {
         return () => {
             console.log('📖 BookReaderPage - Stopping TTS audio on unmount');
-            // Stop any playing TTS narration
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.src = '';
+            // Stop any playing TTS narration using ref (not state, which would be stale)
+            if (currentAudioRef.current) {
+                currentAudioRef.current.pause();
+                currentAudioRef.current.src = '';
             }
             // Reset playing state
             setPlaying(false);
             setActiveTextBoxIndex(null);
             setCurrentWordIndex(-1);
         };
-    }, [currentAudio]);
+    }, []); // Empty array = only runs on unmount
 
     // Effect: Stop audio when page becomes hidden (user switches tabs/apps)
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.hidden) {
                 console.log('📖 Page hidden - stopping book audio');
-                // Stop TTS narration
-                if (currentAudio) {
-                    currentAudio.pause();
+                // Stop TTS narration using ref
+                if (currentAudioRef.current) {
+                    currentAudioRef.current.pause();
                 }
                 setPlaying(false);
                 
@@ -466,7 +472,7 @@ const BookReaderPage: React.FC = () => {
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [currentAudio]);
+    }, []); // Empty array - event handler uses refs, not stale state
 
     // Effect 2: Handle Music Toggle (Play/Pause)
     useEffect(() => {
