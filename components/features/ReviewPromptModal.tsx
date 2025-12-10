@@ -183,13 +183,8 @@ export const shouldShowReviewPrompt = (): boolean => {
     }
   }
   
-  // Check if user has opened any content (just 1 activity triggers the prompt!)
-  const booksOpened = parseInt(localStorage.getItem('godlykids_books_opened') || '0', 10);
-  const lessonsWatched = parseInt(localStorage.getItem('godlykids_lessons_watched') || '0', 10);
-  const songsPlayed = parseInt(localStorage.getItem('godlykids_songs_played') || '0', 10);
-  
-  // Show review prompt after ANY of these activities (just 1!)
-  return booksOpened >= 1 || lessonsWatched >= 1 || songsPlayed >= 1;
+  // Show immediately when user enters home page (no activity requirement)
+  return true;
 };
 
 // Helper to increment activity counters

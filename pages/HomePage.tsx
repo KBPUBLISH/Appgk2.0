@@ -127,15 +127,15 @@ const HomePage: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
 
-  // Check if we should show the review prompt (after 1 book/lesson/song)
+  // Check if we should show the review prompt (immediately on home page)
   useEffect(() => {
-    // Small delay to let the page load first
+    // Short delay to let the page render first
     const timer = setTimeout(() => {
       if (shouldShowReviewPrompt()) {
-        console.log('🌟 Showing review prompt - user has engaged with content!');
+        console.log('🌟 Showing review prompt on home page!');
         setShowReviewPrompt(true);
       }
-    }, 2000); // 2 second delay after page load
+    }, 1000); // 1 second delay after page load
     
     return () => clearTimeout(timer);
   }, []);

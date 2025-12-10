@@ -559,14 +559,13 @@ const PaywallStep: React.FC<{
         </div>
       </div>
 
-      {/* Skip Link - Always visible */}
+      {/* Skip Link - Always visible (Apple Kids App Guideline: Must allow access without account) */}
       <div className="text-center">
         <button 
           onClick={onSkip}
-          disabled={!accountCreated}
-          className={`text-xs underline decoration-dotted transition-colors ${accountCreated ? 'text-white/50 hover:text-white/80' : 'text-white/20 cursor-not-allowed'}`}
+          className="text-xs underline decoration-dotted transition-colors text-white/60 hover:text-white/90"
         >
-          {accountCreated ? 'Continue with limited access' : 'Create account first to continue'}
+          Continue with limited access →
         </button>
         
         {/* Restore Purchases Link */}
