@@ -190,18 +190,26 @@ const ListenPage: React.FC = () => {
       });
 
   // Filter by age - for playlists
+  // Show playlists where minAge <= selected age (appropriate for that age)
   const ageFilteredPlaylists = selectedAge === 'All Ages'
     ? categoryFilteredPlaylists
     : categoryFilteredPlaylists.filter(p => {
-        const playlistAge = p.level || p.minAge?.toString() || '';
-        if (selectedAge === '3+') return playlistAge.includes('3') || (p.minAge && p.minAge <= 3);
-        if (selectedAge === '4+') return playlistAge.includes('4') || (p.minAge && p.minAge <= 4);
-        if (selectedAge === '5+') return playlistAge.includes('5') || (p.minAge && p.minAge <= 5);
-        if (selectedAge === '6+') return playlistAge.includes('6') || (p.minAge && p.minAge <= 6);
-        if (selectedAge === '7+') return playlistAge.includes('7') || (p.minAge && p.minAge <= 7);
-        if (selectedAge === '8+') return playlistAge.includes('8') || (p.minAge && p.minAge <= 8);
-        if (selectedAge === '9+') return playlistAge.includes('9') || (p.minAge && p.minAge <= 9);
-        if (selectedAge === '10+') return playlistAge.includes('10') || (p.minAge && p.minAge <= 10);
+        const selectedAgeNum = parseInt(selectedAge.replace('+', ''));
+        
+        // Check minAge first (numeric)
+        if (p.minAge !== undefined && p.minAge !== null) {
+          return p.minAge <= selectedAgeNum;
+        }
+        
+        // Fallback to level string parsing
+        if (p.level) {
+          const levelMatch = p.level.match(/(\d+)/);
+          if (levelMatch) {
+            return parseInt(levelMatch[1]) <= selectedAgeNum;
+          }
+        }
+        
+        // If no age info, show it (assume it's for all ages)
         return true;
       });
 
@@ -412,12 +420,10 @@ const ListenPage: React.FC = () => {
                           {/* Gradient overlay at bottom */}
                           <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 to-transparent"></div>
 
-                          {/* Age Badge - Top Left (prominent, like BookCard) */}
-                          {(playlist.level || playlist.minAge) && (
-                            <div className="absolute top-2 left-2 bg-gradient-to-r from-[#4CAF50] to-[#8BC34A] text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg border border-white/30 z-20">
-                              {playlist.level || `Ages ${playlist.minAge}+`}
-                            </div>
-                          )}
+                          {/* Age Badge - Bottom Left (matching BookCard style) */}
+                          <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-md border border-white/20 z-20">
+                            {playlist.level || (playlist.minAge ? `${playlist.minAge}+` : 'All')}
+                          </div>
 
                           {/* Type Icon */}
                           <div className="absolute bottom-2 right-2 bg-white/90 text-blue-900 p-1.5 rounded-full shadow-md">
