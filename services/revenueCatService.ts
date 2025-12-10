@@ -113,13 +113,45 @@ const cleanupPurchaseState = () => {
   }
 };
 
+// Extend window to include DeSpia callbacks
+declare global {
+  interface Window {
+    onRevenueCatPurchase?: () => void;
+    onRevenueCatRestore?: () => void;
+  }
+}
+
 // Set up listener for purchase completion
 const setupPurchaseListener = () => {
-  // Listen for custom events that DeSpia might fire
+  // ⚡ INSTANT CALLBACK: DeSpia's onRevenueCatPurchase() fires immediately when Apple purchase succeeds
+  // This is the fastest way to detect purchase success - no webhook delay!
+  (window as any).onRevenueCatPurchase = () => {
+    console.log('🚀 DeSpia onRevenueCatPurchase() - INSTANT purchase confirmation!');
+    localStorage.setItem('godlykids_premium', 'true');
+    window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
+    if (purchaseResolve) {
+      purchaseResolve({ success: true });
+      purchaseResolve = null;
+    }
+    cleanupPurchaseState();
+  };
+  
+  // Also register restore callback
+  (window as any).onRevenueCatRestore = () => {
+    console.log('🔄 DeSpia onRevenueCatRestore() - Restore completed!');
+    localStorage.setItem('godlykids_premium', 'true');
+    window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
+    if (purchaseResolve) {
+      purchaseResolve({ success: true });
+      purchaseResolve = null;
+    }
+    cleanupPurchaseState();
+  };
+
+  // Listen for custom events that DeSpia might fire (backup)
   window.addEventListener('despia-purchase-success', () => {
     console.log('✅ DeSpia purchase success event received');
     localStorage.setItem('godlykids_premium', 'true');
-    // Dispatch event for UI update
     window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
     if (purchaseResolve) {
       purchaseResolve({ success: true });
