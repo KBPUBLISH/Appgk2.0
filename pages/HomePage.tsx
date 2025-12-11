@@ -88,9 +88,17 @@ const HomePage: React.FC = () => {
   // Success notification state
   const [unlockSuccess, setUnlockSuccess] = useState<{ show: boolean; gameName: string }>({ show: false, gameName: '' });
 
-  // Lessons state
-  const [lessons, setLessons] = useState<any[]>([]);
-  const [lessonsLoading, setLessonsLoading] = useState(true);
+  // Helper to get cached data from sessionStorage
+  const getCached = (key: string): any[] => {
+    try {
+      const cached = sessionStorage.getItem(`godlykids_home_${key}`);
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  };
+  
+  // Lessons state - initialize from cache if available
+  const [lessons, setLessons] = useState<any[]>(() => getCached('lessons'));
+  const [lessonsLoading, setLessonsLoading] = useState(() => getCached('lessons').length === 0);
   const [weekLessons, setWeekLessons] = useState<Map<string, any>>(new Map());
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(getSelectedDay());
   const todayIndex = getTodayIndex();
@@ -102,33 +110,37 @@ const HomePage: React.FC = () => {
   });
   const welcomeVideoRef = useRef<HTMLVideoElement>(null);
   
-  // Explore categories state
-  const [exploreCategories, setExploreCategories] = useState<any[]>([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [playlists, setPlaylists] = useState<any[]>([]);
-  const [playlistsLoading, setPlaylistsLoading] = useState(true);
+  // Explore categories state - initialize from cache if available
+  const [exploreCategories, setExploreCategories] = useState<any[]>(() => getCached('categories'));
+  const [categoriesLoading, setCategoriesLoading] = useState(() => getCached('categories').length === 0);
+  const [playlists, setPlaylists] = useState<any[]>(() => getCached('playlists'));
+  const [playlistsLoading, setPlaylistsLoading] = useState(() => getCached('playlists').length === 0);
   
-  // Featured content state
-  const [featuredContent, setFeaturedContent] = useState<any[]>([]);
-  const [featuredLoading, setFeaturedLoading] = useState(true);
+  // Featured content state - initialize from cache if available
+  const [featuredContent, setFeaturedContent] = useState<any[]>(() => getCached('featured'));
+  const [featuredLoading, setFeaturedLoading] = useState(() => getCached('featured').length === 0);
   
   // Recently Read/Played state
   const [recentlyReadBooks, setRecentlyReadBooks] = useState<any[]>([]);
   const [recentlyPlayedPlaylists, setRecentlyPlayedPlaylists] = useState<any[]>([]);
   
-  // Top Rated content state
-  const [topRatedBooks, setTopRatedBooks] = useState<any[]>([]);
-  const [topRatedPlaylists, setTopRatedPlaylists] = useState<any[]>([]);
+  // Top Rated content state - initialize from cache if available
+  const [topRatedBooks, setTopRatedBooks] = useState<any[]>(() => getCached('topBooks'));
+  const [topRatedPlaylists, setTopRatedPlaylists] = useState<any[]>(() => getCached('topPlaylists'));
   
-  // Book Series state
-  const [bookSeries, setBookSeries] = useState<any[]>([]);
+  // Book Series state - initialize from cache if available
+  const [bookSeries, setBookSeries] = useState<any[]>(() => getCached('series'));
   
-  // Dynamic games from backend
-  const [dynamicGames, setDynamicGames] = useState<any[]>([]);
-  const [gamesLoading, setGamesLoading] = useState(true);
+  // Dynamic games from backend - initialize from cache if available
+  const [dynamicGames, setDynamicGames] = useState<any[]>(() => getCached('games'));
+  const [gamesLoading, setGamesLoading] = useState(() => getCached('games').length === 0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
+  
+  // Track last fetch time to prevent excessive refetching (debounce)
+  // Use sessionStorage so it persists across component remounts
+  const FETCH_DEBOUNCE_MS = 60000; // Don't refetch within 60 seconds (1 minute)
 
   // Check if we should show the review prompt (immediately on home page)
   useEffect(() => {
@@ -273,7 +285,28 @@ const HomePage: React.FC = () => {
   };
 
   // Fetch lessons, categories, playlists, featured content, and games
+  // With debounce to prevent excessive refetching when app comes back from background
   useEffect(() => {
+    const now = Date.now();
+    const lastFetchTimeStr = sessionStorage.getItem('godlykids_home_last_fetch');
+    const lastFetch = lastFetchTimeStr ? parseInt(lastFetchTimeStr, 10) : 0;
+    const timeSinceLastFetch = now - lastFetch;
+    
+    // Skip if we fetched recently (prevents memory spikes from rapid refetches)
+    if (timeSinceLastFetch < FETCH_DEBOUNCE_MS && lastFetch > 0) {
+      console.log(`⏸️ HomePage: Skipping fetch, last fetch was ${Math.round(timeSinceLastFetch / 1000)}s ago`);
+      // Still set loading to false since we're using cached data
+      setLessonsLoading(false);
+      setCategoriesLoading(false);
+      setPlaylistsLoading(false);
+      setFeaturedLoading(false);
+      setGamesLoading(false);
+      return;
+    }
+    
+    console.log('🔄 HomePage: Fetching all data...');
+    sessionStorage.setItem('godlykids_home_last_fetch', now.toString());
+    
     fetchLessons();
     fetchExploreCategories();
     fetchPlaylists();
@@ -283,6 +316,15 @@ const HomePage: React.FC = () => {
     fetchBookSeries();
   }, []);
   
+  // Helper to cache data in sessionStorage
+  const cacheData = (key: string, data: any[]) => {
+    try {
+      sessionStorage.setItem(`godlykids_home_${key}`, JSON.stringify(data));
+    } catch (e) {
+      console.log('⚠️ Failed to cache data:', key);
+    }
+  };
+  
   // Fetch dynamic games from backend
   const fetchDynamicGames = async () => {
     try {
@@ -290,6 +332,7 @@ const HomePage: React.FC = () => {
       const games = await ApiService.getDailyTaskGames();
       console.log('🎮 Dynamic games received:', games.length, games);
       setDynamicGames(games);
+      cacheData('games', games);
     } catch (error) {
       console.error('❌ Error fetching dynamic games:', error);
     } finally {
@@ -343,6 +386,7 @@ const HomePage: React.FC = () => {
 
       console.log('📚 Week lessons map (Mon-Sun):', Array.from(weekMap.entries()));
       setWeekLessons(weekMap);
+      cacheData('lessons', data);
     } catch (error) {
       console.error('❌ Error fetching lessons:', error);
     } finally {
@@ -405,6 +449,7 @@ const HomePage: React.FC = () => {
       // Double-check: filter to only include categories with showOnExplore: true
       const exploreOnly = categories.filter(cat => cat.showOnExplore === true);
       setExploreCategories(exploreOnly);
+      cacheData('categories', exploreOnly);
       console.log(`✅ Final explore categories (${exploreOnly.length}):`, exploreOnly.map(c => c.name));
       
     } catch (error) {
@@ -432,6 +477,7 @@ const HomePage: React.FC = () => {
       setPlaylistsLoading(true);
       const data = await ApiService.getPlaylists('published');
       setPlaylists(data);
+      cacheData('playlists', data);
     } catch (error) {
       console.error('❌ Error fetching playlists:', error);
     } finally {
@@ -446,6 +492,7 @@ const HomePage: React.FC = () => {
       const data = await ApiService.getFeaturedContent();
       console.log('⭐ Featured content loaded:', data.length, 'items');
       setFeaturedContent(data);
+      cacheData('featured', data);
     } catch (error) {
       console.error('❌ Error fetching featured content:', error);
     } finally {
@@ -463,6 +510,8 @@ const HomePage: React.FC = () => {
       console.log('🏆 Top rated books:', topBooks.length, 'playlists:', topPlaylists.length);
       setTopRatedBooks(topBooks);
       setTopRatedPlaylists(topPlaylists);
+      cacheData('topBooks', topBooks);
+      cacheData('topPlaylists', topPlaylists);
     } catch (error) {
       console.error('❌ Error fetching top-rated content:', error);
     }
@@ -474,6 +523,7 @@ const HomePage: React.FC = () => {
       const data = await ApiService.getBookSeries();
       console.log('📚 Book series loaded:', data.length);
       setBookSeries(data);
+      cacheData('series', data);
     } catch (error) {
       console.error('❌ Error fetching book series:', error);
     }
