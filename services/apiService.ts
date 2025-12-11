@@ -3,28 +3,37 @@ import { Book } from '../types';
 import { authService } from './authService';
 
 // ============================================
-// Module-level caching to prevent repeated API calls
-// even if components remount frequently
+// LocalStorage-backed caching to survive WebView restarts
+// iOS kills WebView when app is backgrounded, clearing module-level vars
 // ============================================
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-}
-
-const API_CACHE: Record<string, CacheEntry<any>> = {};
+const API_CACHE_PREFIX = 'gk_api_';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 const getCached = <T>(key: string): T | null => {
-  const entry = API_CACHE[key];
-  if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
-    console.log(`📦 API Cache HIT: ${key}`);
-    return entry.data;
-  }
+  try {
+    const cached = localStorage.getItem(`${API_CACHE_PREFIX}${key}`);
+    if (cached) {
+      const { data, ts } = JSON.parse(cached);
+      if (Date.now() - ts < CACHE_TTL) {
+        console.log(`📦 API Cache HIT: ${key}`);
+        return data as T;
+      }
+      // Expired
+      localStorage.removeItem(`${API_CACHE_PREFIX}${key}`);
+    }
+  } catch {}
   return null;
 };
 
 const setCache = <T>(key: string, data: T): void => {
-  API_CACHE[key] = { data, timestamp: Date.now() };
+  try {
+    localStorage.setItem(`${API_CACHE_PREFIX}${key}`, JSON.stringify({
+      data,
+      ts: Date.now()
+    }));
+  } catch {
+    // localStorage full or unavailable - just continue without caching
+  }
 };
 
 // ============================================

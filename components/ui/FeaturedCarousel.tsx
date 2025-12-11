@@ -4,9 +4,36 @@ import { Book } from '../../types';
 import { BookOpen, Music } from 'lucide-react';
 import { ApiService } from '../../services/apiService';
 
-// Module-level cache to prevent duplicate page fetches across component remounts
-const pageImageCache: Record<string, string[]> = {};
-const fetchingBooks: Set<string> = new Set(); // Track in-flight requests
+// Track in-flight requests (module-level, doesn't need persistence)
+const fetchingBooks: Set<string> = new Set();
+
+// LocalStorage-backed cache that survives WebView restarts
+const CACHE_KEY_PREFIX = 'gk_pages_';
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+const getPageCache = (bookId: string): string[] | null => {
+  try {
+    const cached = localStorage.getItem(`${CACHE_KEY_PREFIX}${bookId}`);
+    if (cached) {
+      const { data, ts } = JSON.parse(cached);
+      if (Date.now() - ts < CACHE_TTL) {
+        return data;
+      }
+      // Expired, remove it
+      localStorage.removeItem(`${CACHE_KEY_PREFIX}${bookId}`);
+    }
+  } catch {}
+  return null;
+};
+
+const setPageCache = (bookId: string, pages: string[]) => {
+  try {
+    localStorage.setItem(`${CACHE_KEY_PREFIX}${bookId}`, JSON.stringify({
+      data: pages,
+      ts: Date.now()
+    }));
+  } catch {}
+};
 
 interface FeaturedItem extends Partial<Book> {
   id: string;
@@ -51,26 +78,30 @@ const PageFlipPreview: React.FC<{
   }, []);
 
   // Fetch first 2 pages of the book ONLY when it becomes active
-  // Uses module-level cache to prevent duplicate fetches across remounts
+  // Uses localStorage cache to survive WebView restarts
   useEffect(() => {
     if (!bookId || !isActive) return;
     
-    // Check module-level cache first
-    if (pageImageCache[bookId]) {
-      setPages(pageImageCache[bookId]);
+    // Check localStorage cache first (survives app restarts)
+    const cached = getPageCache(bookId);
+    if (cached) {
+      setPages(cached);
       setPagesLoaded(true);
       return;
     }
     
-    // Already fetching this book? Wait for it
+    // Already fetching this book in this session? Wait for it
     if (fetchingBooks.has(bookId)) {
       const checkCache = setInterval(() => {
-        if (pageImageCache[bookId]) {
-          setPages(pageImageCache[bookId]);
+        const c = getPageCache(bookId);
+        if (c) {
+          setPages(c);
           setPagesLoaded(true);
           clearInterval(checkCache);
         }
       }, 100);
+      // Max wait 3 seconds
+      setTimeout(() => clearInterval(checkCache), 3000);
       return () => clearInterval(checkCache);
     }
     
@@ -87,14 +118,14 @@ const PageFlipPreview: React.FC<{
             .map((p: any) => p.files?.background?.url || p.backgroundUrl)
             .filter(Boolean);
           
-          // Store in module-level cache
-          pageImageCache[bookId] = pageImages;
+          // Store in localStorage cache
+          setPageCache(bookId, pageImages);
           
           if (isMountedRef.current && pageImages.length > 0) {
             setPages(pageImages);
           }
         } else {
-          pageImageCache[bookId] = [];
+          setPageCache(bookId, []);
         }
         
         if (isMountedRef.current) {
@@ -102,7 +133,7 @@ const PageFlipPreview: React.FC<{
         }
       } catch (error) {
         console.log('📖 Could not fetch pages for:', title);
-        pageImageCache[bookId] = [];
+        setPageCache(bookId, []);
         if (isMountedRef.current) {
           setPagesLoaded(true);
         }
