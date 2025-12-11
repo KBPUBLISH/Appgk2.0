@@ -45,6 +45,10 @@ interface Page {
         soundEffect?: {
             url?: string;
         };
+        background?: {
+            url?: string;
+            type?: string;
+        };
     };
     soundEffectUrl?: string;
 }

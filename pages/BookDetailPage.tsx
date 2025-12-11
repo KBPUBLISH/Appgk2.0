@@ -156,6 +156,7 @@ const BookDetailPage: React.FC = () => {
   useEffect(() => {
     if (!id) return;
     const pinned = pinnedColoringService.getPinned(id);
+    console.log('🖼️ Loaded pinned coloring for book', id, ':', pinned);
     if (!pinned) {
       setPinnedDrawing(null);
       return;
@@ -163,9 +164,11 @@ const BookDetailPage: React.FC = () => {
     const dataUrl = pinnedColoringService.getDrawingDataUrl(pinned.pageId);
     if (!dataUrl) {
       // Drawing missing; keep things clean
+      console.log('🖼️ Drawing data not found for pageId:', pinned.pageId);
       setPinnedDrawing(null);
       return;
     }
+    console.log('🖼️ Setting pinned drawing with backgroundUrl:', pinned.backgroundUrl);
     setPinnedDrawing({ 
       pageRef: pinned.pageRef, 
       pageId: pinned.pageId, 
