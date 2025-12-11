@@ -310,18 +310,15 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
     }
   };
 
-  // Auto-advance for playlists (no page flip, just 3 seconds)
+  // Auto-advance all items every 4 seconds (page flip disabled)
   useEffect(() => {
     const currentItem = books[activeIndex];
     if (!currentItem) return;
     
-    const itemIsPlaylist = currentItem._itemType === 'playlist';
-    if (itemIsPlaylist) {
-      const timeout = setTimeout(() => {
-        handleCycleComplete();
-      }, 3000);
-      return () => clearTimeout(timeout);
-    }
+    const timeout = setTimeout(() => {
+      handleCycleComplete();
+    }, 4000);
+    return () => clearTimeout(timeout);
   }, [activeIndex, books, handleCycleComplete]);
 
   if (books.length === 0) return null;
@@ -374,22 +371,13 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
             <div className="relative z-10 transform transition-transform active:scale-95 duration-200 px-4">
               {/* Cover - Aspect Square - Bigger */}
               <div className="w-[19rem] md:w-[24rem] aspect-square rounded-lg shadow-2xl relative overflow-visible">
-                {/* Use PageFlipPreview for books with cover, static image for playlists */}
-                {itemIsPlaylist || !coverUrl ? (
-                  <img
-                    src={coverUrl || '/assets/images/placeholder-book.png'}
-                    alt={item.title}
-                    className="w-full h-full object-cover rounded-lg border-2 border-white/10"
-                  />
-                ) : (
-                  <PageFlipPreview
-                    bookId={itemId}
-                    coverUrl={coverUrl}
-                    title={item.title}
-                    onCycleComplete={handleCycleComplete}
-                    isActive={isActive}
-                  />
-                )}
+                {/* DISABLED PageFlipPreview - was causing crashes */}
+                {/* Now showing static cover images for all items */}
+                <img
+                  src={coverUrl || '/assets/images/placeholder-book.png'}
+                  alt={item.title}
+                  className="w-full h-full object-cover rounded-lg border-2 border-white/10"
+                />
 
                 {/* Action Button Overlay */}
                 <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-md text-black text-xs md:text-sm font-bold px-4 py-1.5 rounded-full flex items-center gap-2 shadow-lg hover:bg-white transition-colors z-30">
