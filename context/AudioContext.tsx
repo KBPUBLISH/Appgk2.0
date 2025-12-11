@@ -437,11 +437,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             // Event listeners
             playlistAudioRef.current.addEventListener('timeupdate', () => {
                 if (playlistAudioRef.current) {
-                    setCurrentTime(playlistAudioRef.current.currentTime);
+                    const time = playlistAudioRef.current.currentTime;
+                    setCurrentTime(time);
                     const dur = playlistAudioRef.current.duration;
                     if (!isNaN(dur)) {
                         setDuration(dur);
-                        setProgress((playlistAudioRef.current.currentTime / dur) * 100);
+                        setProgress((time / dur) * 100);
+                    }
+                    
+                    // Save position to localStorage every 3 seconds for iOS recovery
+                    // (helps when iOS suspends audio and loses currentTime)
+                    if (Math.floor(time) % 3 === 0 && currentPlaylist) {
+                        const posKey = `audio_position_${currentPlaylist._id}_${currentTrackIndex}`;
+                        localStorage.setItem(posKey, time.toString());
                     }
                 }
             });
@@ -722,59 +730,108 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         // Play/Pause from lock screen or headphones
         navigator.mediaSession.setActionHandler('play', async () => {
-            console.log('📱 Media Session: play');
+            console.log('📱 Media Session: play requested');
             
-            // Directly try to play the audio element first
-            if (playlistAudioRef.current) {
-                try {
-                    // Save current position before any operations
-                    const savedPosition = playlistAudioRef.current.currentTime;
-                    console.log('📱 Saved position:', savedPosition);
-                    
-                    // If audio was suspended, we may need to reload
-                    if (playlistAudioRef.current.readyState < 2) {
-                        console.log('📱 Audio needs reload, readyState:', playlistAudioRef.current.readyState);
-                        playlistAudioRef.current.load();
-                        // Wait for audio to be ready
-                        await new Promise<void>((resolve) => {
-                            const onCanPlay = () => {
-                                playlistAudioRef.current?.removeEventListener('canplay', onCanPlay);
-                                resolve();
-                            };
-                            playlistAudioRef.current?.addEventListener('canplay', onCanPlay);
-                            // Timeout fallback
-                            setTimeout(resolve, 1000);
-                        });
-                        // Restore position after reload
-                        if (savedPosition > 0 && playlistAudioRef.current) {
-                            playlistAudioRef.current.currentTime = savedPosition;
-                            console.log('📱 Restored position after reload:', savedPosition);
-                        }
-                    }
-                    
-                    await playlistAudioRef.current.play();
+            if (!playlistAudioRef.current) {
+                console.log('📱 No audio element');
+                return;
+            }
+            
+            const audio = playlistAudioRef.current;
+            
+            // Get saved position from localStorage as backup (iOS sometimes clears currentTime)
+            const savedPositionKey = `audio_position_${currentPlaylist?._id}_${currentTrackIndex}`;
+            const savedPositionStr = localStorage.getItem(savedPositionKey);
+            const savedPosition = savedPositionStr ? parseFloat(savedPositionStr) : audio.currentTime;
+            
+            console.log('📱 Current position:', audio.currentTime, 'Saved position:', savedPosition, 'ReadyState:', audio.readyState);
+            
+            try {
+                // First, try a simple play without reloading
+                if (audio.readyState >= 2) {
+                    // Audio is ready, just play
+                    console.log('📱 Audio ready, attempting play...');
+                    await audio.play();
                     setIsPlaying(true);
-                    console.log('📱 Media Session: play successful at position:', playlistAudioRef.current.currentTime);
-                } catch (e: any) {
-                    console.error('📱 Media Session: play failed:', e.name, e.message);
-                    // Try again after a short delay
-                    setTimeout(async () => {
-                        try {
-                            await playlistAudioRef.current?.play();
-                            setIsPlaying(true);
-                        } catch (e2) {
-                            console.error('📱 Media Session: retry play failed');
-                        }
-                    }, 100);
+                    console.log('📱 Play successful');
+                    return;
                 }
-            } else {
+                
+                // Audio needs to be reloaded (iOS suspended it)
+                console.log('📱 Audio suspended, need to reload. ReadyState:', audio.readyState);
+                
+                // Save the src to reload
+                const currentSrc = audio.src;
+                if (!currentSrc) {
+                    console.log('📱 No audio src');
+                    return;
+                }
+                
+                // Reload by setting src again (more reliable than load())
+                audio.src = currentSrc;
+                
+                // Wait for audio to be ready
+                await new Promise<void>((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        console.log('📱 Canplay timeout, attempting anyway');
+                        resolve();
+                    }, 3000);
+                    
+                    const onCanPlay = () => {
+                        clearTimeout(timeout);
+                        audio.removeEventListener('canplay', onCanPlay);
+                        audio.removeEventListener('error', onError);
+                        console.log('📱 Audio canplay received');
+                        resolve();
+                    };
+                    
+                    const onError = (e: Event) => {
+                        clearTimeout(timeout);
+                        audio.removeEventListener('canplay', onCanPlay);
+                        audio.removeEventListener('error', onError);
+                        console.error('📱 Audio load error');
+                        reject(e);
+                    };
+                    
+                    audio.addEventListener('canplay', onCanPlay);
+                    audio.addEventListener('error', onError);
+                });
+                
+                // Restore position BEFORE playing
+                if (savedPosition > 0) {
+                    console.log('📱 Restoring position to:', savedPosition);
+                    audio.currentTime = savedPosition;
+                    // Small delay to ensure seek completes
+                    await new Promise(r => setTimeout(r, 50));
+                }
+                
+                // Now play
+                await audio.play();
                 setIsPlaying(true);
+                console.log('📱 Play successful at position:', audio.currentTime);
+                
+            } catch (e: any) {
+                console.error('📱 Media Session play failed:', e.name, e.message);
+                
+                // Last resort: try play without any fancy logic
+                try {
+                    await audio.play();
+                    setIsPlaying(true);
+                } catch (e2) {
+                    console.error('📱 Final play attempt failed');
+                }
             }
         });
 
         navigator.mediaSession.setActionHandler('pause', () => {
             console.log('📱 Media Session: pause');
             if (playlistAudioRef.current) {
+                // Save position before pausing (in case iOS loses it)
+                if (currentPlaylist) {
+                    const posKey = `audio_position_${currentPlaylist._id}_${currentTrackIndex}`;
+                    localStorage.setItem(posKey, playlistAudioRef.current.currentTime.toString());
+                    console.log('📱 Saved position on pause:', playlistAudioRef.current.currentTime);
+                }
                 playlistAudioRef.current.pause();
             }
             setIsPlaying(false);

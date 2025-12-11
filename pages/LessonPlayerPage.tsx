@@ -105,6 +105,10 @@ const LessonPlayerPage: React.FC = () => {
     const [currentEpisodeIndex, setCurrentEpisodeIndex] = useState(0);
     const [showEpisodeSelector, setShowEpisodeSelector] = useState(false);
     const preloadedVideosRef = useRef<Map<string, HTMLVideoElement>>(new Map());
+    
+    // Video ready state - for older iPhones that block autoplay
+    const [videoReady, setVideoReady] = useState(false);
+    const [needsUserInteraction, setNeedsUserInteraction] = useState(false);
 
     // Quiz state
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -282,6 +286,8 @@ const LessonPlayerPage: React.FC = () => {
             }
             setIsVideoPlaying(false);
             setVideoProgress(0);
+            setVideoReady(false);
+            setNeedsUserInteraction(false);
             setCurrentEpisodeIndex(prev => prev + 1);
         } else if (!hasEpisodes || currentEpisodeIndex >= totalEpisodes - 1) {
             // Last episode finished - transition to devotional
@@ -301,6 +307,8 @@ const LessonPlayerPage: React.FC = () => {
             }
             setIsVideoPlaying(false);
             setVideoProgress(0);
+            setVideoReady(false);
+            setNeedsUserInteraction(false);
             setCurrentEpisodeIndex(prev => prev - 1);
         }
     };
@@ -313,6 +321,8 @@ const LessonPlayerPage: React.FC = () => {
             }
             setIsVideoPlaying(false);
             setVideoProgress(0);
+            setVideoReady(false);
+            setNeedsUserInteraction(false);
             setCurrentEpisodeIndex(index);
             setShowEpisodeSelector(false);
         }
@@ -935,10 +945,17 @@ const LessonPlayerPage: React.FC = () => {
                             className="w-full h-full object-contain cursor-pointer"
                             onClick={(e) => {
                                 e.stopPropagation();
+                                // Clear needs interaction flag on tap
+                                if (needsUserInteraction) {
+                                    setNeedsUserInteraction(false);
+                                }
                                 handleVideoTap();
                             }}
                             onTimeUpdate={handleVideoProgress}
-                            onPlay={() => setIsVideoPlaying(true)}
+                            onPlay={() => {
+                                setIsVideoPlaying(true);
+                                setNeedsUserInteraction(false);
+                            }}
                             onPause={() => setIsVideoPlaying(false)}
                             onEnded={() => {
                                 setIsVideoPlaying(false);
@@ -953,21 +970,70 @@ const LessonPlayerPage: React.FC = () => {
                                     setCurrentScreen('devotional');
                                 }
                             }}
+                            onCanPlay={() => {
+                                setVideoReady(true);
+                            }}
                             onLoadedData={() => {
-                                // Auto-play when video loads (if on video screen)
+                                setVideoReady(true);
+                                // Try to auto-play when video loads (if on video screen)
                                 if (videoRef.current && currentScreen === 'video') {
-                                    videoRef.current.play().catch(err => {
-                                        console.log('Autoplay prevented:', err);
-                                    });
+                                    const playPromise = videoRef.current.play();
+                                    if (playPromise !== undefined) {
+                                        playPromise.catch(err => {
+                                            console.log('Autoplay prevented (older iOS):', err.name);
+                                            // Show play button for user to tap
+                                            setNeedsUserInteraction(true);
+                                        });
+                                    }
                                 }
                             }}
+                            onError={(e) => {
+                                console.error('Video error:', e);
+                                setVideoReady(true); // Still show UI
+                                setNeedsUserInteraction(true);
+                            }}
                             playsInline
+                            webkit-playsinline="true"
                             preload="auto"
                         />
                     </div>
 
+                    {/* Loading indicator while video loads */}
+                    {!videoReady && !needsUserInteraction && (
+                        <div className="absolute inset-0 flex items-center justify-center z-40 bg-black/50">
+                            <div className="flex flex-col items-center">
+                                <div className="w-12 h-12 border-4 border-[#FFD700] border-t-transparent rounded-full animate-spin mb-3" />
+                                <p className="text-white/80 font-display text-sm">Loading video...</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Play button for older iPhones where autoplay is blocked */}
+                    {needsUserInteraction && !isVideoPlaying && (
+                        <div 
+                            className="absolute inset-0 flex items-center justify-center z-40 cursor-pointer"
+                            onClick={() => {
+                                if (videoRef.current) {
+                                    videoRef.current.play().then(() => {
+                                        setNeedsUserInteraction(false);
+                                        setIsVideoPlaying(true);
+                                    }).catch(err => {
+                                        console.log('Play failed:', err);
+                                    });
+                                }
+                            }}
+                        >
+                            <div className="bg-[#FFD700] rounded-full p-6 shadow-2xl animate-pulse">
+                                <Play className="w-16 h-16 text-[#3E1F07] ml-1" fill="#3E1F07" />
+                            </div>
+                            <p className="absolute bottom-[30%] text-white font-display font-bold text-lg drop-shadow-lg">
+                                Tap to Play
+                            </p>
+                        </div>
+                    )}
+
                     {/* Tap indicator (shows briefly on tap) - Outside scroll container */}
-                    {showVideoControls && (
+                    {showVideoControls && !needsUserInteraction && (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
                             <div className="bg-black/50 rounded-full p-4">
                                 {isVideoPlaying ? (
