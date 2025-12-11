@@ -69,7 +69,8 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
             pinnedColoringService.unpin(parsedPage.bookId);
             setPinToast('Removed from fridge');
         } else {
-            const pinned = pinnedColoringService.pinFromPageId(pageId);
+            // Pass the resolved background URL so we can overlay line art on the fridge card
+            const pinned = pinnedColoringService.pinFromPageId(pageId, resolvedImageUrl || undefined);
             setPinToast(pinned ? 'Pinned to book!' : 'Could not pin (storage full?)');
         }
         window.setTimeout(() => setPinToast(null), 1500);

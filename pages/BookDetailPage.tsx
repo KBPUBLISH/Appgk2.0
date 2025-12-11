@@ -70,7 +70,8 @@ const BookDetailPage: React.FC = () => {
   const [isFavorited, setIsFavorited] = useState<boolean>(false);
   const [isInLibrary, setIsInLibrary] = useState<boolean>(false);
   const [isMembersOnly, setIsMembersOnly] = useState<boolean>(false);
-  const [pinnedDrawing, setPinnedDrawing] = useState<{ pageRef: string; pageId: string; dataUrl: string } | null>(null);
+  const [pinnedDrawing, setPinnedDrawing] = useState<{ pageRef: string; pageId: string; dataUrl: string; backgroundUrl?: string } | null>(null);
+  const [showDrawingModal, setShowDrawingModal] = useState(false);
   
   // Check if book is locked (members only and user not subscribed)
   const isLocked = isMembersOnly && !isSubscribed;
@@ -165,8 +166,36 @@ const BookDetailPage: React.FC = () => {
       setPinnedDrawing(null);
       return;
     }
-    setPinnedDrawing({ pageRef: pinned.pageRef, pageId: pinned.pageId, dataUrl });
+    setPinnedDrawing({ 
+      pageRef: pinned.pageRef, 
+      pageId: pinned.pageId, 
+      dataUrl,
+      backgroundUrl: pinned.backgroundUrl 
+    });
   }, [id]);
+
+  // Fun encouraging messages that rotate based on the pageId hash
+  const getFridgeMessage = (pageId: string): string => {
+    const messages = [
+      "Wow, Great Job! 🌟",
+      "Amazing artwork! ✨",
+      "You're so creative! 🎨",
+      "Beautiful colors! 🌈",
+      "A masterpiece! 🏆",
+      "Super talented! ⭐",
+      "I love it! 💖",
+      "Fantastic work! 🎉",
+      "You're an artist! 🖌️",
+      "So pretty! 💫",
+    ];
+    // Simple hash to pick a consistent message for each drawing
+    let hash = 0;
+    for (let i = 0; i < pageId.length; i++) {
+      hash = ((hash << 5) - hash) + pageId.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return messages[Math.abs(hash) % messages.length];
+  };
 
   // Fetch book details including bookGames and total pages
   useEffect(() => {
@@ -686,47 +715,140 @@ const BookDetailPage: React.FC = () => {
 
         {/* Description or Playlist */}
         <div className="max-w-lg mx-auto">
-          {/* Pinned drawing ("fridge") */}
+          {/* Pinned drawing ("fridge") - Portrait framed page style */}
           {pinnedDrawing && !isAudio && (
-            <div className="mb-6 bg-white rounded-2xl p-3 shadow-[0_6px_16px_rgba(0,0,0,0.12)] border-2 border-[#eecaa0]">
-              <div className="flex items-center justify-between gap-3 mb-2">
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-[#8B4513] opacity-80 uppercase tracking-wide">
-                    Your Drawing
-                  </p>
-                  <p className="text-[#3E1F07] font-display font-bold text-lg leading-tight truncate">
-                    Continue coloring
-                  </p>
+            <div className="mb-6 flex flex-col items-center">
+              {/* Encouragement message */}
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-2xl">🎨</span>
+                <p className="text-[#3E1F07] font-display font-bold text-xl">
+                  {getFridgeMessage(pinnedDrawing.pageId)}
+                </p>
+              </div>
+              
+              {/* Framed drawing - portrait layout like a page on the fridge */}
+              <div 
+                onClick={() => setShowDrawingModal(true)}
+                className="relative bg-white p-3 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.15)] border-4 border-[#8B4513] cursor-pointer hover:scale-[1.02] transition-transform active:scale-[0.98]"
+                style={{
+                  // Tape effect at top
+                  backgroundImage: 'linear-gradient(to bottom, #f5f5dc 0%, #fff 8%)',
+                }}
+              >
+                {/* Decorative tape */}
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-6 bg-gradient-to-b from-[#f0e68c] to-[#daa520] opacity-80 rounded-sm shadow-sm" style={{ transform: 'translateX(-50%) rotate(-2deg)' }} />
+                
+                {/* Drawing container - portrait aspect ratio */}
+                <div className="w-44 aspect-[3/4] rounded overflow-hidden bg-white relative">
+                  {/* User's colored strokes (bottom layer) */}
+                  <img
+                    src={pinnedDrawing.dataUrl}
+                    alt="Your coloring"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  {/* Line art overlay (top layer) */}
+                  {pinnedDrawing.backgroundUrl && (
+                    <img
+                      src={pinnedDrawing.backgroundUrl}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                      style={{ mixBlendMode: 'multiply' }}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  )}
                 </div>
+                
+                {/* Tap hint */}
+                <p className="text-center text-[10px] text-[#8B4513] opacity-60 mt-2 font-bold">
+                  Tap to view
+                </p>
+              </div>
+
+              {/* Action buttons */}
+              <div className="mt-4 flex items-center gap-3">
                 <button
                   onClick={() => {
                     if (!id) return;
                     navigate(`/read/${id}?coloring=${encodeURIComponent(pinnedDrawing.pageRef)}`);
                   }}
-                  className="shrink-0 bg-[#6da34d] hover:bg-[#7db85b] text-white text-sm font-bold py-2 px-4 rounded-full shadow-[0_3px_0_#3d5c2b] active:translate-y-[3px] active:shadow-none transition-all border border-[#ffffff20]"
+                  className="bg-[#6da34d] hover:bg-[#7db85b] text-white text-sm font-bold py-2 px-5 rounded-full shadow-[0_3px_0_#3d5c2b] active:translate-y-[3px] active:shadow-none transition-all border border-[#ffffff20] flex items-center gap-2"
                 >
-                  Continue
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                  Edit
+                </button>
+                <button
+                  onClick={() => {
+                    if (!id) return;
+                    pinnedColoringService.unpin(id);
+                    setPinnedDrawing(null);
+                  }}
+                  className="text-xs font-bold text-[#8B4513] hover:text-[#5c2e0b] underline underline-offset-2"
+                >
+                  Remove
                 </button>
               </div>
-              <div className="w-full aspect-[16/9] rounded-xl overflow-hidden bg-[#fdf6e3] border border-[#eecaa0]">
-                <img
-                  src={pinnedDrawing.dataUrl}
-                  alt="Pinned drawing"
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
+            </div>
+          )}
+
+          {/* Full-screen drawing modal */}
+          {showDrawingModal && pinnedDrawing && (
+            <div 
+              className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
+              onClick={() => setShowDrawingModal(false)}
+            >
+              <div className="relative max-w-sm w-full bg-white rounded-2xl p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                {/* Close button */}
+                <button
+                  onClick={() => setShowDrawingModal(false)}
+                  className="absolute -top-3 -right-3 w-10 h-10 bg-[#8B4513] hover:bg-[#5c2e0b] text-white rounded-full flex items-center justify-center shadow-lg border-2 border-white z-10"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                
+                {/* Message */}
+                <p className="text-center text-[#3E1F07] font-display font-bold text-xl mb-3">
+                  {getFridgeMessage(pinnedDrawing.pageId)}
+                </p>
+                
+                {/* Full drawing - portrait */}
+                <div className="w-full aspect-[3/4] rounded-xl overflow-hidden bg-white relative border-2 border-[#eecaa0]">
+                  <img
+                    src={pinnedDrawing.dataUrl}
+                    alt="Your coloring"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  {pinnedDrawing.backgroundUrl && (
+                    <img
+                      src={pinnedDrawing.backgroundUrl}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                      style={{ mixBlendMode: 'multiply' }}
+                    />
+                  )}
+                </div>
+                
+                {/* Edit button in modal */}
+                <button
+                  onClick={() => {
+                    setShowDrawingModal(false);
+                    if (!id) return;
+                    navigate(`/read/${id}?coloring=${encodeURIComponent(pinnedDrawing.pageRef)}`);
+                  }}
+                  className="mt-4 w-full bg-[#6da34d] hover:bg-[#7db85b] text-white font-bold py-3 rounded-xl shadow-[0_4px_0_#3d5c2b] active:translate-y-[4px] active:shadow-none transition-all flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                  Continue Coloring
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  if (!id) return;
-                  pinnedColoringService.unpin(id);
-                  setPinnedDrawing(null);
-                }}
-                className="mt-3 text-xs font-bold text-[#8B4513] hover:text-[#5c2e0b] underline underline-offset-2"
-              >
-                Remove from fridge
-              </button>
             </div>
           )}
 

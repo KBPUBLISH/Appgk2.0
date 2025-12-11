@@ -5,6 +5,8 @@ export type PinnedColoring = {
   /** "5" or Mongo _id portion from pageId */
   pageRef: string;
   pinnedAt: number;
+  /** The coloring page line art URL (so we can overlay it on top of the drawing) */
+  backgroundUrl?: string;
 };
 
 const PIN_PREFIX = 'godlykids_pinned_coloring_';
@@ -35,7 +37,7 @@ export const pinnedColoringService = {
     }
   },
 
-  pinFromPageId(pageId: string): PinnedColoring | null {
+  pinFromPageId(pageId: string, backgroundUrl?: string): PinnedColoring | null {
     const parsed = parseColoringPageId(pageId);
     if (!parsed) return null;
     const pinned: PinnedColoring = {
@@ -43,6 +45,7 @@ export const pinnedColoringService = {
       pageId,
       pageRef: parsed.pageRef,
       pinnedAt: Date.now(),
+      backgroundUrl,
     };
     try {
       localStorage.setItem(storageKeyForBook(parsed.bookId), JSON.stringify(pinned));
