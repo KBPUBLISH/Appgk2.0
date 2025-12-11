@@ -170,6 +170,9 @@ const PlaylistDetailPage: React.FC = () => {
     const [translatedTitle, setTranslatedTitle] = useState<string>('');
     const [translatedDescription, setTranslatedDescription] = useState<string>('');
     
+    // Track mounted state to prevent state updates after unmount
+    const isMountedRef = useRef(true);
+    
     // Dynamic gradient colors extracted from cover image
     const [gradientColors, setGradientColors] = useState({
         primary: '#8B4513',
@@ -180,12 +183,24 @@ const PlaylistDetailPage: React.FC = () => {
     // Check if this playlist is currently playing
     const isThisPlaylistPlaying = currentPlaylist?._id === playlistId;
 
+    // Cleanup on unmount
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
+
     useEffect(() => {
         fetchPlaylist();
         // Check if favorited/liked from localStorage
-        const likes = JSON.parse(localStorage.getItem('liked_playlists') || '[]');
-        const isLocallyLiked = likes.includes(playlistId);
-        setIsLiked(isLocallyLiked);
+        try {
+            const likes = JSON.parse(localStorage.getItem('liked_playlists') || '[]');
+            const isLocallyLiked = likes.includes(playlistId);
+            setIsLiked(isLocallyLiked);
+        } catch (e) {
+            console.warn('Error parsing liked_playlists:', e);
+        }
         
         // Check if saved to library (using favorites service)
         if (playlistId) {
@@ -210,7 +225,11 @@ const PlaylistDetailPage: React.FC = () => {
     useEffect(() => {
         if (playlist?.coverImage) {
             extractColors(playlist.coverImage).then(colors => {
-                setGradientColors(colors);
+                if (isMountedRef.current) {
+                    setGradientColors(colors);
+                }
+            }).catch(e => {
+                console.warn('Error extracting colors:', e);
             });
         }
     }, [playlist?.coverImage]);
@@ -219,10 +238,17 @@ const PlaylistDetailPage: React.FC = () => {
         try {
             const baseUrl = getApiBaseUrl();
             const response = await fetch(`${baseUrl}playlists/${playlistId}`);
+            
+            // Check if still mounted
+            if (!isMountedRef.current) return;
+            
             if (!response.ok) {
                 throw new Error('Failed to fetch playlist');
             }
             const data = await response.json();
+            
+            // Check if still mounted before state updates
+            if (!isMountedRef.current) return;
             
             // NOTE: Individual items within the playlist can be marked as isMembersOnly
             // The check is done in handleItemClick() when user tries to play a locked item
@@ -233,26 +259,42 @@ const PlaylistDetailPage: React.FC = () => {
             }
             setPlaylist(data);
             
-            // Translate title and description for non-English
+            // Translate title and description for non-English (with mount check)
             if (currentLanguage !== 'en') {
-                if (data.title) translateText(data.title).then(setTranslatedTitle);
-                if (data.description) translateText(data.description).then(setTranslatedDescription);
+                if (data.title) {
+                    translateText(data.title).then(text => {
+                        if (isMountedRef.current) setTranslatedTitle(text);
+                    });
+                }
+                if (data.description) {
+                    translateText(data.description).then(text => {
+                        if (isMountedRef.current) setTranslatedDescription(text);
+                    });
+                }
             } else {
                 setTranslatedTitle(data.title || '');
                 setTranslatedDescription(data.description || '');
             }
             
             // Initialize like count from backend, but ensure it's at least 1 if locally liked
-            const likes = JSON.parse(localStorage.getItem('liked_playlists') || '[]');
-            const isLocallyLiked = likes.includes(playlistId);
-            const backendLikeCount = data.likeCount || 0;
-            // If locally liked and backend count is 0, show at least 1
-            // Otherwise use backend count (which should include local like)
-            setLocalLikeCount(isLocallyLiked && backendLikeCount === 0 ? 1 : backendLikeCount);
+            try {
+                const likes = JSON.parse(localStorage.getItem('liked_playlists') || '[]');
+                const isLocallyLiked = likes.includes(playlistId);
+                const backendLikeCount = data.likeCount || 0;
+                // If locally liked and backend count is 0, show at least 1
+                // Otherwise use backend count (which should include local like)
+                if (isMountedRef.current) {
+                    setLocalLikeCount(isLocallyLiked && backendLikeCount === 0 ? 1 : backendLikeCount);
+                }
+            } catch (e) {
+                console.warn('Error parsing liked_playlists:', e);
+            }
         } catch (error) {
             console.error('Error fetching playlist:', error);
         } finally {
-            setLoading(false);
+            if (isMountedRef.current) {
+                setLoading(false);
+            }
         }
     };
 

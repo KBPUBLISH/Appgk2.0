@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, BookOpen, Heart, Bookmark, Lock, Check, Crown } from 'lucide-react';
 import { getApiBaseUrl } from '../services/apiService';
@@ -167,12 +167,27 @@ const BookSeriesDetailPage: React.FC = () => {
     const [translatedTitle, setTranslatedTitle] = useState<string>('');
     const [translatedDescription, setTranslatedDescription] = useState<string>('');
     const [colors, setColors] = useState({ primary: '#2d1b4e', secondary: '#4a2c7a', accent: '#9b59b6' });
+    
+    // Track mounted state to prevent state updates after unmount
+    const isMountedRef = useRef(true);
+    
+    // Cleanup on unmount
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
 
     useEffect(() => {
         fetchSeries();
         // Check if favorited/liked from localStorage
-        const likes = JSON.parse(localStorage.getItem('liked_book_series') || '[]');
-        setIsLiked(likes.includes(seriesId));
+        try {
+            const likes = JSON.parse(localStorage.getItem('liked_book_series') || '[]');
+            setIsLiked(likes.includes(seriesId));
+        } catch (e) {
+            console.warn('Error parsing liked_book_series:', e);
+        }
         
         if (seriesId) {
             setIsFavorited(favoritesService.isBookSeriesFavorite?.(seriesId) || false);
@@ -182,9 +197,13 @@ const BookSeriesDetailPage: React.FC = () => {
     // Translate title and description when language changes
     useEffect(() => {
         if (series && currentLanguage !== 'en') {
-            translateText(series.title).then(setTranslatedTitle);
+            translateText(series.title).then(text => {
+                if (isMountedRef.current) setTranslatedTitle(text);
+            });
             if (series.description) {
-                translateText(series.description).then(setTranslatedDescription);
+                translateText(series.description).then(text => {
+                    if (isMountedRef.current) setTranslatedDescription(text);
+                });
             }
         } else if (series) {
             setTranslatedTitle(series.title);
@@ -195,7 +214,11 @@ const BookSeriesDetailPage: React.FC = () => {
     // Extract colors from cover image
     useEffect(() => {
         if (series?.coverImage) {
-            extractColors(series.coverImage).then(setColors);
+            extractColors(series.coverImage).then(extractedColors => {
+                if (isMountedRef.current) setColors(extractedColors);
+            }).catch(e => {
+                console.warn('Error extracting colors:', e);
+            });
         }
     }, [series?.coverImage]);
 
@@ -204,13 +227,21 @@ const BookSeriesDetailPage: React.FC = () => {
             setLoading(true);
             const baseUrl = getApiBaseUrl();
             const response = await fetch(`${baseUrl}book-series/${seriesId}`);
+            
+            if (!isMountedRef.current) return;
+            
             if (!response.ok) throw new Error('Failed to fetch book series');
             const data = await response.json();
-            setSeries(data);
+            
+            if (isMountedRef.current) {
+                setSeries(data);
+            }
         } catch (error) {
             console.error('Error fetching book series:', error);
         } finally {
-            setLoading(false);
+            if (isMountedRef.current) {
+                setLoading(false);
+            }
         }
     };
 
