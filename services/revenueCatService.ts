@@ -123,41 +123,26 @@ declare global {
 
 // Set up listener for purchase completion
 const setupPurchaseListener = () => {
-  // ⚡ INSTANT CALLBACK: DeSpia's onRevenueCatPurchase() fires immediately when Apple purchase succeeds
-  // This is the fastest way to detect purchase success - no webhook delay!
+  // ⚠️ IMPORTANT: We NO LONGER trust these callbacks for instant premium grant!
+  // DeSpia may fire these callbacks before the Apple payment is actually confirmed.
+  // We only grant premium after the backend webhook confirms the purchase.
   (window as any).onRevenueCatPurchase = () => {
-    console.log('🚀 DeSpia onRevenueCatPurchase() - INSTANT purchase confirmation!');
-    localStorage.setItem('godlykids_premium', 'true');
-    window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
-    if (purchaseResolve) {
-      purchaseResolve({ success: true });
-      purchaseResolve = null;
-    }
-    cleanupPurchaseState();
+    console.log('📱 DeSpia onRevenueCatPurchase() called - will verify with backend before granting premium');
+    // DO NOT set premium here - wait for backend webhook confirmation!
+    // The polling loop will check the backend and set premium when confirmed.
   };
   
   // Also register restore callback
   (window as any).onRevenueCatRestore = () => {
-    console.log('🔄 DeSpia onRevenueCatRestore() - Restore completed!');
-    localStorage.setItem('godlykids_premium', 'true');
-    window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
-    if (purchaseResolve) {
-      purchaseResolve({ success: true });
-      purchaseResolve = null;
-    }
-    cleanupPurchaseState();
+    console.log('📱 DeSpia onRevenueCatRestore() called - will verify with backend before granting premium');
+    // DO NOT set premium here - the restore flow will verify with backend
   };
 
-  // Listen for custom events that DeSpia might fire (backup)
+  // Listen for custom events that DeSpia might fire
+  // ⚠️ We do NOT grant premium on these events - only after backend webhook confirms
   window.addEventListener('despia-purchase-success', () => {
-    console.log('✅ DeSpia purchase success event received');
-    localStorage.setItem('godlykids_premium', 'true');
-    window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
-    if (purchaseResolve) {
-      purchaseResolve({ success: true });
-      purchaseResolve = null;
-    }
-    cleanupPurchaseState();
+    console.log('📱 DeSpia despia-purchase-success event - will verify with backend');
+    // Do NOT set premium here - wait for backend confirmation
   });
 
   window.addEventListener('despia-purchase-failed', (event: any) => {
@@ -179,20 +164,14 @@ const setupPurchaseListener = () => {
   });
   
   // Listen for DeSpia callback when payment sheet completes (success or failure)
-  // DeSpia uses postMessage or URL callback to notify of purchase result
+  // ⚠️ We do NOT grant premium on success messages - only after backend webhook confirms
   window.addEventListener('message', (event: MessageEvent) => {
     try {
       const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
       
       if (data?.type === 'revenuecat_purchase_success' || data?.type === 'despia_purchase_complete') {
-        console.log('✅ Purchase complete message received:', data);
-        localStorage.setItem('godlykids_premium', 'true');
-        window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
-        if (purchaseResolve) {
-          purchaseResolve({ success: true });
-          purchaseResolve = null;
-        }
-        cleanupPurchaseState();
+        console.log('📱 Purchase complete message received - will verify with backend:', data);
+        // Do NOT set premium here - wait for backend confirmation via polling
       } else if (data?.type === 'revenuecat_purchase_failed' || data?.type === 'despia_purchase_failed') {
         console.log('❌ Purchase failed message received:', data);
         if (purchaseResolve) {
@@ -206,10 +185,11 @@ const setupPurchaseListener = () => {
     }
   });
   
-  // Also listen for localStorage changes (in case another tab/process sets it)
+  // Listen for localStorage changes from backend webhook confirmation
+  // This is safe because the backend only sets premium after Apple confirms payment
   window.addEventListener('storage', (event: StorageEvent) => {
     if (event.key === 'godlykids_premium' && event.newValue === 'true') {
-      console.log('✅ Premium status detected via storage event');
+      console.log('✅ Premium status confirmed via storage event (likely from backend webhook)');
       window.dispatchEvent(new CustomEvent('revenuecat:premiumChanged', { detail: { isPremium: true } }));
       if (purchaseResolve) {
         purchaseResolve({ success: true });

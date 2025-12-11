@@ -2,6 +2,31 @@
 
 import { getApiBaseUrl } from './apiService';
 
+// Throttle duplicate events within a short time window
+const recentEvents: Map<string, number> = new Map();
+const EVENT_THROTTLE_MS = 5000; // 5 seconds
+
+const shouldThrottle = (eventKey: string): boolean => {
+    const now = Date.now();
+    const lastTime = recentEvents.get(eventKey);
+    
+    if (lastTime && now - lastTime < EVENT_THROTTLE_MS) {
+        return true; // Throttle - too soon
+    }
+    
+    recentEvents.set(eventKey, now);
+    
+    // Clean up old entries periodically
+    if (recentEvents.size > 100) {
+        const cutoff = now - EVENT_THROTTLE_MS * 2;
+        for (const [key, time] of recentEvents) {
+            if (time < cutoff) recentEvents.delete(key);
+        }
+    }
+    
+    return false;
+};
+
 // Generate or retrieve session ID
 const getSessionId = (): string => {
     let sessionId = sessionStorage.getItem('analytics_session_id');
@@ -79,7 +104,7 @@ interface TrackEventParams {
 
 export const analyticsService = {
     /**
-     * Track a generic event
+     * Track a generic event (throttled to prevent duplicates)
      */
     track: async ({
         eventType,
@@ -89,6 +114,12 @@ export const analyticsService = {
         metadata,
     }: TrackEventParams): Promise<void> => {
         try {
+            // Create a key for throttling - same event type + target within 5s is ignored
+            const eventKey = `${eventType}_${targetType || ''}_${targetId || ''}`;
+            if (shouldThrottle(eventKey)) {
+                return; // Skip duplicate event
+            }
+
             const baseUrl = getApiBaseUrl();
             const payload = {
                 userId: getUserId(),
@@ -101,7 +132,7 @@ export const analyticsService = {
                 metadata: metadata || {},
                 platform: getPlatform(),
                 deviceType: getDeviceType(),
-                appVersion: '1.0.0', // TODO: Get from config
+                appVersion: '1.0.0',
             };
 
             // Fire and forget - don't await or block on analytics

@@ -4,6 +4,10 @@ import { Book } from '../../types';
 import { BookOpen, Music } from 'lucide-react';
 import { ApiService } from '../../services/apiService';
 
+// Module-level cache to prevent duplicate page fetches across component remounts
+const pageImageCache: Record<string, string[]> = {};
+const fetchingBooks: Set<string> = new Set(); // Track in-flight requests
+
 interface FeaturedItem extends Partial<Book> {
   id: string;
   _id?: string;
@@ -31,7 +35,6 @@ const PageFlipPreview: React.FC<{
   const [isFlipping, setIsFlipping] = useState(false);
   const [pagesLoaded, setPagesLoaded] = useState(false);
   const cycleCompleteRef = useRef(false);
-  const hasFetchedRef = useRef(false);
   const flipIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
 
@@ -48,42 +51,67 @@ const PageFlipPreview: React.FC<{
   }, []);
 
   // Fetch first 2 pages of the book ONLY when it becomes active
-  // This prevents loading all book pages at once which can crash older devices
+  // Uses module-level cache to prevent duplicate fetches across remounts
   useEffect(() => {
-    // Only fetch when this book is active AND we haven't fetched yet
-    if (!bookId || !isActive || hasFetchedRef.current) return;
+    if (!bookId || !isActive) return;
     
-    const fetchPages = async () => {
-      hasFetchedRef.current = true;
+    // Check module-level cache first
+    if (pageImageCache[bookId]) {
+      setPages(pageImageCache[bookId]);
+      setPagesLoaded(true);
+      return;
+    }
+    
+    // Already fetching this book? Wait for it
+    if (fetchingBooks.has(bookId)) {
+      const checkCache = setInterval(() => {
+        if (pageImageCache[bookId]) {
+          setPages(pageImageCache[bookId]);
+          setPagesLoaded(true);
+          clearInterval(checkCache);
+        }
+      }, 100);
+      return () => clearInterval(checkCache);
+    }
+    
+    // Mark as fetching
+    fetchingBooks.add(bookId);
+    
+    const fetchPagesData = async () => {
       try {
         const bookPages = await ApiService.getBookPages(bookId);
         
-        // Check if still mounted before updating state
-        if (!isMountedRef.current) return;
-        
         if (bookPages && bookPages.length > 0) {
-          // Path is: files.background.url
           const pageImages = bookPages
             .slice(0, 2)
             .map((p: any) => p.files?.background?.url || p.backgroundUrl)
             .filter(Boolean);
           
-          if (pageImages.length > 0 && isMountedRef.current) {
+          // Store in module-level cache
+          pageImageCache[bookId] = pageImages;
+          
+          if (isMountedRef.current && pageImages.length > 0) {
             setPages(pageImages);
           }
+        } else {
+          pageImageCache[bookId] = [];
         }
+        
         if (isMountedRef.current) {
           setPagesLoaded(true);
         }
       } catch (error) {
         console.log('📖 Could not fetch pages for:', title);
+        pageImageCache[bookId] = [];
         if (isMountedRef.current) {
           setPagesLoaded(true);
         }
+      } finally {
+        fetchingBooks.delete(bookId);
       }
     };
     
-    fetchPages();
+    fetchPagesData();
   }, [bookId, title, isActive]);
 
   // Reset when becoming active
