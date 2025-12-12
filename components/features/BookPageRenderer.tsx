@@ -74,6 +74,7 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     const [videoUnmuted, setVideoUnmuted] = useState(false);
     const [bubblePosition, setBubblePosition] = useState({ x: 75, y: 20 }); // Default position (top right area)
     const [sfxPositions, setSfxPositions] = useState<Record<string, { x: number; y: number }>>({});
+    const [poppedSfxUrls, setPoppedSfxUrls] = useState<Set<string>>(new Set());
     
     // Swipe detection for scroll height changes
     const touchStartY = useRef<number>(0);
@@ -265,6 +266,9 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
 
     // Reset bubble positions when page changes or sound effects change
     useEffect(() => {
+        // Reset per-bubble "popped" state on page change
+        setPoppedSfxUrls(new Set());
+
         // Randomize bubble position across different areas of the screen
         // Avoid the very center where text usually is, and edges where controls are
         const positions = [
@@ -289,6 +293,15 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
         e.stopPropagation();
         const audio = url ? soundEffectRefs.current.get(url) : null;
         if (!audio) return;
+
+        // Hide only the tapped bubble after it is tapped/played
+        if (url) {
+            setPoppedSfxUrls((prev) => {
+                const next = new Set(prev);
+                next.add(url);
+                return next;
+            });
+        }
 
         // Stop any other sound effects so only the tapped one plays
         soundEffectRefs.current.forEach((a, key) => {
@@ -518,6 +531,7 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                 return (
                     <>
                         {sfx.map((s, idx) => {
+                            if (poppedSfxUrls.has(s.url)) return null;
                             const pos = sfxPositions[s.url] || { x: bubblePosition.x, y: bubblePosition.y };
                             return (
                                 <div
