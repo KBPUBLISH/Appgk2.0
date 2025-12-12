@@ -5,11 +5,13 @@ import WoodButton from '../components/ui/WoodButton';
 import { useLanguage } from '../context/LanguageContext';
 
 const STORAGE_KEY = 'godly_kids_data_v6';
+const TERMS_URL = 'https://godlykids.com/terms-and-conditions';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const [isChecking, setIsChecking] = useState(true);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const { currentLanguage, setLanguage, supportedLanguages, t } = useLanguage();
 
   // Check if user has already completed onboarding
@@ -195,11 +197,45 @@ const LandingPage: React.FC = () => {
                   </button>
 
                   <p className="text-center text-white/60 text-xs mt-4">
-                    {t('termsConditions')}
+                    By continuing you agree to our{' '}
+                    <button 
+                      onClick={() => setShowTermsModal(true)}
+                      className="text-[#FFD700] underline hover:text-[#FFF8DC] transition-colors"
+                    >
+                      Terms & Conditions
+                    </button>
                   </p>
               </div>
           </div>
       </div>
+
+      {/* Terms & Conditions WebView Modal */}
+      {showTermsModal && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg h-[80vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-[#8B4513] to-[#A0522D]">
+              <h2 className="font-bold text-white text-lg">Terms & Conditions</h2>
+              <button
+                onClick={() => setShowTermsModal(false)}
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+            
+            {/* WebView Content */}
+            <div className="flex-1 overflow-hidden">
+              <iframe
+                src={TERMS_URL}
+                className="w-full h-full border-0"
+                title="Terms and Conditions"
+                sandbox="allow-scripts allow-same-origin"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
