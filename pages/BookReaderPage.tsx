@@ -167,6 +167,7 @@ const BookReaderPage: React.FC = () => {
 
     // NOTE: In-app volume slider UI was removed, but we still enforce a fixed 20% volume.
     const BOOK_MUSIC_VOLUME = 0.20;
+    const lastBookMusicRecreateAtRef = useRef<number>(0);
 
     const getBookMusicContext = useCallback((): AudioContext | null => {
         try {
@@ -241,6 +242,46 @@ const BookReaderPage: React.FC = () => {
         if (ok) ensureBookMusicGraph(audioEl);
     }, [ensureBookMusicGraph, resumeBookMusicContext]);
 
+    const recreateBookMusicAudio = useCallback((reason: string) => {
+        const now = Date.now();
+        if (now - lastBookMusicRecreateAtRef.current < 1500) return; // prevent tight loops
+        lastBookMusicRecreateAtRef.current = now;
+
+        const current = bookBackgroundMusicRef.current;
+        const src = current?.src;
+        if (!src) return;
+
+        console.warn(`🎵 Book music recovery: recreating audio element (${reason})`);
+
+        // Tear down current element
+        try {
+            current?.pause();
+        } catch { }
+        try {
+            if (current) current.src = '';
+        } catch { }
+
+        // Disconnect WebAudio source (if any)
+        if (bookMusicSourceRef.current) {
+            try { bookMusicSourceRef.current.disconnect(); } catch { }
+            bookMusicSourceRef.current = null;
+        }
+        bookMusicConnectedElRef.current = null;
+
+        // Recreate the element (ensures it can output directly if WebAudio gets suspended on iOS)
+        const audio = new Audio(src);
+        audio.loop = true;
+        audio.preload = 'auto';
+        try { audio.volume = BOOK_MUSIC_VOLUME; } catch { }
+        bookBackgroundMusicRef.current = audio;
+
+        if (bookMusicEnabledRef.current) {
+            audio.play().catch((err) => {
+                console.warn('⚠️ Book music recovery play blocked:', err);
+            });
+        }
+    }, []);
+
     // One-tap unlock (resumes AudioContext so GainNode routing works on iOS).
     useEffect(() => {
         const unlock = () => {
@@ -250,8 +291,23 @@ const BookReaderPage: React.FC = () => {
             });
         };
         window.addEventListener('pointerdown', unlock, { passive: true });
-        return () => window.removeEventListener('pointerdown', unlock as any);
+        return () => window.removeEventListener('pointerdown', unlock);
     }, [ensureBookMusicGraph, resumeBookMusicContext]);
+
+    // If iOS suspends the AudioContext after we routed the element through WebAudio, audio can go silent.
+    // Detect that and fall back to a fresh HTMLAudioElement (direct output) at 20%.
+    useEffect(() => {
+        const id = window.setInterval(() => {
+            const ctx = bookMusicCtxRef.current;
+            const connectedEl = bookMusicConnectedElRef.current;
+            if (!ctx || !connectedEl) return;
+            if (!bookMusicEnabledRef.current) return;
+            if (ctx.state !== 'running') {
+                recreateBookMusicAudio(`audioctx_${ctx.state}`);
+            }
+        }, 1000);
+        return () => window.clearInterval(id);
+    }, [recreateBookMusicAudio]);
 
     const [hasBookMusic, setHasBookMusic] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
@@ -574,6 +630,13 @@ const BookReaderPage: React.FC = () => {
                 // Stop book background music
                 if (bookBackgroundMusicRef.current) {
                     bookBackgroundMusicRef.current.pause();
+                }
+            } else {
+                // Page visible again: try to resume book music if enabled
+                if (bookMusicEnabledRef.current && bookBackgroundMusicRef.current) {
+                    prepareBookMusicPlayback(bookBackgroundMusicRef.current).finally(() => {
+                        bookBackgroundMusicRef.current?.play().catch(() => { });
+                    });
                 }
             }
         };
