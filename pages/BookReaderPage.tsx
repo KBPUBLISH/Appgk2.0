@@ -130,6 +130,10 @@ const BookReaderPage: React.FC = () => {
     }, [selectedLanguage]);
     const wordAlignmentRef = useRef<{ words: Array<{ word: string; start: number; end: number }> } | null>(null);
     const bookBackgroundMusicRef = useRef<HTMLAudioElement | null>(null);
+    const bookMusicCtxRef = useRef<AudioContext | null>(null);
+    const bookMusicGainRef = useRef<GainNode | null>(null);
+    const bookMusicSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+    const bookMusicConnectedElRef = useRef<HTMLAudioElement | null>(null);
     const voiceDropdownRef = useRef<HTMLDivElement>(null);
     const [autoPlayMode, setAutoPlayMode] = useState(false);
     const autoPlayModeRef = useRef(false);
@@ -161,7 +165,93 @@ const BookReaderPage: React.FC = () => {
         bookMusicEnabledRef.current = bookMusicEnabled;
     }, [bookMusicEnabled]);
 
-    // NOTE: In-app volume control was removed. Volume is controlled via portal upload attenuation.
+    // NOTE: In-app volume slider UI was removed, but we still enforce a fixed 20% volume.
+    const BOOK_MUSIC_VOLUME = 0.20;
+
+    const getBookMusicContext = useCallback((): AudioContext | null => {
+        try {
+            if (!bookMusicCtxRef.current) {
+                const Ctx = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext | undefined;
+                if (!Ctx) return null;
+                bookMusicCtxRef.current = new Ctx();
+            }
+            return bookMusicCtxRef.current;
+        } catch {
+            return null;
+        }
+    }, []);
+
+    const resumeBookMusicContext = useCallback(async (): Promise<boolean> => {
+        const ctx = getBookMusicContext();
+        if (!ctx) return false;
+        if (ctx.state === 'running') return true;
+        try {
+            await ctx.resume();
+            return ctx.state === 'running';
+        } catch {
+            return false;
+        }
+    }, [getBookMusicContext]);
+
+    const ensureBookMusicGraph = useCallback((audioEl: HTMLAudioElement | null) => {
+        if (!audioEl) return;
+        const ctx = getBookMusicContext();
+        if (!ctx || ctx.state !== 'running') return; // Don't route through a suspended context (can silence output on iOS)
+
+        // If we're already connected to this element, just ensure gain is correct.
+        if (bookMusicConnectedElRef.current === audioEl && bookMusicGainRef.current) {
+            try { bookMusicGainRef.current.gain.value = BOOK_MUSIC_VOLUME; } catch { }
+            return;
+        }
+
+        try {
+            // Disconnect prior source if switching audio elements/books.
+            if (bookMusicSourceRef.current) {
+                try { bookMusicSourceRef.current.disconnect(); } catch { }
+                bookMusicSourceRef.current = null;
+            }
+
+            if (!bookMusicGainRef.current) {
+                bookMusicGainRef.current = ctx.createGain();
+                bookMusicGainRef.current.connect(ctx.destination);
+            }
+            bookMusicGainRef.current.gain.value = BOOK_MUSIC_VOLUME;
+
+            // When routing through WebAudio, keep element volume at 1 (gain handles loudness).
+            audioEl.volume = 1;
+
+            const source = ctx.createMediaElementSource(audioEl);
+            source.connect(bookMusicGainRef.current);
+            bookMusicSourceRef.current = source;
+            bookMusicConnectedElRef.current = audioEl;
+        } catch {
+            // Fallback: if WebAudio wiring fails, try plain element volume.
+            try { audioEl.volume = BOOK_MUSIC_VOLUME; } catch { }
+        }
+    }, [getBookMusicContext]);
+
+    const prepareBookMusicPlayback = useCallback(async (audioEl: HTMLAudioElement | null) => {
+        if (!audioEl) return;
+
+        // Always set a reasonable fallback volume (some platforms honor it).
+        try { audioEl.volume = BOOK_MUSIC_VOLUME; } catch { }
+
+        // iOS often ignores HTMLAudioElement.volume; use GainNode when possible.
+        const ok = await resumeBookMusicContext();
+        if (ok) ensureBookMusicGraph(audioEl);
+    }, [ensureBookMusicGraph, resumeBookMusicContext]);
+
+    // One-tap unlock (resumes AudioContext so GainNode routing works on iOS).
+    useEffect(() => {
+        const unlock = () => {
+            if (!bookMusicEnabledRef.current) return;
+            resumeBookMusicContext().then((ok) => {
+                if (ok) ensureBookMusicGraph(bookBackgroundMusicRef.current);
+            });
+        };
+        window.addEventListener('pointerdown', unlock, { passive: true });
+        return () => window.removeEventListener('pointerdown', unlock as any);
+    }, [ensureBookMusicGraph, resumeBookMusicContext]);
 
     const [hasBookMusic, setHasBookMusic] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
@@ -388,21 +478,27 @@ const BookReaderPage: React.FC = () => {
                         const audio = new Audio(musicUrl);
                         audio.loop = true;
                         audio.preload = 'auto';
+                        // Fallback volume (some platforms honor it; iOS often ignores without GainNode)
+                        audio.volume = BOOK_MUSIC_VOLUME;
                         bookBackgroundMusicRef.current = audio;
                         // Start playing book music automatically when loaded
                         audio.addEventListener('canplaythrough', () => {
                             if (bookMusicEnabledRef.current) {
                                 console.log('🎵 Book music ready - starting playback');
-                                audio.play().catch(err => {
-                                    console.warn('⚠️ Book music auto-play prevented:', err);
+                                prepareBookMusicPlayback(audio).finally(() => {
+                                    audio.play().catch(err => {
+                                        console.warn('⚠️ Book music auto-play prevented:', err);
+                                    });
                                 });
                             }
                         }, { once: true });
 
                         // Try to play immediately if already loaded
                         if (audio.readyState >= 3 && bookMusicEnabledRef.current) {
-                            audio.play().catch(err => {
-                                console.warn('⚠️ Book music immediate play prevented:', err);
+                            prepareBookMusicPlayback(audio).finally(() => {
+                                audio.play().catch(err => {
+                                    console.warn('⚠️ Book music immediate play prevented:', err);
+                                });
                             });
                         }
 
@@ -430,12 +526,17 @@ const BookReaderPage: React.FC = () => {
                 bookBackgroundMusicRef.current.src = '';
                 bookBackgroundMusicRef.current = null;
             }
-            // (Volume graph removed) nothing else to cleanup here.
+            // Disconnect WebAudio routing for book music (keep context alive, but release the source node).
+            if (bookMusicSourceRef.current) {
+                try { bookMusicSourceRef.current.disconnect(); } catch { }
+                bookMusicSourceRef.current = null;
+            }
+            bookMusicConnectedElRef.current = null;
 
             // Resume app music
             setMusicPaused(false);
         };
-    }, [bookId, setGameMode, setMusicPaused]); // Removed in-app volume graph dependencies
+    }, [bookId, setGameMode, setMusicPaused]); // WebAudio helpers are ref-based; no deps needed here
 
     // Ref to track current audio for cleanup (avoids stale closure issues)
     const currentAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -491,17 +592,19 @@ const BookReaderPage: React.FC = () => {
 
         if (bookMusicEnabled) {
             console.log('🎵 Book music enabled - attempting to play');
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(err => {
-                    console.warn('⚠️ Auto-play prevented:', err);
-                });
-            }
+            prepareBookMusicPlayback(audio).finally(() => {
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(err => {
+                        console.warn('⚠️ Auto-play prevented:', err);
+                    });
+                }
+            });
         } else {
             console.log('🎵 Book music disabled - pausing');
             audio.pause();
         }
-    }, [bookMusicEnabled, hasBookMusic]); // Run when toggle changes or when music is loaded
+    }, [bookMusicEnabled, hasBookMusic, prepareBookMusicPlayback]); // Run when toggle changes or when music is loaded
 
     useEffect(() => {
         const fetchPages = async () => {
