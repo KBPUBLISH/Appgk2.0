@@ -122,6 +122,34 @@ const ResetPasswordPage: React.FC = () => {
     );
   }
 
+  // Try to open the app via deep link
+  const handleOpenApp = () => {
+    // Try to open the app with custom URL scheme
+    const appDeepLink = 'godlykids://signin';
+    const webFallback = 'https://app.godlykids.com/#/signin';
+    
+    // Create a hidden iframe to try opening the app
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+    
+    // Set a timeout - if the app doesn't open, redirect to web
+    const timeout = setTimeout(() => {
+      document.body.removeChild(iframe);
+      // App didn't open, go to web sign-in
+      window.location.href = webFallback;
+    }, 2500);
+    
+    // Try to open the app
+    iframe.src = appDeepLink;
+    
+    // If we're still here after a moment, app might have opened
+    window.addEventListener('blur', () => {
+      clearTimeout(timeout);
+      document.body.removeChild(iframe);
+    }, { once: true });
+  };
+
   // Success state
   if (success) {
     return (
@@ -132,9 +160,15 @@ const ResetPasswordPage: React.FC = () => {
           <p className="text-white/70 mb-6">
             Your password has been successfully updated. You can now sign in with your new password.
           </p>
-          <WoodButton onClick={() => navigate('/sign-in')} fullWidth>
-            Sign In Now
+          <WoodButton onClick={handleOpenApp} fullWidth>
+            Open App & Sign In
           </WoodButton>
+          <button
+            onClick={() => navigate('/signin')}
+            className="w-full text-white/60 text-sm mt-3 hover:text-white transition-colors underline"
+          >
+            Or sign in on web
+          </button>
         </div>
       </div>
     );

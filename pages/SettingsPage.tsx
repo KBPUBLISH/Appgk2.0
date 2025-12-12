@@ -572,6 +572,10 @@ const SettingsPage: React.FC = () => {
                     localStorage.removeItem('godly_kids_data_v6');
                     localStorage.removeItem('godlykids_app_language');
                     localStorage.removeItem('godlykids_reader_language');
+                    // Clear subscription/identity data to prevent cross-account leakage
+                    localStorage.removeItem('godlykids_user_email');
+                    localStorage.removeItem('godlykids_premium');
+                    localStorage.removeItem('godlykids_device_id');
                     // Sign out from auth service
                     authService.signOut();
                     // Navigate to landing page

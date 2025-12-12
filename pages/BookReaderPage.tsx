@@ -645,23 +645,33 @@ const BookReaderPage: React.FC = () => {
 
     // Deep link: /read/:bookId?coloring=<pageNumber|pageId> opens coloring modal directly
     useEffect(() => {
-        if (openedColoringFromLinkRef.current) return;
-        if (!bookId) return;
+        try {
+            if (openedColoringFromLinkRef.current) return;
+            if (!bookId) return;
 
-        const coloringParam = searchParams.get('coloring');
-        if (!coloringParam) return;
-        if (!coloringPages || coloringPages.length === 0) return;
+            const coloringParam = searchParams.get('coloring');
+            if (!coloringParam) return;
+            if (!coloringPages || coloringPages.length === 0) return;
 
-        const match = coloringPages.find((p: any) => {
-            const pageNum = p?.pageNumber;
-            const pageId = p?._id;
-            return String(pageNum) === String(coloringParam) || String(pageId) === String(coloringParam);
-        });
+            console.log('🎨 Deep link: Looking for coloring page:', coloringParam);
+            console.log('🎨 Available coloring pages:', coloringPages.map(p => ({ pageNumber: p.pageNumber, _id: p._id })));
 
-        if (match) {
-            setSelectedColoringPage(match);
-            setShowColoringModal(true);
-            openedColoringFromLinkRef.current = true;
+            const match = coloringPages.find((p: any) => {
+                const pageNum = p?.pageNumber;
+                const pageId = p?._id;
+                return String(pageNum) === String(coloringParam) || String(pageId) === String(coloringParam);
+            });
+
+            if (match) {
+                console.log('🎨 Found matching coloring page:', match);
+                setSelectedColoringPage(match);
+                setShowColoringModal(true);
+                openedColoringFromLinkRef.current = true;
+            } else {
+                console.warn('🎨 No matching coloring page found for:', coloringParam);
+            }
+        } catch (err) {
+            console.error('🎨 Error handling coloring deep link:', err);
         }
     }, [bookId, coloringPages, searchParams]);
 

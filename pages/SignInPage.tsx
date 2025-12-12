@@ -175,6 +175,17 @@ const SignInPage: React.FC = () => {
       if (result.success) {
         console.log('✅ SignInPage: Login successful! Token stored.');
         
+        // Store user email for subscription/RevenueCat identification
+        const loginEmail = emailValue || email;
+        if (loginEmail && provider === 'email') {
+          localStorage.setItem('godlykids_user_email', loginEmail.toLowerCase().trim());
+          console.log('📧 Stored user email for subscription:', loginEmail);
+        } else if ((result as any).email) {
+          // For OAuth logins, get email from result
+          localStorage.setItem('godlykids_user_email', (result as any).email.toLowerCase().trim());
+          console.log('📧 Stored OAuth user email for subscription:', (result as any).email);
+        }
+        
         // If email needs confirmation, navigate to onboarding instead of home
         if ((result as any).needsConfirmation) {
           console.log('⚠️ Email confirmation needed, navigating to onboarding');
