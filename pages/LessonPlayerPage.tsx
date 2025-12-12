@@ -361,7 +361,7 @@ const LessonPlayerPage: React.FC = () => {
                 }
             }, 100);
             
-            // Fallback: If video doesn't load within 8 seconds, show play button
+            // Fallback: If video doesn't load within 5 seconds, show play button
             // This handles older iPhones where events might not fire
             const fallbackTimer = setTimeout(() => {
                 if (!videoReady && !needsUserInteraction) {
@@ -369,7 +369,7 @@ const LessonPlayerPage: React.FC = () => {
                     setVideoReady(true);
                     setNeedsUserInteraction(true);
                 }
-            }, 8000);
+            }, 5000);
             
             return () => {
                 clearTimeout(timer);
@@ -956,6 +956,7 @@ const LessonPlayerPage: React.FC = () => {
                             ref={videoRef}
                             src={getCurrentVideoUrl()}
                             className="w-full h-full object-contain cursor-pointer"
+                            crossOrigin="anonymous"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 // Clear needs interaction flag on tap
@@ -1020,16 +1021,24 @@ const LessonPlayerPage: React.FC = () => {
                             }}
                             playsInline
                             webkit-playsinline="true"
-                            preload="auto"
+                            preload="metadata"
                         />
                     </div>
 
                     {/* Loading indicator while video loads */}
                     {!videoReady && !needsUserInteraction && (
-                        <div className="absolute inset-0 flex items-center justify-center z-40 bg-black/50">
+                        <div 
+                            className="absolute inset-0 flex items-center justify-center z-40 bg-black/50 cursor-pointer"
+                            onClick={() => {
+                                // Allow user to skip loading state and show play button
+                                setVideoReady(true);
+                                setNeedsUserInteraction(true);
+                            }}
+                        >
                             <div className="flex flex-col items-center">
                                 <div className="w-12 h-12 border-4 border-[#FFD700] border-t-transparent rounded-full animate-spin mb-3" />
                                 <p className="text-white/80 font-display text-sm">Loading video...</p>
+                                <p className="text-white/50 text-xs mt-2">Tap to skip</p>
                             </div>
                         </div>
                     )}

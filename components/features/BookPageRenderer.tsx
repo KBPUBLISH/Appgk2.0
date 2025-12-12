@@ -69,7 +69,9 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     // Refs for text box containers to enable scrolling
     const textBoxRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
     const soundEffectRef = useRef<HTMLAudioElement | null>(null);
+    const videoRef = useRef<HTMLVideoElement | null>(null);
     const [bubblePopped, setBubblePopped] = useState(false);
+    const [videoUnmuted, setVideoUnmuted] = useState(false);
     const [bubblePosition, setBubblePosition] = useState({ x: 75, y: 20 }); // Default position (top right area)
     
     // Swipe detection for scroll height changes
@@ -153,6 +155,34 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
         };
     }, [page.soundEffectUrl]);
 
+    // Handle video audio - unmute on first user interaction (iOS requirement)
+    useEffect(() => {
+        const handleUserInteraction = () => {
+            if (videoRef.current && !videoUnmuted) {
+                videoRef.current.muted = false;
+                videoRef.current.volume = 0.3; // Background audio at 30% volume
+                setVideoUnmuted(true);
+                console.log('🎬 Video unmuted after user interaction');
+            }
+        };
+
+        // Listen for first user interaction to unmute video
+        document.addEventListener('touchstart', handleUserInteraction, { once: true });
+        document.addEventListener('click', handleUserInteraction, { once: true });
+
+        return () => {
+            document.removeEventListener('touchstart', handleUserInteraction);
+            document.removeEventListener('click', handleUserInteraction);
+        };
+    }, [videoUnmuted]);
+
+    // Set video volume when video ref is available
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.volume = 0.3; // Background audio at 30% volume
+        }
+    }, [page.backgroundUrl]);
+
     // Reset bubble when page changes
     useEffect(() => {
         setBubblePopped(false);
@@ -207,13 +237,20 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
             >
                 {page.backgroundType === 'video' ? (
                     <video
+                        ref={videoRef}
                         src={page.backgroundUrl}
                         className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full"
                         autoPlay
                         loop
-                        muted
+                        muted={!videoUnmuted} // Start muted for iOS autoplay, unmute on user interaction
                         playsInline
                         preload="auto"
+                        onLoadedData={() => {
+                            // Set volume once video is loaded
+                            if (videoRef.current) {
+                                videoRef.current.volume = 0.3;
+                            }
+                        }}
                         style={{
                             objectFit: 'cover',
                             width: '100%',
