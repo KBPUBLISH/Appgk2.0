@@ -36,6 +36,37 @@ const setCache = <T>(key: string, data: T): void => {
   }
 };
 
+// Clear all API caches - useful for forcing fresh data after updates
+export const clearApiCache = (): void => {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(API_CACHE_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    console.log(`🗑️ Cleared ${keysToRemove.length} API cache entries`);
+  } catch (e) {
+    console.error('Failed to clear API cache:', e);
+  }
+};
+
+// Clear cache for a specific book (use after editing in portal)
+export const clearBookCache = (bookId: string): void => {
+  try {
+    // Clear book-specific caches
+    localStorage.removeItem(`${API_CACHE_PREFIX}book_${bookId}`);
+    localStorage.removeItem(`${API_CACHE_PREFIX}book_pages_${bookId}`);
+    // Also clear the main books list so it refetches
+    localStorage.removeItem(`${API_CACHE_PREFIX}books`);
+    console.log(`🗑️ Cleared cache for book: ${bookId}`);
+  } catch (e) {
+    console.error('Failed to clear book cache:', e);
+  }
+};
+
 // ============================================
 
 // Get API base URL from environment or use default

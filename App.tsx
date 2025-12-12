@@ -7,10 +7,16 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import OnboardingPage from './pages/OnboardingPage';
 import HomePage from './pages/HomePage';
 
+// Import cache clearing function
+import { clearApiCache } from './services/apiService';
+
 // Diagnostic: Log when the entire app JS module is evaluated (WebView recreation)
 if (!(window as any).__GK_APP_BOOTED__) {
   (window as any).__GK_APP_BOOTED__ = true;
   console.log('🚀 APP BOOT (WebView created)', new Date().toISOString());
+  
+  // Clear API cache on fresh page load/refresh to get updated content
+  clearApiCache();
   
   // GLOBAL ERROR HANDLERS - catch ALL JS errors, not just React ones
   window.onerror = (message, source, lineno, colno, error) => {

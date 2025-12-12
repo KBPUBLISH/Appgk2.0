@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { removeEmotionalCues } from '../../utils/textProcessing';
-import { Music } from 'lucide-react';
+import { Music, Volume2, VolumeX } from 'lucide-react';
 
 interface TextBox {
     id: string;
@@ -70,9 +70,13 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     const textBoxRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
     const soundEffectRef = useRef<HTMLAudioElement | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
+    const volumeHideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [bubblePopped, setBubblePopped] = useState(false);
     const [videoUnmuted, setVideoUnmuted] = useState(false);
     const [bubblePosition, setBubblePosition] = useState({ x: 75, y: 20 }); // Default position (top right area)
+    const [showVolumeControl, setShowVolumeControl] = useState(false);
+    const [videoVolume, setVideoVolume] = useState(0.3); // Default 30% volume
+    const [isMuted, setIsMuted] = useState(false);
     
     // Swipe detection for scroll height changes
     const touchStartY = useRef<number>(0);
@@ -179,9 +183,60 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     // Set video volume when video ref is available
     useEffect(() => {
         if (videoRef.current) {
-            videoRef.current.volume = 0.3; // Background audio at 30% volume
+            videoRef.current.volume = videoVolume;
+            videoRef.current.muted = isMuted || !videoUnmuted;
         }
-    }, [page.backgroundUrl]);
+    }, [page.backgroundUrl, videoVolume, isMuted, videoUnmuted]);
+
+    // Auto-hide volume control after 3 seconds
+    const resetVolumeHideTimeout = useCallback(() => {
+        if (volumeHideTimeoutRef.current) {
+            clearTimeout(volumeHideTimeoutRef.current);
+        }
+        volumeHideTimeoutRef.current = setTimeout(() => {
+            setShowVolumeControl(false);
+        }, 3000);
+    }, []);
+
+    // Clean up timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (volumeHideTimeoutRef.current) {
+                clearTimeout(volumeHideTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    // Handle volume icon click
+    const handleVolumeIconClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setShowVolumeControl(prev => !prev);
+        if (!showVolumeControl) {
+            resetVolumeHideTimeout();
+        }
+    };
+
+    // Handle volume slider change
+    const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        e.stopPropagation();
+        const newVolume = parseFloat(e.target.value);
+        setVideoVolume(newVolume);
+        if (videoRef.current) {
+            videoRef.current.volume = newVolume;
+        }
+        // Reset auto-hide timer when user interacts
+        resetVolumeHideTimeout();
+    };
+
+    // Handle mute toggle
+    const handleMuteToggle = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsMuted(prev => !prev);
+        if (videoRef.current) {
+            videoRef.current.muted = !isMuted;
+        }
+        resetVolumeHideTimeout();
+    };
 
     // Reset bubble when page changes
     useEffect(() => {
@@ -242,13 +297,13 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                         className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full"
                         autoPlay
                         loop
-                        muted={!videoUnmuted} // Start muted for iOS autoplay, unmute on user interaction
+                        muted={isMuted || !videoUnmuted} // Start muted for iOS autoplay, unmute on user interaction
                         playsInline
                         preload="auto"
                         onLoadedData={() => {
                             // Set volume once video is loaded
                             if (videoRef.current) {
-                                videoRef.current.volume = 0.3;
+                                videoRef.current.volume = videoVolume;
                             }
                         }}
                         style={{
@@ -459,6 +514,105 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                         @keyframes pop {
                             0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
                             100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+                        }
+                    `}</style>
+                </div>
+            )}
+
+            {/* Background Music Volume Control - Only show for video backgrounds */}
+            {page.backgroundType === 'video' && (
+                <div 
+                    className="absolute top-4 right-4 z-40 flex flex-col items-center"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Music Icon Button */}
+                    <button
+                        onClick={handleVolumeIconClick}
+                        className="w-12 h-12 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:bg-black/60 transition-all duration-200 border border-white/20"
+                    >
+                        {isMuted ? (
+                            <VolumeX className="w-6 h-6 text-white" />
+                        ) : (
+                            <Volume2 className="w-6 h-6 text-white" />
+                        )}
+                    </button>
+
+                    {/* Volume Slider - Slides down when visible */}
+                    <div 
+                        className={`
+                            mt-2 bg-black/50 backdrop-blur-sm rounded-full p-3 shadow-lg border border-white/20
+                            transition-all duration-300 ease-out origin-top
+                            ${showVolumeControl 
+                                ? 'opacity-100 scale-y-100 translate-y-0' 
+                                : 'opacity-0 scale-y-0 -translate-y-2 pointer-events-none'
+                            }
+                        `}
+                    >
+                        {/* Mute/Unmute Toggle */}
+                        <button
+                            onClick={handleMuteToggle}
+                            className="w-full mb-3 py-2 px-3 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center gap-2 transition-colors"
+                        >
+                            {isMuted ? (
+                                <>
+                                    <VolumeX className="w-4 h-4 text-white" />
+                                    <span className="text-white text-xs font-medium">Muted</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Volume2 className="w-4 h-4 text-white" />
+                                    <span className="text-white text-xs font-medium">On</span>
+                                </>
+                            )}
+                        </button>
+
+                        {/* Vertical Volume Slider */}
+                        <div className="flex flex-col items-center h-32">
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={videoVolume}
+                                onChange={handleVolumeChange}
+                                onClick={(e) => e.stopPropagation()}
+                                className="volume-slider"
+                                style={{
+                                    writingMode: 'vertical-lr',
+                                    direction: 'rtl',
+                                    height: '100%',
+                                    width: '24px',
+                                    appearance: 'none',
+                                    background: `linear-gradient(to top, #FFD700 ${videoVolume * 100}%, rgba(255,255,255,0.3) ${videoVolume * 100}%)`,
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                }}
+                            />
+                            <span className="text-white text-xs mt-2 font-medium">
+                                {Math.round(videoVolume * 100)}%
+                            </span>
+                        </div>
+                    </div>
+
+                    <style>{`
+                        .volume-slider::-webkit-slider-thumb {
+                            appearance: none;
+                            width: 20px;
+                            height: 20px;
+                            background: #FFD700;
+                            border-radius: 50%;
+                            cursor: pointer;
+                            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                            border: 2px solid white;
+                        }
+                        .volume-slider::-moz-range-thumb {
+                            width: 20px;
+                            height: 20px;
+                            background: #FFD700;
+                            border-radius: 50%;
+                            cursor: pointer;
+                            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                            border: 2px solid white;
                         }
                     `}</style>
                 </div>
