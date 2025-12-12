@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, X, Play, Pause, Volume2, Mic, Check, Music, Home, Heart, Star, RotateCcw, Lock, Sparkles, HelpCircle, Share2, Copy, Smartphone, Grid3X3, Loader2, Globe } from 'lucide-react';
 import { ApiService } from '../services/apiService';
@@ -130,6 +130,10 @@ const BookReaderPage: React.FC = () => {
     }, [selectedLanguage]);
     const wordAlignmentRef = useRef<{ words: Array<{ word: string; start: number; end: number }> } | null>(null);
     const bookBackgroundMusicRef = useRef<HTMLAudioElement | null>(null);
+    // iOS/WKWebView often ignores HTMLAudioElement.volume. Use WebAudio GainNode for reliable volume control.
+    const bookMusicCtxRef = useRef<AudioContext | null>(null);
+    const bookMusicGainRef = useRef<GainNode | null>(null);
+    const bookMusicSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
     const voiceDropdownRef = useRef<HTMLDivElement>(null);
     const [autoPlayMode, setAutoPlayMode] = useState(false);
     const autoPlayModeRef = useRef(false);
@@ -155,7 +159,11 @@ const BookReaderPage: React.FC = () => {
     
     const [bookMusicEnabled, setBookMusicEnabled] = useState(true); // Default to enabled
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
-    const [musicVolume, setMusicVolume] = useState(0.20); // Default 20% volume
+    const [musicVolume, setMusicVolume] = useState(() => {
+        const saved = localStorage.getItem('godlykids_book_music_volume');
+        const parsed = saved ? Number(saved) : 0.2;
+        return Number.isFinite(parsed) ? Math.min(1, Math.max(0, parsed)) : 0.2;
+    });
     const volumeSliderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Use ref to track music enabled state for intervals/callbacks
@@ -163,6 +171,66 @@ const BookReaderPage: React.FC = () => {
     useEffect(() => {
         bookMusicEnabledRef.current = bookMusicEnabled;
     }, [bookMusicEnabled]);
+
+    const ensureBookMusicGraph = useCallback((audioEl: HTMLAudioElement) => {
+        const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
+        if (!Ctx) return;
+
+        if (!bookMusicCtxRef.current) {
+            bookMusicCtxRef.current = new Ctx();
+        }
+        const ctx = bookMusicCtxRef.current;
+
+        if (!bookMusicGainRef.current) {
+            bookMusicGainRef.current = ctx.createGain();
+            bookMusicGainRef.current.connect(ctx.destination);
+        }
+        // Keep element volume at 1, control loudness via GainNode (reliable on iOS)
+        audioEl.volume = 1;
+        bookMusicGainRef.current.gain.value = musicVolume;
+
+        // Re-create source for the current element; disconnect any previous source
+        if (bookMusicSourceRef.current) {
+            try { bookMusicSourceRef.current.disconnect(); } catch { }
+            bookMusicSourceRef.current = null;
+        }
+        try {
+            bookMusicSourceRef.current = ctx.createMediaElementSource(audioEl);
+            bookMusicSourceRef.current.connect(bookMusicGainRef.current);
+        } catch (e) {
+            // If the element is already connected (shouldn't happen if we recreate per book),
+            // fall back to element.volume approach.
+            console.warn('🎵 Could not connect book music to WebAudio graph:', e);
+        }
+    }, [musicVolume]);
+
+    const resumeBookMusicContext = useCallback(async () => {
+        try {
+            if (bookMusicCtxRef.current && bookMusicCtxRef.current.state === 'suspended') {
+                await bookMusicCtxRef.current.resume();
+            }
+        } catch { }
+    }, []);
+
+    const applyBookMusicVolume = useCallback((v: number) => {
+        const clamped = Math.min(1, Math.max(0, v));
+        setMusicVolume(clamped);
+        localStorage.setItem('godlykids_book_music_volume', String(clamped));
+
+        if (bookMusicGainRef.current) {
+            bookMusicGainRef.current.gain.value = clamped;
+        } else if (bookBackgroundMusicRef.current) {
+            // fallback for browsers that respect element volume
+            bookBackgroundMusicRef.current.volume = clamped;
+        }
+    }, []);
+
+    // Keep gain node in sync if volume changes after graph is created
+    useEffect(() => {
+        if (bookMusicGainRef.current) {
+            bookMusicGainRef.current.gain.value = musicVolume;
+        }
+    }, [musicVolume]);
 
     const [hasBookMusic, setHasBookMusic] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
@@ -388,16 +456,13 @@ const BookReaderPage: React.FC = () => {
 
                         const audio = new Audio(musicUrl);
                         audio.loop = true;
-                        audio.volume = 0.20; // Default 20% volume for background music
                         audio.preload = 'auto';
                         bookBackgroundMusicRef.current = audio;
+                        ensureBookMusicGraph(audio);
 
                         // Start playing book music automatically when loaded
-                        audio.addEventListener('canplaythrough', () => {
-                            // Ensure volume is set correctly before playing
-                            if (bookBackgroundMusicRef.current) {
-                                audio.volume = bookBackgroundMusicRef.current.volume || 0.20;
-                            }
+                        audio.addEventListener('canplaythrough', async () => {
+                            await resumeBookMusicContext();
                             if (bookMusicEnabledRef.current) {
                                 console.log('🎵 Book music ready - starting playback');
                                 audio.play().catch(err => {
@@ -408,6 +473,7 @@ const BookReaderPage: React.FC = () => {
 
                         // Try to play immediately if already loaded
                         if (audio.readyState >= 3 && bookMusicEnabledRef.current) {
+                            await resumeBookMusicContext();
                             audio.play().catch(err => {
                                 console.warn('⚠️ Book music immediate play prevented:', err);
                             });
@@ -437,11 +503,16 @@ const BookReaderPage: React.FC = () => {
                 bookBackgroundMusicRef.current.src = '';
                 bookBackgroundMusicRef.current = null;
             }
+            // Disconnect WebAudio graph for book music source
+            if (bookMusicSourceRef.current) {
+                try { bookMusicSourceRef.current.disconnect(); } catch { }
+                bookMusicSourceRef.current = null;
+            }
 
             // Resume app music
             setMusicPaused(false);
         };
-    }, [bookId, setGameMode, setMusicPaused]); // Removed bookMusicEnabled from dependencies
+    }, [bookId, setGameMode, setMusicPaused, ensureBookMusicGraph, resumeBookMusicContext]); // Removed bookMusicEnabled from dependencies
 
     // Ref to track current audio for cleanup (avoids stale closure issues)
     const currentAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -2057,7 +2128,9 @@ const BookReaderPage: React.FC = () => {
                                         // If music is off, turn it on
                                         setBookMusicEnabled(true);
                                         if (bookBackgroundMusicRef.current) {
-                                            bookBackgroundMusicRef.current.volume = musicVolume;
+                                            // Ensure WebAudio graph exists + is resumed (iOS)
+                                            ensureBookMusicGraph(bookBackgroundMusicRef.current);
+                                            resumeBookMusicContext();
                                             bookBackgroundMusicRef.current.play().catch(err => {
                                                 console.warn('Could not play book music:', err);
                                             });
@@ -2072,7 +2145,8 @@ const BookReaderPage: React.FC = () => {
                                     setShowVolumeSlider(false);
                                     if (bookBackgroundMusicRef.current) {
                                         if (newState) {
-                                            bookBackgroundMusicRef.current.volume = musicVolume;
+                                            ensureBookMusicGraph(bookBackgroundMusicRef.current);
+                                            resumeBookMusicContext();
                                             bookBackgroundMusicRef.current.play().catch(err => {
                                                 console.warn('Could not play book music:', err);
                                             });
@@ -2111,14 +2185,7 @@ const BookReaderPage: React.FC = () => {
                                                 onInput={(e) => {
                                                     const target = e.target as HTMLInputElement;
                                                     const newVolume = parseInt(target.value) / 100;
-                                                    console.log('🎵 Volume slider changed to:', newVolume);
-                                                    setMusicVolume(newVolume);
-                                                    if (bookBackgroundMusicRef.current) {
-                                                        bookBackgroundMusicRef.current.volume = newVolume;
-                                                        console.log('🎵 Applied volume to audio element:', bookBackgroundMusicRef.current.volume);
-                                                    } else {
-                                                        console.warn('🎵 No audio ref available!');
-                                                    }
+                                                    applyBookMusicVolume(newVolume);
                                                     // Reset auto-hide timer on interaction
                                                     if (volumeSliderTimeoutRef.current) {
                                                         clearTimeout(volumeSliderTimeoutRef.current);
@@ -2131,14 +2198,13 @@ const BookReaderPage: React.FC = () => {
                                                     // Also handle onChange for desktop browsers
                                                     const target = e.target as HTMLInputElement;
                                                     const newVolume = parseInt(target.value) / 100;
-                                                    setMusicVolume(newVolume);
-                                                    if (bookBackgroundMusicRef.current) {
-                                                        bookBackgroundMusicRef.current.volume = newVolume;
-                                                    }
+                                                    applyBookMusicVolume(newVolume);
                                                 }}
                                                 className="absolute w-32 h-3 bg-white/20 rounded-full appearance-none cursor-pointer origin-center touch-none"
                                                 style={{
-                                                    transform: 'rotate(-90deg)',
+                                                    top: '50%',
+                                                    left: '50%',
+                                                    transform: 'translate(-50%, -50%) rotate(-90deg)',
                                                     WebkitAppearance: 'none',
                                                     background: `linear-gradient(to right, #FFD700 0%, #FFD700 ${musicVolume * 100}%, rgba(255,255,255,0.2) ${musicVolume * 100}%, rgba(255,255,255,0.2) 100%)`,
                                                     touchAction: 'none',
