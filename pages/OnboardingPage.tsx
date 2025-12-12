@@ -590,6 +590,7 @@ const PaywallStep: React.FC<{
         onClose={() => setShowTermsModal(false)}
         url={termsModalUrl}
         title={termsModalTitle}
+        hideExternalLink={true}
       />
     </div>
   );

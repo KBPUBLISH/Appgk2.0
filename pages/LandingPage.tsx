@@ -5,7 +5,7 @@ import WoodButton from '../components/ui/WoodButton';
 import { useLanguage } from '../context/LanguageContext';
 
 const STORAGE_KEY = 'godly_kids_data_v6';
-const TERMS_URL = 'https://godlykids.com/terms-and-conditions';
+const TERMS_URL = 'https://www.godlykids.com/end-user-license-agreement';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -215,7 +215,7 @@ const LandingPage: React.FC = () => {
           <div className="bg-white w-full max-w-lg h-[80vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-[#8B4513] to-[#A0522D]">
-              <h2 className="font-bold text-white text-lg">Terms & Conditions</h2>
+              <h2 className="font-bold text-white text-lg">End-User License Agreement</h2>
               <button
                 onClick={() => setShowTermsModal(false)}
                 className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
@@ -229,7 +229,7 @@ const LandingPage: React.FC = () => {
               <iframe
                 src={TERMS_URL}
                 className="w-full h-full border-0"
-                title="Terms and Conditions"
+                title="End-User License Agreement"
                 sandbox="allow-scripts allow-same-origin"
               />
             </div>
