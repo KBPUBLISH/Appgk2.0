@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { removeEmotionalCues } from '../../utils/textProcessing';
-import { Music, VolumeX } from 'lucide-react';
+import { Music } from 'lucide-react';
 
 interface TextBox {
     id: string;
@@ -73,7 +73,6 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     const [bubblePopped, setBubblePopped] = useState(false);
     const [videoUnmuted, setVideoUnmuted] = useState(false);
     const [bubblePosition, setBubblePosition] = useState({ x: 75, y: 20 }); // Default position (top right area)
-    const [isMuted, setIsMuted] = useState(false); // Toggle for video background audio
     
     // Swipe detection for scroll height changes
     const touchStartY = useRef<number>(0);
@@ -177,22 +176,12 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
         };
     }, [videoUnmuted]);
 
-    // Set video volume when video ref is available (fixed at 30%)
+    // Set video volume when video ref is available
     useEffect(() => {
         if (videoRef.current) {
-            videoRef.current.volume = 0.3; // Fixed 30% volume
-            videoRef.current.muted = isMuted || !videoUnmuted;
+            videoRef.current.volume = 0.3; // Background audio at 30% volume
         }
-    }, [page.backgroundUrl, isMuted, videoUnmuted]);
-
-    // Handle music toggle - tap to turn on/off
-    const handleMusicToggle = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setIsMuted(prev => !prev);
-        if (videoRef.current) {
-            videoRef.current.muted = !isMuted;
-        }
-    };
+    }, [page.backgroundUrl]);
 
     // Reset bubble when page changes
     useEffect(() => {
@@ -253,11 +242,11 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                         className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full"
                         autoPlay
                         loop
-                        muted={isMuted || !videoUnmuted} // Start muted for iOS autoplay, unmute on user interaction
+                        muted={!videoUnmuted} // Start muted for iOS autoplay, unmute on user interaction
                         playsInline
                         preload="auto"
                         onLoadedData={() => {
-                            // Set volume once video is loaded (fixed at 30%)
+                            // Set volume once video is loaded
                             if (videoRef.current) {
                                 videoRef.current.volume = 0.3;
                             }
@@ -424,8 +413,8 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                 })}
             </div>
 
-            {/* Floating Sound Effect Bubble - Only show for non-video pages with sound effects */}
-            {page.soundEffectUrl && !bubblePopped && page.backgroundType !== 'video' && (
+            {/* Floating Sound Effect Bubble */}
+            {page.soundEffectUrl && !bubblePopped && (
                 <div
                     className="absolute z-30 cursor-pointer"
                     style={{
@@ -452,8 +441,8 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                 </div>
             )}
 
-            {/* Popped bubble animation - Only for non-video pages */}
-            {bubblePopped && page.backgroundType !== 'video' && (
+            {/* Popped bubble animation */}
+            {bubblePopped && (
                 <div
                     className="absolute z-30 pointer-events-none"
                     style={{
@@ -472,30 +461,6 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                             100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
                         }
                     `}</style>
-                </div>
-            )}
-
-            {/* Background Music Toggle - Only show for video backgrounds */}
-            {page.backgroundType === 'video' && (
-                <div 
-                    className="absolute top-4 left-4 z-40"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {/* Music Toggle Button - tap to turn on/off */}
-                    <button
-                        onClick={handleMusicToggle}
-                        className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-all duration-200 border-2 border-white ${
-                            isMuted 
-                                ? 'bg-gray-500/80' 
-                                : 'bg-gradient-to-br from-indigo-400 to-purple-500'
-                        }`}
-                    >
-                        {isMuted ? (
-                            <VolumeX className="w-6 h-6 text-white" />
-                        ) : (
-                            <Music className="w-6 h-6 text-white" />
-                        )}
-                    </button>
                 </div>
             )}
         </div>
