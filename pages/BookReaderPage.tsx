@@ -175,6 +175,9 @@ const BookReaderPage: React.FC = () => {
         bookMusicEnabledRef.current = bookMusicEnabled;
     }, [bookMusicEnabled]);
 
+    // Prevent re-wiring the same audio element on arbitrary taps (iOS can glitch/pause when MediaElementSource is recreated)
+    const bookMusicConnectedElRef = useRef<HTMLAudioElement | null>(null);
+
     const ensureBookMusicGraph = useCallback((audioEl: HTMLAudioElement) => {
         const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
         if (!Ctx) return;
@@ -200,6 +203,11 @@ const BookReaderPage: React.FC = () => {
         audioEl.volume = 1;
         bookMusicGainRef.current.gain.value = musicVolume;
 
+        // Already wired this element? Don't recreate the source (prevents pausing/glitch on random taps)
+        if (bookMusicConnectedElRef.current === audioEl && bookMusicSourceRef.current) {
+            return;
+        }
+
         // Re-create source for the current element; disconnect any previous source
         if (bookMusicSourceRef.current) {
             try { bookMusicSourceRef.current.disconnect(); } catch { }
@@ -208,6 +216,7 @@ const BookReaderPage: React.FC = () => {
         try {
             bookMusicSourceRef.current = ctx.createMediaElementSource(audioEl);
             bookMusicSourceRef.current.connect(bookMusicGainRef.current);
+            bookMusicConnectedElRef.current = audioEl;
         } catch (e) {
             console.warn('🎵 Could not connect book music to WebAudio graph:', e);
             // fallback: at least keep audio audible
@@ -233,6 +242,17 @@ const BookReaderPage: React.FC = () => {
         } else if (bookBackgroundMusicRef.current) {
             // fallback for browsers that respect element volume
             bookBackgroundMusicRef.current.volume = clamped;
+        }
+
+        // Only wire into WebAudio when the user actually adjusts volume (not on random page taps)
+        const audioEl = bookBackgroundMusicRef.current;
+        if (audioEl) {
+            resumeBookMusicContext().then(() => {
+                if (bookMusicCtxRef.current && bookMusicCtxRef.current.state === 'running') {
+                    bookMusicWebAudioReadyRef.current = true;
+                    ensureBookMusicGraph(audioEl);
+                }
+            });
         }
     }, []);
 
@@ -292,12 +312,9 @@ const BookReaderPage: React.FC = () => {
         }
     }, [musicVolume]);
 
-    // iOS: unlock WebAudio on first user gesture, then (re)wire book music through GainNode
+    // iOS: unlock WebAudio on first user gesture (DO NOT rewire book music here; rewiring on random taps pauses music)
     useEffect(() => {
         const unlock = async () => {
-            const audioEl = bookBackgroundMusicRef.current;
-            if (!audioEl) return;
-
             // Ensure context exists
             const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
             if (Ctx && !bookMusicCtxRef.current) {
@@ -307,7 +324,6 @@ const BookReaderPage: React.FC = () => {
             await resumeBookMusicContext();
             if (bookMusicCtxRef.current && bookMusicCtxRef.current.state === 'running') {
                 bookMusicWebAudioReadyRef.current = true;
-                ensureBookMusicGraph(audioEl);
             }
         };
 
