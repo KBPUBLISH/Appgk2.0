@@ -208,6 +208,9 @@ const BookReaderPage: React.FC = () => {
             return;
         }
 
+        // Preserve playback state - iOS can pause/silence when routing changes mid-play.
+        const wasPlaying = !audioEl.paused && !audioEl.ended;
+
         // Re-create source for the current element; disconnect any previous source
         if (bookMusicSourceRef.current) {
             try { bookMusicSourceRef.current.disconnect(); } catch { }
@@ -217,6 +220,16 @@ const BookReaderPage: React.FC = () => {
             bookMusicSourceRef.current = ctx.createMediaElementSource(audioEl);
             bookMusicSourceRef.current.connect(bookMusicGainRef.current);
             bookMusicConnectedElRef.current = audioEl;
+
+            // If it was playing before, force a resume after the re-route (helps iOS).
+            if (wasPlaying) {
+                // Defer to next tick to let the connection settle.
+                setTimeout(() => {
+                    try {
+                        audioEl.play().catch(() => { });
+                    } catch { }
+                }, 0);
+            }
         } catch (e) {
             console.warn('🎵 Could not connect book music to WebAudio graph:', e);
             // fallback: at least keep audio audible
@@ -251,6 +264,10 @@ const BookReaderPage: React.FC = () => {
                 if (bookMusicCtxRef.current && bookMusicCtxRef.current.state === 'running') {
                     bookMusicWebAudioReadyRef.current = true;
                     ensureBookMusicGraph(audioEl);
+                    // If audio got paused by iOS during the route change, try to resume.
+                    if (bookMusicEnabledRef.current && audioEl.paused) {
+                        audioEl.play().catch(() => { });
+                    }
                 }
             });
         }
