@@ -463,6 +463,9 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                                     ? `calc(100% - max(${box.y}%, ${scrollTopVal}) - 70px)`
                                     : `calc(100% - ${box.y}% - 60px)`,
                                 overflowY: 'auto',
+                                WebkitOverflowScrolling: 'touch',
+                                // Ensure vertical scrolling works even when parent container restricts gestures
+                                touchAction: 'pan-y',
                                 textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
                                 scrollBehavior: 'smooth',
                                 // Only use opacity for smooth hide/show - no translateY to avoid layout jump

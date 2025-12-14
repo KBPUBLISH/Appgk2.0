@@ -1886,7 +1886,9 @@ const BookReaderPage: React.FC = () => {
                 // Prevent iOS overscroll/bounce that reveals background
                 overscrollBehavior: 'none',
                 WebkitOverflowScrolling: 'auto', // Disable momentum scrolling
-                touchAction: 'pan-x pinch-zoom', // Allow horizontal swipes and pinch zoom, block vertical overscroll
+                // IMPORTANT: Allow vertical pan so text boxes (overflow-y) can scroll in landscape.
+                // We still handle page turns via our gesture logic rather than relying on touchAction restrictions.
+                touchAction: 'pan-x pan-y pinch-zoom',
             }}
             onTouchStart={(e) => {
                 // Block any music from playing on touch
