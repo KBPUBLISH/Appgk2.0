@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Play, Lock, Check, Calendar, Book, FlaskConical, Calculator, Hourglass, Languages, Palette, Cpu, Video } from 'lucide-react';
 import { ApiService } from '../services/apiService';
 import { isCompleted, isLocked } from '../services/lessonService';
+import { useUser } from '../context/UserContext';
 
 interface Lesson {
     _id: string;
@@ -17,6 +18,19 @@ interface Lesson {
     scheduledDate?: string;
 }
 
+type PlannerSlot = {
+    slotIndex: number;
+    isDailyVerse: boolean;
+    lesson: any; // backend returns populated Lesson doc
+};
+
+type PlannerDayResponse = {
+    profileId: string;
+    dateKey: string;
+    weekKey: string;
+    slots: PlannerSlot[];
+};
+
 const getLessonIcon = (type: string) => {
     switch (type) {
         case 'Bible': return <Book className="w-4 h-4 text-white" />;
@@ -30,52 +44,64 @@ const getLessonIcon = (type: string) => {
     }
 };
 
+const formatLocalDateKey = (d: Date): string => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+};
+
+const ageToLessonAgeGroup = (age?: number): string => {
+    if (!age || !Number.isFinite(age)) return 'all';
+    if (age <= 6) return '4-6';
+    if (age <= 8) return '6-8';
+    if (age <= 10) return '8-10';
+    if (age <= 12) return '10-12';
+    return 'all';
+};
+
 const LessonsPage: React.FC = () => {
     const navigate = useNavigate();
-    const [lessons, setLessons] = useState<Lesson[]>([]);
+    const { kids, currentProfileId } = useUser();
     const [loading, setLoading] = useState(true);
-    const [weekLessons, setWeekLessons] = useState<Map<string, Lesson>>(new Map());
+    const [dayPlans, setDayPlans] = useState<Map<string, PlannerDayResponse>>(new Map());
+    const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
 
     useEffect(() => {
-        fetchLessons();
-    }, []);
-
-    const fetchLessons = async () => {
-        try {
-            const data = await ApiService.getLessons();
-            setLessons(data);
-
-            // Organize lessons by day for the next 7 days
-            const weekMap = new Map<string, Lesson>();
-            const today = new Date();
-
-            for (let i = 0; i < 7; i++) {
-                const date = new Date(today);
-                date.setDate(date.getDate() + i);
-                date.setHours(0, 0, 0, 0);
-
-                const dateKey = date.toISOString().split('T')[0];
-
-                // Find lesson scheduled for this date
-                const lesson = data.find((l: Lesson) => {
-                    if (!l.scheduledDate) return false;
-                    const scheduled = new Date(l.scheduledDate);
-                    scheduled.setHours(0, 0, 0, 0);
-                    return scheduled.getTime() === date.getTime();
-                });
-
-                if (lesson) {
-                    weekMap.set(dateKey, lesson);
+        // Auto-load today's plan for the active kid profile (do not generate all days up front).
+        const init = async () => {
+            try {
+                if (!currentProfileId) {
+                    setLoading(false);
+                    return;
                 }
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const dateKey = formatLocalDateKey(today);
+                setSelectedDateKey(dateKey);
+            } finally {
+                setLoading(false);
             }
+        };
+        init();
+    }, [currentProfileId]);
 
-            setWeekLessons(weekMap);
-        } catch (error) {
-            console.error('Error fetching lessons:', error);
-        } finally {
-            setLoading(false);
+    const loadDayPlan = useCallback(async (dateKey: string) => {
+        if (!currentProfileId) return;
+        if (dayPlans.has(dateKey)) return; // already loaded/locked
+
+        const kid = kids.find((k: any) => String(k.id) === String(currentProfileId));
+        const ageGroup = ageToLessonAgeGroup(kid?.age);
+
+        const plan = await ApiService.getLessonPlannerDay(currentProfileId, dateKey, ageGroup);
+        if (plan) {
+            setDayPlans(prev => {
+                const next = new Map(prev);
+                next.set(dateKey, plan);
+                return next;
+            });
         }
-    };
+    }, [currentProfileId, dayPlans, kids]);
 
     const getDayLabel = (date: Date): string => {
         const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -86,11 +112,8 @@ const LessonsPage: React.FC = () => {
         return date.getDate();
     };
 
-    const handleLessonClick = (lesson: Lesson) => {
-        if (isLocked(lesson)) {
-            return; // Don't navigate if locked
-        }
-        navigate(`/lesson/${lesson._id}`);
+    const handleLessonClick = (lessonId: string, meta?: { dateKey?: string; slotIndex?: number; isDailyVerse?: boolean }) => {
+        navigate(`/lesson/${lessonId}`, { state: meta || {} });
     };
 
     if (loading) {
@@ -120,22 +143,31 @@ const LessonsPage: React.FC = () => {
                     <p className="text-white/80">Watch, learn, and grow each day!</p>
                 </div>
 
+                {!currentProfileId && (
+                    <div className="mb-6 bg-black/30 border border-white/10 rounded-xl p-4 text-white/90">
+                        Please select a kid profile to see daily lessons.
+                    </div>
+                )}
+
                 {/* Week View - Portrait Style Thumbnails */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
                     {weekDays.map((date) => {
-                        const dateKey = date.toISOString().split('T')[0];
-                        const lesson = weekLessons.get(dateKey);
-                        const locked = lesson ? isLocked(lesson) : false;
-                        const completed = lesson ? isCompleted(lesson._id) : false;
-                        const status = locked ? 'locked' : (completed ? 'completed' : (lesson ? 'available' : 'empty'));
+                        const dateKey = formatLocalDateKey(date);
+                        const plan = dayPlans.get(dateKey);
+                        const slot0 = plan?.slots?.find(s => s.slotIndex === 0) || plan?.slots?.[0];
+                        const thumb = slot0?.lesson?.video?.thumbnail || slot0?.lesson?.video?.thumbnailUrl || slot0?.lesson?.thumbnail;
+                        const status = plan ? 'available' : 'empty';
                         const isToday = date.toDateString() === today.toDateString();
-                        const isPast = date < today && !isToday;
 
                         return (
                             <div
                                 key={dateKey}
-                                className={`relative ${locked ? 'cursor-not-allowed' : status !== 'empty' ? 'cursor-pointer' : ''}`}
-                                onClick={() => lesson && !locked && handleLessonClick(lesson)}
+                                className={`relative cursor-pointer`}
+                                onClick={() => {
+                                    if (!currentProfileId) return;
+                                    setSelectedDateKey(dateKey);
+                                    loadDayPlan(dateKey);
+                                }}
                             >
                                 {/* Day Label */}
                                 <div className="text-center mb-2">
@@ -152,16 +184,16 @@ const LessonsPage: React.FC = () => {
                                     {status === 'empty' ? (
                                         <div className="w-full h-full flex items-center justify-center">
                                             <div className="text-white/40 text-xs text-center px-2">
-                                                No lesson
+                                                Tap to load
                                             </div>
                                         </div>
-                                    ) : lesson ? (
+                                    ) : plan ? (
                                         <>
                                             {/* Thumbnail */}
-                                            {lesson.video?.thumbnail ? (
+                                            {thumb ? (
                                                 <img
-                                                    src={lesson.video.thumbnail}
-                                                    alt={lesson.title}
+                                                    src={thumb}
+                                                    alt={slot0?.lesson?.title || 'Lesson'}
                                                     className="w-full h-full object-cover"
                                                 />
                                             ) : (
@@ -171,39 +203,19 @@ const LessonsPage: React.FC = () => {
                                             )}
 
                                             {/* Overlay */}
-                                            <div className={`absolute inset-0 ${status === 'locked'
-                                                ? 'bg-black/70'
-                                                : status === 'completed'
-                                                    ? 'bg-green-500/30'
-                                                    : 'bg-black/20'
-                                                }`} />
-
-                                            {/* Type Icon */}
-                                            <div className="absolute top-2 left-2 bg-black/40 backdrop-blur-sm rounded-full p-1.5">
-                                                {getLessonIcon(lesson.type || 'Bible')}
-                                            </div>
+                                            <div className="absolute inset-0 bg-black/20" />
 
                                             {/* Status Icons */}
                                             <div className="absolute top-2 right-2">
-                                                {status === 'locked' ? (
-                                                    <div className="bg-black/60 rounded-full p-1.5">
-                                                        <Lock className="w-4 h-4 text-white" />
-                                                    </div>
-                                                ) : status === 'completed' ? (
-                                                    <div className="bg-green-500 rounded-full p-1.5">
-                                                        <Check className="w-4 h-4 text-white" />
-                                                    </div>
-                                                ) : (
-                                                    <div className="bg-white/20 backdrop-blur-sm rounded-full p-1.5">
-                                                        <Play className="w-4 h-4 text-white" />
-                                                    </div>
-                                                )}
+                                                <div className="bg-white/20 backdrop-blur-sm rounded-full px-2 py-1 text-[10px] text-white font-bold">
+                                                    {plan.slots?.length || 0}
+                                                </div>
                                             </div>
 
                                             {/* Title Overlay */}
                                             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
                                                 <p className="text-white text-xs font-semibold line-clamp-2">
-                                                    {lesson.title}
+                                                    {slot0?.lesson?.title || 'Daily Lessons'}
                                                 </p>
                                             </div>
                                         </>
@@ -219,73 +231,73 @@ const LessonsPage: React.FC = () => {
                     })}
                 </div>
 
-                {/* Available Lessons (Past and Today) */}
-                {lessons.filter(l => {
-                    const locked = isLocked(l);
-                    const completed = isCompleted(l._id);
-                    return !locked || completed; // Show if not locked, or if completed
-                }).length > 0 && (
-                        <div className="mb-6">
-                            <h2 className="text-xl font-bold text-white mb-4">Available Lessons</h2>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                {lessons
-                                    .filter(l => {
-                                        const locked = isLocked(l);
-                                        const completed = isCompleted(l._id); // Fix: Pass lesson._id
-                                        return !locked || completed;
-                                    })
-                                    .map((lesson) => {
-                                        const completed = isCompleted(lesson._id); // Fix: Pass lesson._id
-                                        const status = completed ? 'completed' : 'available';
-                                        return (
-                                            <div
-                                                key={lesson._id}
-                                                className="relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-800/50 border-2 cursor-pointer hover:scale-105 transition-transform"
-                                                onClick={() => handleLessonClick(lesson)}
-                                            >
-                                                {lesson.video?.thumbnail ? (
-                                                    <img
-                                                        src={lesson.video.thumbnail}
-                                                        alt={lesson.title}
-                                                        className="w-full h-full object-cover"
-                                                    />
+                {/* Selected Day Lessons */}
+                {selectedDateKey && (
+                    <div className="mb-6">
+                        <h2 className="text-xl font-bold text-white mb-4">
+                            Lessons for {selectedDateKey}
+                        </h2>
+                        {!dayPlans.get(selectedDateKey) ? (
+                            <div className="text-white/70 text-sm">
+                                Tap the day above to load lessons.
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                {dayPlans.get(selectedDateKey)!.slots.map((slot) => {
+                                    const lesson = slot.lesson;
+                                    const completed = lesson?._id ? isCompleted(String(lesson._id)) : false;
+                                    return (
+                                        <div
+                                            key={`${selectedDateKey}-${slot.slotIndex}-${lesson?._id}`}
+                                            className="relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-800/50 border-2 cursor-pointer hover:scale-[1.02] transition-transform"
+                                            onClick={() => handleLessonClick(String(lesson._id), {
+                                                dateKey: selectedDateKey,
+                                                slotIndex: slot.slotIndex,
+                                                isDailyVerse: slot.isDailyVerse,
+                                            })}
+                                        >
+                                            {lesson?.video?.thumbnail ? (
+                                                <img
+                                                    src={lesson.video.thumbnail}
+                                                    alt={lesson.title}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-600">
+                                                    <Video className="w-12 h-12 text-white/50" />
+                                                </div>
+                                            )}
+
+                                            <div className="absolute inset-0 bg-black/20" />
+
+                                            <div className="absolute top-2 left-2 bg-black/60 rounded-full px-2 py-1 text-[10px] text-white font-bold">
+                                                {slot.isDailyVerse ? 'Daily Verse' : `Video ${slot.slotIndex + 1}`}
+                                            </div>
+
+                                            <div className="absolute top-2 right-2">
+                                                {completed ? (
+                                                    <div className="bg-green-500 rounded-full p-1.5">
+                                                        <Check className="w-4 h-4 text-white" />
+                                                    </div>
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-600">
-                                                        <Video className="w-12 h-12 text-white/50" />
+                                                    <div className="bg-white/20 backdrop-blur-sm rounded-full p-1.5">
+                                                        <Play className="w-4 h-4 text-white" />
                                                     </div>
                                                 )}
-
-                                                <div className={`absolute inset-0 ${status === 'completed' ? 'bg-green-500/30' : 'bg-black/20'
-                                                    }`} />
-
-                                                {/* Type Icon */}
-                                                <div className="absolute top-2 left-2 bg-black/40 backdrop-blur-sm rounded-full p-1.5">
-                                                    {getLessonIcon(lesson.video?.type || 'Bible')}
-                                                </div>
-
-                                                <div className="absolute top-2 right-2">
-                                                    {status === 'completed' ? (
-                                                        <div className="bg-green-500 rounded-full p-1.5">
-                                                            <Check className="w-4 h-4 text-white" />
-                                                        </div>
-                                                    ) : (
-                                                        <div className="bg-white/20 backdrop-blur-sm rounded-full p-1.5">
-                                                            <Play className="w-4 h-4 text-white" />
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                                                    <p className="text-white text-xs font-semibold line-clamp-2">
-                                                        {lesson.title}
-                                                    </p>
-                                                </div>
                                             </div>
-                                        );
-                                    })}
+
+                                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                                                <p className="text-white text-xs font-semibold line-clamp-2">
+                                                    {lesson?.title || 'Lesson'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );
