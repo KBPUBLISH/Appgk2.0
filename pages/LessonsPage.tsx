@@ -66,42 +66,73 @@ const LessonsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [dayPlans, setDayPlans] = useState<Map<string, PlannerDayResponse>>(new Map());
     const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+    const [loadingDay, setLoadingDay] = useState<string | null>(null);
+    
+    // Track which days we've already requested (to avoid duplicate fetches)
+    const loadedDaysRef = React.useRef<Set<string>>(new Set());
 
-    useEffect(() => {
-        // Auto-load today's plan for the active kid profile (do not generate all days up front).
-        const init = async () => {
-            try {
-                if (!currentProfileId) {
-                    setLoading(false);
-                    return;
-                }
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const dateKey = formatLocalDateKey(today);
-                setSelectedDateKey(dateKey);
-            } finally {
-                setLoading(false);
-            }
-        };
-        init();
-    }, [currentProfileId]);
+    const loadDayPlan = useCallback(async (dateKey: string, forceLoad = false) => {
+        if (!currentProfileId) {
+            console.log('📅 loadDayPlan: No currentProfileId');
+            return;
+        }
+        
+        // Skip if already loaded or currently loading
+        if (!forceLoad && loadedDaysRef.current.has(dateKey)) {
+            console.log('📅 loadDayPlan: Already loaded/loading', dateKey);
+            return;
+        }
+        
+        loadedDaysRef.current.add(dateKey);
+        setLoadingDay(dateKey);
 
-    const loadDayPlan = useCallback(async (dateKey: string) => {
-        if (!currentProfileId) return;
-        if (dayPlans.has(dateKey)) return; // already loaded/locked
-
+        console.log('📅 loadDayPlan: Fetching plan for', dateKey, 'profile:', currentProfileId);
         const kid = kids.find((k: any) => String(k.id) === String(currentProfileId));
         const ageGroup = ageToLessonAgeGroup(kid?.age);
+        console.log('📅 loadDayPlan: Kid age group:', ageGroup, 'kid:', kid?.name);
 
-        const plan = await ApiService.getLessonPlannerDay(currentProfileId, dateKey, ageGroup);
-        if (plan) {
-            setDayPlans(prev => {
-                const next = new Map(prev);
-                next.set(dateKey, plan);
-                return next;
-            });
+        try {
+            const plan = await ApiService.getLessonPlannerDay(currentProfileId, dateKey, ageGroup);
+            console.log('📅 loadDayPlan: Got plan:', plan);
+            if (plan && plan.slots && plan.slots.length > 0) {
+                setDayPlans(prev => {
+                    const next = new Map(prev);
+                    next.set(dateKey, plan);
+                    return next;
+                });
+            } else {
+                console.warn('📅 loadDayPlan: Plan has no slots or is null. Response:', JSON.stringify(plan));
+            }
+        } catch (error) {
+            console.error('📅 loadDayPlan: Error fetching plan:', error);
+            // Remove from loaded set so user can retry
+            loadedDaysRef.current.delete(dateKey);
+        } finally {
+            setLoadingDay(null);
         }
-    }, [currentProfileId, dayPlans, kids]);
+    }, [currentProfileId, kids]);
+
+    // Auto-load today's plan when page opens
+    useEffect(() => {
+        if (!currentProfileId) {
+            setLoading(false);
+            return;
+        }
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dateKey = formatLocalDateKey(today);
+        setSelectedDateKey(dateKey);
+        
+        // Load today's plan immediately
+        loadDayPlan(dateKey).finally(() => setLoading(false));
+    }, [currentProfileId, loadDayPlan]);
+    
+    // Also load when selectedDateKey changes (user taps a different day)
+    useEffect(() => {
+        if (selectedDateKey && currentProfileId) {
+            loadDayPlan(selectedDateKey);
+        }
+    }, [selectedDateKey, currentProfileId, loadDayPlan]);
 
     const getDayLabel = (date: Date): string => {
         const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -181,7 +212,14 @@ const LessonsPage: React.FC = () => {
 
                                 {/* Portrait Thumbnail Container */}
                                 <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-800/50 border-2 transition-all">
-                                    {status === 'empty' ? (
+                                    {loadingDay === dateKey ? (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                            <div className="text-white/60 text-xs text-center px-2">
+                                                <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin mx-auto mb-1"></div>
+                                                Loading...
+                                            </div>
+                                        </div>
+                                    ) : status === 'empty' ? (
                                         <div className="w-full h-full flex items-center justify-center">
                                             <div className="text-white/40 text-xs text-center px-2">
                                                 Tap to load
@@ -237,9 +275,14 @@ const LessonsPage: React.FC = () => {
                         <h2 className="text-xl font-bold text-white mb-4">
                             Lessons for {selectedDateKey}
                         </h2>
-                        {!dayPlans.get(selectedDateKey) ? (
+                        {loadingDay === selectedDateKey ? (
+                            <div className="flex items-center gap-2 text-white/70 text-sm">
+                                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+                                Loading lessons...
+                            </div>
+                        ) : !dayPlans.get(selectedDateKey) ? (
                             <div className="text-white/70 text-sm">
-                                Tap the day above to load lessons.
+                                No lessons available for this day. Make sure you have lessons created and marked as "Daily Verse" or other types in the portal.
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
