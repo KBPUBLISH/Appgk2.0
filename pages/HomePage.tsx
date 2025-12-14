@@ -114,16 +114,28 @@ const HomePage: React.FC = () => {
     } catch { return []; }
   };
   
-  // Lessons state - now using daily planner API
-  const [lessons, setLessons] = useState<any[]>(() => getCached('lessons'));
-  const [lessonsLoading, setLessonsLoading] = useState(() => getCached('lessons').length === 0);
+  // Lessons state - now using daily planner API (don't use cache - planner is per-day)
+  const [lessons, setLessons] = useState<any[]>([]);
+  const [lessonsLoading, setLessonsLoading] = useState(true);
   const [weekLessons, setWeekLessons] = useState<Map<string, any>>(new Map());
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(getSelectedDay());
   const todayIndex = getTodayIndex();
   
-  // Daily planner state
+  // Daily planner state - reset on mount to avoid stale data
   const [dayPlans, setDayPlans] = useState<Map<string, any>>(new Map());
   const loadedDaysRef = useRef<Set<string>>(new Set());
+  const lastProfileRef = useRef<string | null>(null);
+  
+  // Reset planner state when profile changes
+  useEffect(() => {
+    if (currentProfileId !== lastProfileRef.current) {
+      console.log('📚 Profile changed, resetting planner state');
+      lastProfileRef.current = currentProfileId;
+      setDayPlans(new Map());
+      loadedDaysRef.current = new Set();
+      setLessons([]);
+    }
+  }, [currentProfileId]);
   
   // Welcome video state - plays once per app session when returning to home
   const [showWelcomeVideo, setShowWelcomeVideo] = useState(() => {
@@ -430,12 +442,9 @@ const HomePage: React.FC = () => {
           console.log('📚 Lessons from planner:', lessonsFromPlan.length);
         }
       } else {
-        // Fallback to old API if no profile (shouldn't happen in normal use)
-        console.log('📚 No profile, falling back to old lessons API...');
-        const data = await ApiService.getLessons();
-        console.log('📚 Lessons received (fallback):', data.length);
-        setLessons(data);
-        cacheData('lessons', data);
+        // No profile - show empty state (user needs to select a child profile)
+        console.log('📚 No profile selected - lessons require a child profile');
+        setLessons([]);
       }
     } catch (error) {
       console.error('❌ Error fetching lessons:', error);
