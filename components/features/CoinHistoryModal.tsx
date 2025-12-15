@@ -7,6 +7,7 @@ interface CoinHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenShop: () => void;
+  outOfCoinsMode?: boolean; // Special mode when user has 0 coins
 }
 
 const getSourceIcon = (source: CoinTransaction['source']) => {
@@ -63,12 +64,12 @@ const formatTimeAgo = (timestamp: number): string => {
   return new Date(timestamp).toLocaleDateString();
 };
 
-const CoinHistoryModal: React.FC<CoinHistoryModalProps> = ({ isOpen, onClose, onOpenShop }) => {
+const CoinHistoryModal: React.FC<CoinHistoryModalProps> = ({ isOpen, onClose, onOpenShop, outOfCoinsMode = false }) => {
   const { coins, coinTransactions, referralCode, redeemCode } = useUser();
   const [copied, setCopied] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const [redeemMessage, setRedeemMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'earn' | 'history'>('earn');
+  const [activeTab, setActiveTab] = useState<'earn' | 'history'>(outOfCoinsMode ? 'earn' : 'earn');
 
   // Hide BottomNavigation when modal is open
   useEffect(() => {
@@ -90,10 +91,11 @@ const CoinHistoryModal: React.FC<CoinHistoryModalProps> = ({ isOpen, onClose, on
   };
   
   const handleShare = async () => {
+    const referralLink = `https://app.godlykids.com/#/ref/${referralCode}`;
     const shareData = {
       title: 'Join Godly Kids! 🌟',
-      text: `Hey! Use my special code ${referralCode} when you join Godly Kids and we BOTH get 100 gold coins! 🪙✨`,
-      url: 'https://app.godlykids.com',
+      text: `Hey! Use my special code ${referralCode} when you join Godly Kids and we BOTH get 500 gold coins! 🪙✨`,
+      url: referralLink,
     };
     
     try {
@@ -147,18 +149,40 @@ const CoinHistoryModal: React.FC<CoinHistoryModalProps> = ({ isOpen, onClose, on
             <X className="w-5 h-5 text-white/70" />
           </button>
           
+          {/* Out of Coins Alert */}
+          {outOfCoinsMode && coins === 0 && (
+            <div className="mb-4 bg-gradient-to-r from-red-500/20 to-orange-500/20 rounded-xl p-3 border border-red-500/30 text-center">
+              <p className="text-white font-bold text-lg">😱 Out of Coins!</p>
+              <p className="text-white/70 text-xs mt-1">
+                Refer a friend to earn <span className="text-[#FFD700] font-bold">500 gold coins!</span>
+              </p>
+            </div>
+          )}
+          
           {/* Coin Balance */}
           <div className="text-center">
-            <div className="inline-flex items-center gap-3 bg-gradient-to-r from-[#FFD700]/20 to-[#B8860B]/20 px-6 py-3 rounded-2xl border border-[#FFD700]/30">
+            <div className={`inline-flex items-center gap-3 px-6 py-3 rounded-2xl border ${
+              outOfCoinsMode && coins === 0 
+                ? 'bg-gradient-to-r from-red-500/10 to-orange-500/10 border-red-500/30' 
+                : 'bg-gradient-to-r from-[#FFD700]/20 to-[#B8860B]/20 border-[#FFD700]/30'
+            }`}>
               <div className="relative">
-                <div className="w-14 h-14 bg-gradient-to-br from-[#FFE55C] to-[#DAA520] rounded-full border-2 border-[#B8860B] shadow-lg flex items-center justify-center animate-pulse">
-                  <span className="text-[#5c2e0b] font-black text-xl">G</span>
+                <div className={`w-14 h-14 rounded-full border-2 shadow-lg flex items-center justify-center ${
+                  outOfCoinsMode && coins === 0
+                    ? 'bg-gradient-to-br from-gray-400 to-gray-600 border-gray-500'
+                    : 'bg-gradient-to-br from-[#FFE55C] to-[#DAA520] border-[#B8860B] animate-pulse'
+                }`}>
+                  <span className={`font-black text-xl ${outOfCoinsMode && coins === 0 ? 'text-gray-700' : 'text-[#5c2e0b]'}`}>G</span>
                 </div>
-                <div className="absolute top-1 left-1 w-3 h-3 bg-white/40 rounded-full"></div>
+                {!(outOfCoinsMode && coins === 0) && (
+                  <div className="absolute top-1 left-1 w-3 h-3 bg-white/40 rounded-full"></div>
+                )}
               </div>
               <div className="text-left">
                 <p className="text-white/60 text-xs font-medium">Your Gold Coins</p>
-                <p className="text-[#FFD700] font-black text-3xl font-display">
+                <p className={`font-black text-3xl font-display ${
+                  outOfCoinsMode && coins === 0 ? 'text-red-400' : 'text-[#FFD700]'
+                }`}>
                   {coins.toLocaleString()}
                 </p>
               </div>
@@ -231,7 +255,7 @@ const CoinHistoryModal: React.FC<CoinHistoryModalProps> = ({ isOpen, onClose, on
                   <div>
                     <h3 className="text-white font-bold text-base">Ask Your Parents! 👨‍👩‍👧</h3>
                     <p className="text-white/70 text-xs mt-1">
-                      Share your special code with friends and family. When they join, you BOTH get <span className="text-[#FFD700] font-bold">100 gold coins!</span>
+                      Share your special code with friends and family. When they join, you BOTH get <span className="text-[#FFD700] font-bold">500 gold coins!</span>
                     </p>
                   </div>
                 </div>

@@ -61,6 +61,21 @@ import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
 import MiniPlayer from './components/audio/MiniPlayer';
 import BottomNavigation from './components/layout/BottomNavigation';
 import ErrorBoundary from './components/ErrorBoundary';
+import CoinHistoryModal from './components/features/CoinHistoryModal';
+import { useUser } from './context/UserContext';
+
+// Global Coin Modal - shows when user runs out of coins (outOfCoinsMode)
+const GlobalCoinModal: React.FC = () => {
+  const { showReferralModal, setShowReferralModal } = useUser();
+  return (
+    <CoinHistoryModal 
+      isOpen={showReferralModal} 
+      onClose={() => setShowReferralModal(false)}
+      onOpenShop={() => {}} // No-op since we're just showing referral
+      outOfCoinsMode={true}
+    />
+  );
+};
 import { BooksProvider } from './context/BooksContext';
 import { UserProvider } from './context/UserContext';
 import { AudioProvider } from './context/AudioContext';
@@ -246,6 +261,7 @@ const App: React.FC = () => {
       <LanguageProvider>
       <AudioProvider>
         <UserProvider>
+          <GlobalCoinModal />
           <SubscriptionProvider>
             <BooksProvider>
               <HashRouter>

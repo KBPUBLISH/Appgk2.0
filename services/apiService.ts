@@ -1887,6 +1887,95 @@ export const ApiService = {
       return { error: error.message || 'Network error' };
     }
   },
+
+  // ===========================================
+  // REFERRAL SYSTEM
+  // ===========================================
+
+  /**
+   * Sync user's referral code to the backend
+   */
+  syncReferralCode: async (userId: string | null, email: string | null, referralCode: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}referrals/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, email, referralCode }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to sync referral code' };
+      }
+      return { success: true };
+    } catch (error: any) {
+      console.error('❌ Failed to sync referral code:', error);
+      return { success: false, error: error.message || 'Network error' };
+    }
+  },
+
+  /**
+   * Update user's push notification token
+   */
+  updatePushToken: async (userId: string | null, email: string | null, pushToken: string): Promise<{ success: boolean }> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}referrals/update-push-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, email, pushToken }),
+      });
+
+      return { success: response.ok };
+    } catch (error: any) {
+      console.error('❌ Failed to update push token:', error);
+      return { success: false };
+    }
+  },
+
+  /**
+   * Redeem a referral code (validates and notifies owner)
+   */
+  redeemReferralCode: async (
+    code: string, 
+    redeemerUserId?: string, 
+    redeemerEmail?: string, 
+    redeemerName?: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}referrals/redeem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, redeemerUserId, redeemerEmail, redeemerName }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error, message: data.message };
+      }
+      return { success: true, message: data.message };
+    } catch (error: any) {
+      console.error('❌ Failed to redeem referral code:', error);
+      return { success: false, error: 'Network error' };
+    }
+  },
+
+  /**
+   * Validate a referral code without redeeming
+   */
+  validateReferralCode: async (code: string): Promise<{ valid: boolean; ownerInitial?: string }> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}referrals/validate/${encodeURIComponent(code)}`);
+      const data = await response.json();
+      return { valid: data.valid, ownerInitial: data.ownerInitial };
+    } catch (error: any) {
+      console.error('❌ Failed to validate referral code:', error);
+      return { valid: false };
+    }
+  },
 };
 
 // Log API configuration on startup

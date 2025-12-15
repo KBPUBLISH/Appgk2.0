@@ -114,26 +114,64 @@ const HomePage: React.FC = () => {
     } catch { return []; }
   };
   
-  // Lessons state - now using daily planner API (don't use cache - planner is per-day)
-  const [lessons, setLessons] = useState<any[]>([]);
-  const [lessonsLoading, setLessonsLoading] = useState(true);
+  // Lessons state - using daily planner API with sessionStorage cache for navigation
+  const [lessons, setLessons] = useState<any[]>(() => {
+    try {
+      const cached = sessionStorage.getItem('godlykids_home_lessons');
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  });
+  const [lessonsLoading, setLessonsLoading] = useState(() => {
+    // If we have cached lessons, don't show loading initially
+    try {
+      const cached = sessionStorage.getItem('godlykids_home_lessons');
+      return !cached || JSON.parse(cached).length === 0;
+    } catch { return true; }
+  });
   const [weekLessons, setWeekLessons] = useState<Map<string, any>>(new Map());
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(getSelectedDay());
   const todayIndex = getTodayIndex();
   
-  // Daily planner state - reset on mount to avoid stale data
-  const [dayPlans, setDayPlans] = useState<Map<string, any>>(new Map());
-  const loadedDaysRef = useRef<Set<string>>(new Set());
-  const lastProfileRef = useRef<string | null>(null);
+  // Daily planner state - restore from sessionStorage for navigation
+  const [dayPlans, setDayPlans] = useState<Map<string, any>>(() => {
+    try {
+      const cached = sessionStorage.getItem('godlykids_home_dayPlans');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return new Map(Object.entries(parsed));
+      }
+    } catch {}
+    return new Map();
+  });
+  const loadedDaysRef = useRef<Set<string>>(() => {
+    try {
+      const cached = sessionStorage.getItem('godlykids_home_loadedDays');
+      return cached ? new Set(JSON.parse(cached)) : new Set();
+    } catch { return new Set(); }
+  }());
+  const lastProfileRef = useRef<string | null | undefined>(undefined); // undefined = initial mount
   
-  // Reset planner state when profile changes
+  // Reset planner state when profile changes (but not on initial mount)
   useEffect(() => {
+    // Skip the initial mount - let cached data show first
+    if (lastProfileRef.current === undefined) {
+      lastProfileRef.current = currentProfileId;
+      return;
+    }
+    
+    // Only reset if profile actually changed
     if (currentProfileId !== lastProfileRef.current) {
       console.log('📚 Profile changed, resetting planner state');
       lastProfileRef.current = currentProfileId;
       setDayPlans(new Map());
       loadedDaysRef.current = new Set();
       setLessons([]);
+      // Clear cache when profile changes
+      sessionStorage.removeItem('godlykids_home_lessons');
+      sessionStorage.removeItem('godlykids_home_dayPlans');
+      sessionStorage.removeItem('godlykids_home_loadedDays');
+      // Trigger a refetch for the new profile
+      sessionStorage.removeItem('godlykids_home_last_fetch');
     }
   }, [currentProfileId]);
   
@@ -368,6 +406,27 @@ const HomePage: React.FC = () => {
     }
   };
   
+  // Helper to cache lessons with sessionStorage for navigation persistence
+  const cacheLessons = (lessonsData: any[]) => {
+    try {
+      sessionStorage.setItem('godlykids_home_lessons', JSON.stringify(lessonsData));
+    } catch (e) {
+      console.log('⚠️ Failed to cache lessons');
+    }
+  };
+  
+  // Helper to cache day plans
+  const cacheDayPlans = (plans: Map<string, any>) => {
+    try {
+      const obj: Record<string, any> = {};
+      plans.forEach((value, key) => { obj[key] = value; });
+      sessionStorage.setItem('godlykids_home_dayPlans', JSON.stringify(obj));
+      sessionStorage.setItem('godlykids_home_loadedDays', JSON.stringify([...loadedDaysRef.current]));
+    } catch (e) {
+      console.log('⚠️ Failed to cache day plans');
+    }
+  };
+  
   // Fetch dynamic games from backend
   const fetchDynamicGames = async () => {
     try {
@@ -409,6 +468,8 @@ const HomePage: React.FC = () => {
         setDayPlans(prev => {
           const next = new Map(prev);
           next.set(dateKey, plan);
+          // Cache for navigation persistence
+          setTimeout(() => cacheDayPlans(next), 0);
           return next;
         });
         return plan;
@@ -439,6 +500,7 @@ const HomePage: React.FC = () => {
           // Convert planner slots to lessons array for backward compatibility
           const lessonsFromPlan = plan.slots.map((slot: any) => slot.lesson).filter(Boolean);
           setLessons(lessonsFromPlan);
+          cacheLessons(lessonsFromPlan); // Cache for navigation persistence
           console.log('📚 Lessons from planner:', lessonsFromPlan.length);
         }
       } else {
@@ -769,6 +831,7 @@ const HomePage: React.FC = () => {
                   if (plan && plan.slots) {
                     const lessonsFromPlan = plan.slots.map((slot: any) => slot.lesson).filter(Boolean);
                     setLessons(lessonsFromPlan);
+                    cacheLessons(lessonsFromPlan); // Cache for navigation persistence
                   }
                   setLessonsLoading(false);
                 }
