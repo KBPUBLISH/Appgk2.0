@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ApiService } from '../services/apiService';
-import { Sparkles, Gift, Shield, Heart, Play, ArrowRight, BookOpen, Music, Gamepad2 } from 'lucide-react';
+import { Sparkles, Gift, Shield, Heart, Play, ArrowRight, BookOpen, Music, Gamepad2, Mail } from 'lucide-react';
 
 interface InfluencerData {
     name: string;
@@ -23,6 +23,30 @@ const InfluencerLandingPage: React.FC = () => {
     const [influencer, setInfluencer] = useState<InfluencerData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    
+    // Email for checkout (web only)
+    const [email, setEmail] = useState('');
+    const [emailError, setEmailError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // Detect if we're on web vs native app
+    const [isWebBrowser, setIsWebBrowser] = useState(true);
+    
+    useEffect(() => {
+        // Check platform on mount
+        const checkPlatform = () => {
+            const ua = navigator.userAgent.toLowerCase();
+            const isNative = (window as any).despia || 
+                             ua.includes('despia') || 
+                             ua.includes('wv') || 
+                             ua.includes('webview');
+            const isMobileDevice = /iphone|ipad|ipod|android/.test(ua);
+            
+            // If native app wrapper OR mobile device (likely opening in app), skip email
+            setIsWebBrowser(!isNative && !isMobileDevice);
+        };
+        checkPlatform();
+    }, []);
 
     useEffect(() => {
         const loadInfluencer = async () => {
@@ -40,7 +64,7 @@ const InfluencerLandingPage: React.FC = () => {
                 const data = await ApiService.getInfluencer(code);
                 if (data) {
                     setInfluencer(data);
-                    // Store code in localStorage for attribution during onboarding
+                    // Store code in localStorage for attribution
                     localStorage.setItem('godlykids_influencer_code', code.toUpperCase());
                     localStorage.setItem('godlykids_influencer_name', data.name);
                     localStorage.setItem('godlykids_influencer_discount', String(data.discountPercent));
@@ -58,9 +82,81 @@ const InfluencerLandingPage: React.FC = () => {
         loadInfluencer();
     }, [code]);
 
-    const handleGetStarted = () => {
-        // Navigate to onboarding - the influencer code is already in localStorage
-        navigate('/onboarding');
+    // Detect environment
+    const isNativeApp = (): boolean => {
+        // Check for DeSpia native wrapper
+        if ((window as any).despia) return true;
+        // Check user agent for native app indicators
+        const ua = navigator.userAgent.toLowerCase();
+        if (ua.includes('despia')) return true;
+        // Check for iOS/Android WebView indicators
+        if (ua.includes('wv') || ua.includes('webview')) return true;
+        return false;
+    };
+
+    const getPlatform = (): 'ios' | 'android' | 'web' => {
+        const ua = navigator.userAgent.toLowerCase();
+        if (/iphone|ipad|ipod/.test(ua)) return 'ios';
+        if (/android/.test(ua)) return 'android';
+        return 'web';
+    };
+
+    const validateEmail = (email: string) => {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    };
+
+    const handleStartTrial = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setEmailError(null);
+
+        // For native apps, we don't need email upfront - just go to onboarding
+        const platform = getPlatform();
+        const isNative = isNativeApp();
+
+        if (isNative || platform !== 'web') {
+            // Native app (iOS/Android) - go to onboarding for native IAP
+            console.log(`📱 Native app detected (${platform}) - redirecting to onboarding`);
+            navigate('/onboarding');
+            return;
+        }
+
+        // Web browser - need email for RevenueCat Web Billing
+        if (!email) {
+            setEmailError('Please enter your email address');
+            return;
+        }
+
+        if (!validateEmail(email)) {
+            setEmailError('Please enter a valid email address');
+            return;
+        }
+
+        setIsSubmitting(true);
+
+        try {
+            // Track signup intent with influencer (before redirect to checkout)
+            if (code) {
+                await ApiService.trackInfluencerSignup(code, undefined, email);
+            }
+
+            // Store email for post-checkout
+            localStorage.setItem('godlykids_checkout_email', email);
+
+            // Redirect to RevenueCat Web Billing
+            // The product ID with the discounted price
+            const productId = 'prod3ebe8a0e5a';
+            const checkoutUrl = `https://billing.revenuecat.com/rcb-checkout/${productId}?email=${encodeURIComponent(email)}`;
+            
+            console.log(`🌐 Web browser detected - redirecting to RevenueCat Web Billing`);
+            window.location.href = checkoutUrl;
+        } catch (err) {
+            setEmailError('Something went wrong. Please try again.');
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleSignIn = () => {
+        navigate('/signin');
     };
 
     if (loading) {
@@ -149,18 +245,53 @@ const InfluencerLandingPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* CTA Button */}
-                    <button
-                        onClick={handleGetStarted}
-                        className="w-full py-4 bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-[#1a237e] font-bold text-lg rounded-xl hover:from-[#FFC000] hover:to-[#FF9500] transition-all transform hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2"
-                    >
-                        Get Started Free
-                        <ArrowRight className="w-5 h-5" />
-                    </button>
+                    {/* CTA Form */}
+                    <form onSubmit={handleStartTrial} className="space-y-4">
+                        {/* Email input - only show on web browser */}
+                        {isWebBrowser && (
+                            <div className="relative">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
+                                <input
+                                    type="email"
+                                    placeholder="Enter your email address"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full pl-12 pr-4 py-4 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#FFD700] focus:border-transparent text-center"
+                                    disabled={isSubmitting}
+                                />
+                            </div>
+                        )}
 
-                    <p className="text-white/50 text-xs text-center mt-3">
-                        No credit card required • Cancel anytime
-                    </p>
+                        {emailError && (
+                            <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-3 text-red-200 text-sm text-center">
+                                {emailError}
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="w-full py-4 bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-[#1a237e] font-bold text-lg rounded-xl hover:from-[#FFC000] hover:to-[#FF9500] transition-all transform hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-[#1a237e]/30 border-t-[#1a237e] rounded-full animate-spin"></div>
+                                    Processing...
+                                </>
+                            ) : (
+                                <>
+                                    Start {influencer.trialDays}-Day Free Trial
+                                    <ArrowRight className="w-5 h-5" />
+                                </>
+                            )}
+                        </button>
+
+                        <p className="text-white/50 text-xs text-center">
+                            {isWebBrowser 
+                                ? 'Cancel anytime during your free trial' 
+                                : 'You\'ll complete signup in the app'}
+                        </p>
+                    </form>
                 </div>
 
                 {/* Trust indicators */}
@@ -220,7 +351,7 @@ const InfluencerLandingPage: React.FC = () => {
                 <p className="mt-6 text-white/60 text-sm">
                     Already have an account?{' '}
                     <button 
-                        onClick={() => navigate('/signin')}
+                        onClick={handleSignIn}
                         className="text-[#FFD700] hover:underline font-medium"
                     >
                         Sign in
