@@ -768,6 +768,30 @@ const HomePage: React.FC = () => {
             </div>
           )}
 
+          {/* Switch to Child Account Banner - Shows for parents who have kids */}
+          {currentProfileId === null && kids.length > 0 && (
+            <div 
+              className="rounded-2xl p-6 mb-4 text-center shadow-lg"
+              style={{ background: 'linear-gradient(135deg, #FF6B35 0%, #F7931E 100%)' }}
+            >
+              <div className="text-4xl mb-3">👦👧</div>
+              
+              <h3 className="text-white font-bold text-lg mb-2 font-display">
+                Switch to Your Child's Account
+              </h3>
+              <p className="text-white/90 text-sm mb-4">
+                Sign into your child's profile to view their personalized daily lessons!
+              </p>
+              
+              <button
+                onClick={() => navigate('/profile')}
+                className="inline-flex items-center gap-2 bg-white text-[#FF6B35] font-bold px-6 py-3 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
+              >
+                Switch Profile
+              </button>
+            </div>
+          )}
+
           {/* Lessons Path - Gamified Learning Path Style */}
           {lessonsLoading ? (
             <div className="text-white/70 text-center py-8 px-4">Loading lessons...</div>

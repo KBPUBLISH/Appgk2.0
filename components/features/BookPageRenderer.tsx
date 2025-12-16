@@ -343,11 +343,13 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                             data-scroll-container="true"
                             className="absolute pointer-events-auto overflow-y-auto p-2 pt-8 group"
                             style={{
-                                left: `${box.x}%`,
+                                // Add safe area padding for landscape mode (notch/Dynamic Island)
+                                // Use calc to ensure minimum 3% from edge + safe area
+                                left: `calc(max(${box.x}%, 3%) + env(safe-area-inset-left, 0px))`,
                                 top: page.scrollUrl 
                                     ? `max(${box.y}%, calc(${scrollTopVal} + 12px))` 
                                     : `${box.y}%`,
-                                width: `${box.width || 30}%`,
+                                width: `min(${box.width || 30}%, calc(100% - max(${box.x}%, 3%) - 3% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)))`,
                                 textAlign: box.alignment || 'left',
                                 color: box.color || '#4a3b2a',
                                 fontFamily: box.fontFamily || 'Comic Sans MS',
