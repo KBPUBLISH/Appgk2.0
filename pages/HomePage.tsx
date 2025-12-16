@@ -759,7 +759,7 @@ const HomePage: React.FC = () => {
               </p>
               
               <button
-                onClick={() => navigate('/create-profile')}
+                onClick={() => navigate('/profile')}
                 className="inline-flex items-center gap-2 bg-white text-[#7C4DFF] font-bold px-6 py-3 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
               >
                 <span className="text-lg">+</span>
