@@ -308,12 +308,34 @@ export const getLessonsForDay = (lessons: any[], dayIndex: number): any[] => {
     if (!targetDate) return [];
     
     const targetDateStr = toLocalDateKey(targetDate);
-    
-    return lessons.filter(lesson => {
-        if (!lesson.scheduledDate) return false;
+
+    // 1) Prefer explicitly scheduled lessons for that calendar date
+    const scheduledForDay = lessons.filter(lesson => {
+        if (!lesson?.scheduledDate) return false;
         const lessonDateStr = toLocalDateKey(new Date(lesson.scheduledDate));
         return lessonDateStr === targetDateStr;
     });
+    if (scheduledForDay.length > 0) return scheduledForDay;
+
+    // 2) Fallback: many legacy "published" lessons have no scheduledDate.
+    // Distribute them across the week deterministically so kids always see content.
+    const unscheduledPublished = lessons
+        .filter(l => l && l.status === 'published' && !l.scheduledDate)
+        .sort((a, b) => {
+            const ao = Number.isFinite(a?.order) ? a.order : 0;
+            const bo = Number.isFinite(b?.order) ? b.order : 0;
+            if (ao !== bo) return ao - bo;
+            const at = new Date(a?.publishedDate || a?.createdAt || 0).getTime();
+            const bt = new Date(b?.publishedDate || b?.createdAt || 0).getTime();
+            return bt - at;
+        });
+
+    // Put items into buckets by index % 7
+    const bucketed: any[] = [];
+    for (let i = 0; i < unscheduledPublished.length; i++) {
+        if (i % 7 === safeIndex) bucketed.push(unscheduledPublished[i]);
+    }
+    return bucketed;
 };
 
 /**

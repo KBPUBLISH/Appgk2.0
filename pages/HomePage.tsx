@@ -754,7 +754,7 @@ const HomePage: React.FC = () => {
               setSelectedDayIndex(dayIndex);
               setSelectedDay(dayIndex);
             }}
-            dayCompletions={[0, 1, 2, 3, 4].map(i => isDayComplete(lessons, i))}
+            dayCompletions={[0, 1, 2, 3, 4, 5, 6].map(i => isDayComplete(lessons, i))}
             todayIndex={todayIndex}
           />
 
