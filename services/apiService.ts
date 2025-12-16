@@ -1483,7 +1483,18 @@ export const ApiService = {
   getLessons: async (): Promise<any[]> => {
     const cacheKey = 'lessons';
     const cached = getCached<any[]>(cacheKey);
-    if (cached) return cached;
+    // IMPORTANT:
+    // Never short-circuit on a cached EMPTY array. If we cache an empty response once
+    // (e.g. transient backend issue), it would prevent future fetches until TTL expires,
+    // and makes it look like "lessons never load" (and backend never sees /lessons calls).
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    if (cached && Array.isArray(cached) && cached.length === 0) {
+      try {
+        localStorage.removeItem(`${API_CACHE_PREFIX}${cacheKey}`);
+      } catch {
+        // ignore
+      }
+    }
 
     try {
       const baseUrl = getApiBaseUrl();
@@ -1504,7 +1515,16 @@ export const ApiService = {
         } else {
           result = Array.isArray(data) ? data : [];
         }
-        setCache(cacheKey, result);
+        // Cache only if non-empty to avoid trapping empty lists.
+        if (Array.isArray(result) && result.length > 0) {
+          setCache(cacheKey, result);
+        } else {
+          try {
+            localStorage.removeItem(`${API_CACHE_PREFIX}${cacheKey}`);
+          } catch {
+            // ignore
+          }
+        }
         return result;
       }
 

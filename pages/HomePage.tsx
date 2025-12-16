@@ -316,9 +316,12 @@ const HomePage: React.FC = () => {
 
   // Fetch lessons, categories, playlists, featured content, and games
   // With debounce to prevent excessive refetching when app comes back from background
+  // IMPORTANT: debounce is per-profile so switching parent<->kid always triggers fetch.
   useEffect(() => {
     const now = Date.now();
-    const lastFetchTimeStr = sessionStorage.getItem('godlykids_home_last_fetch');
+    const profileKey = currentProfileId ?? 'parent';
+    const lastFetchKey = `godlykids_home_last_fetch_${profileKey}`;
+    const lastFetchTimeStr = sessionStorage.getItem(lastFetchKey);
     const lastFetch = lastFetchTimeStr ? parseInt(lastFetchTimeStr, 10) : 0;
     const timeSinceLastFetch = now - lastFetch;
     
@@ -329,8 +332,7 @@ const HomePage: React.FC = () => {
     // Skip if we fetched recently AND we have cached data
     // Always fetch if cache is empty (even within debounce window)
     if (timeSinceLastFetch < FETCH_DEBOUNCE_MS && lastFetch > 0 && hasLessonsData) {
-      console.log(`⏸️ HomePage: Using cached data, last fetch was ${Math.round(timeSinceLastFetch / 1000)}s ago, cached lessons: ${cachedLessons.length}`);
-      // Use cached data
+      console.log(`⏸️ HomePage(${profileKey}): Using cached data, last fetch was ${Math.round(timeSinceLastFetch / 1000)}s ago, cached lessons: ${cachedLessons.length}`);
       setLessons(cachedLessons);
       setLessonsLoading(false);
       setCategoriesLoading(false);
@@ -340,8 +342,8 @@ const HomePage: React.FC = () => {
       return;
     }
     
-    console.log('🔄 HomePage: Fetching all data... (cached lessons:', hasLessonsData ? cachedLessons.length : 0, ')');
-    sessionStorage.setItem('godlykids_home_last_fetch', now.toString());
+    console.log(`🔄 HomePage(${profileKey}): Fetching all data... (cached lessons: ${hasLessonsData ? cachedLessons.length : 0})`);
+    sessionStorage.setItem(lastFetchKey, now.toString());
     
     fetchLessons();
     fetchExploreCategories();
@@ -350,7 +352,7 @@ const HomePage: React.FC = () => {
     fetchTopRatedContent();
     fetchDynamicGames();
     fetchBookSeries();
-  }, []);
+  }, [currentProfileId]);
   
   // Helper to cache data in sessionStorage
   const cacheData = (key: string, data: any[]) => {

@@ -14,16 +14,54 @@ if (!(window as any).__GK_APP_BOOTED__) {
   
   // GLOBAL ERROR HANDLERS - catch ALL JS errors, not just React ones
   window.onerror = (message, source, lineno, colno, error) => {
-    console.error('💥 GLOBAL ERROR:', { message, source, lineno, colno, error: error?.stack });
-    // Prevent white screen - show alert so user knows what happened
+    const details = {
+      name: error?.name || 'Error',
+      message: String(message || ''),
+      source: String(source || ''),
+      lineno: Number(lineno || 0),
+      colno: Number(colno || 0),
+      stack: String(error?.stack || ''),
+      url: window.location.href,
+      userAgent: navigator.userAgent,
+      screen: `${window.innerWidth}x${window.innerHeight}`,
+      devicePixelRatio: window.devicePixelRatio,
+      visibility: document.visibilityState,
+      ts: new Date().toISOString(),
+    };
+    console.error('💥 GLOBAL ERROR:', details);
+
+    // Persist last errors so we can inspect on-device
     try {
+      const existing = JSON.parse(localStorage.getItem('gk_last_errors') || '[]');
+      existing.push(details);
+      localStorage.setItem('gk_last_errors', JSON.stringify(existing.slice(-5)));
+    } catch {}
+
+    // Prevent white screen - show overlay so user knows what happened
+    try {
+      const escapeHtml = (s: any) => String(s ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const errorDiv = document.createElement('div');
+      errorDiv.id = 'gk_global_error_overlay';
       errorDiv.innerHTML = `
         <div style="position:fixed;inset:0;background:#1a3a52;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;padding:20px;text-align:center;">
           <div style="font-size:48px;margin-bottom:16px;">🌊</div>
           <h1 style="color:white;font-size:20px;font-weight:bold;margin-bottom:8px;">Oops! Something went wrong</h1>
-          <p style="color:rgba(255,255,255,0.7);margin-bottom:16px;max-width:280px;">The app hit a wave. Tap to refresh.</p>
-          <button onclick="location.reload()" style="background:linear-gradient(to right,#FFD700,#FFA500);color:#3E1F07;font-weight:bold;padding:12px 32px;border-radius:9999px;border:none;">Refresh</button>
+          <p style="color:rgba(255,255,255,0.7);margin-bottom:12px;max-width:320px;">Tap “Show details” and screenshot it.</p>
+
+          <button onclick="var el=document.getElementById('gk_err'); if(el) el.style.display='block';"
+            style="background:rgba(255,255,255,0.15);color:white;font-weight:bold;padding:10px 18px;border-radius:9999px;border:none;margin-bottom:10px;">
+            Show details
+          </button>
+
+          <pre id="gk_err" style="display:none;white-space:pre-wrap;text-align:left;max-width:380px;max-height:240px;overflow:auto;background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.85);padding:12px;border-radius:12px;font-size:12px;">${escapeHtml(JSON.stringify(details, null, 2))}</pre>
+
+          <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;justify-content:center;">
+            <button onclick="try{localStorage.removeItem('gk_api_lessons');}catch(e){}; try{sessionStorage.clear();}catch(e){}; location.reload();"
+              style="background:rgba(255,255,255,0.2);color:white;font-weight:bold;padding:12px 18px;border-radius:9999px;border:none;">
+              Clear cache & reload
+            </button>
+            <button onclick="location.reload()" style="background:linear-gradient(to right,#FFD700,#FFA500);color:#3E1F07;font-weight:bold;padding:12px 24px;border-radius:9999px;border:none;">Refresh</button>
+          </div>
         </div>
       `;
       document.body.appendChild(errorDiv);
@@ -32,7 +70,24 @@ if (!(window as any).__GK_APP_BOOTED__) {
   };
   
   window.onunhandledrejection = (event) => {
-    console.error('💥 UNHANDLED PROMISE REJECTION:', event.reason);
+    const reason = (event as any)?.reason;
+    const details = {
+      type: 'unhandledrejection',
+      message: String(reason?.message || reason || ''),
+      stack: String(reason?.stack || ''),
+      url: window.location.href,
+      userAgent: navigator.userAgent,
+      screen: `${window.innerWidth}x${window.innerHeight}`,
+      devicePixelRatio: window.devicePixelRatio,
+      visibility: document.visibilityState,
+      ts: new Date().toISOString(),
+    };
+    console.error('💥 UNHANDLED PROMISE REJECTION:', details);
+    try {
+      const existing = JSON.parse(localStorage.getItem('gk_last_errors') || '[]');
+      existing.push(details);
+      localStorage.setItem('gk_last_errors', JSON.stringify(existing.slice(-5)));
+    } catch {}
   };
 } else {
   console.log('♻️ APP module re-evaluated but already booted');
