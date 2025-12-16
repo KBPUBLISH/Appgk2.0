@@ -238,5 +238,60 @@ export const getLessonStatus = (lesson: any): 'available' | 'locked' | 'complete
     return 'available';
 };
 
+/**
+ * Get today's index (0 = Monday, 6 = Sunday)
+ */
+export const getTodayIndex = (): number => {
+    const day = new Date().getDay();
+    // Convert from Sunday=0 to Monday=0
+    return day === 0 ? 6 : day - 1;
+};
+
+const SELECTED_DAY_KEY = 'godlykids_selected_day';
+
+/**
+ * Get the currently selected day index (defaults to today)
+ */
+export const getSelectedDay = (): number => {
+    try {
+        const saved = sessionStorage.getItem(SELECTED_DAY_KEY);
+        if (saved !== null) {
+            return parseInt(saved, 10);
+        }
+    } catch (e) {
+        // Ignore
+    }
+    return getTodayIndex();
+};
+
+/**
+ * Set the selected day index
+ */
+export const setSelectedDay = (dayIndex: number): void => {
+    try {
+        sessionStorage.setItem(SELECTED_DAY_KEY, dayIndex.toString());
+    } catch (e) {
+        // Ignore
+    }
+};
+
+/**
+ * Get lessons for a specific day of the week
+ */
+export const getLessonsForDay = (lessons: any[], dayIndex: number): any[] => {
+    const weekDays = getWeekDays();
+    const targetDate = weekDays[dayIndex];
+    
+    if (!targetDate) return [];
+    
+    const targetDateStr = targetDate.toISOString().split('T')[0];
+    
+    return lessons.filter(lesson => {
+        if (!lesson.scheduledDate) return false;
+        const lessonDateStr = new Date(lesson.scheduledDate).toISOString().split('T')[0];
+        return lessonDateStr === targetDateStr;
+    });
+};
+
 // All functions are exported as named exports above
 // No default export to avoid circular dependency issues
