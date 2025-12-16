@@ -109,6 +109,7 @@ const HomePage: React.FC = () => {
     // Clear fetch debounce to allow fresh fetch
     sessionStorage.removeItem('godlykids_home_last_fetch');
   }, [currentProfileId]);
+  
   const [weekLessons, setWeekLessons] = useState<Map<string, any>>(new Map());
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(getSelectedDay());
   const todayIndex = getTodayIndex();
@@ -321,10 +322,16 @@ const HomePage: React.FC = () => {
     const lastFetch = lastFetchTimeStr ? parseInt(lastFetchTimeStr, 10) : 0;
     const timeSinceLastFetch = now - lastFetch;
     
-    // Skip if we fetched recently (prevents memory spikes from rapid refetches)
-    if (timeSinceLastFetch < FETCH_DEBOUNCE_MS && lastFetch > 0) {
-      console.log(`⏸️ HomePage: Skipping fetch, last fetch was ${Math.round(timeSinceLastFetch / 1000)}s ago`);
-      // Still set loading to false since we're using cached data
+    // Get cached lessons to check if we have data
+    const cachedLessons = getCached('lessons');
+    const hasLessonsData = cachedLessons && cachedLessons.length > 0;
+    
+    // Skip if we fetched recently AND we have cached data
+    // Always fetch if cache is empty (even within debounce window)
+    if (timeSinceLastFetch < FETCH_DEBOUNCE_MS && lastFetch > 0 && hasLessonsData) {
+      console.log(`⏸️ HomePage: Using cached data, last fetch was ${Math.round(timeSinceLastFetch / 1000)}s ago, cached lessons: ${cachedLessons.length}`);
+      // Use cached data
+      setLessons(cachedLessons);
       setLessonsLoading(false);
       setCategoriesLoading(false);
       setPlaylistsLoading(false);
@@ -333,7 +340,7 @@ const HomePage: React.FC = () => {
       return;
     }
     
-    console.log('🔄 HomePage: Fetching all data...');
+    console.log('🔄 HomePage: Fetching all data... (cached lessons:', hasLessonsData ? cachedLessons.length : 0, ')');
     sessionStorage.setItem('godlykids_home_last_fetch', now.toString());
     
     fetchLessons();
@@ -423,6 +430,23 @@ const HomePage: React.FC = () => {
       setLessonsLoading(false);
     }
   };
+
+  // Handle app resume from background (iOS) - fetch lessons if cache is empty
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('📱 App became visible again');
+        const cachedLessons = getCached('lessons');
+        if (!cachedLessons || cachedLessons.length === 0) {
+          console.log('📱 No cached lessons on resume, fetching...');
+          fetchLessons();
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   const getDayLabel = (date: Date): string => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
