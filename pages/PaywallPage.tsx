@@ -80,8 +80,43 @@ const PaywallPage: React.FC = () => {
     try {
       console.log('🔄 Starting restore purchases...');
       console.log('🔄 isNativeApp:', isNativeApp);
+      console.log('🔄 emailToSearch:', emailToSearch);
       
-      // First, try native RevenueCat/DeSpia restore (this asks Apple directly)
+      // IMPORTANT: Store the email BEFORE any restore calls so it can be used for backend checks
+      const user = authService.getUser();
+      const emailForRestore = emailToSearch || user?.email;
+      if (emailForRestore) {
+        console.log('📧 Storing email for restore:', emailForRestore);
+        localStorage.setItem('godlykids_user_email', emailForRestore.toLowerCase().trim());
+      }
+      
+      // First, check backend directly with the email (fastest path)
+      const baseUrl = getApiBaseUrl();
+      if (emailForRestore) {
+        console.log('🔄 Checking backend for email:', emailForRestore);
+        try {
+          const response = await fetch(`${baseUrl}/api/webhooks/purchase-status/${encodeURIComponent(emailForRestore)}`);
+          if (response.ok) {
+            const data = await response.json();
+            console.log('🔄 Backend response for email:', data);
+            if (data.isPremium) {
+              console.log('✅ Premium found via email lookup!');
+              localStorage.setItem('godlykids_premium', 'true');
+              subscribe();
+              setMigrationResult({
+                type: 'success',
+                message: 'Your subscription has been restored! 🎉',
+              });
+              setTimeout(() => navigate('/home'), 1500);
+              return;
+            }
+          }
+        } catch (backendError) {
+          console.log('⚠️ Backend check failed:', backendError);
+        }
+      }
+      
+      // Try native RevenueCat/DeSpia restore (this asks Apple directly)
       const result = await restorePurchases(true); // true = trigger native Apple restore
       console.log('🔄 Native restore result:', result);
 
@@ -105,19 +140,14 @@ const PaywallPage: React.FC = () => {
         return;
       }
 
-      // Try migration API with the provided email or current user's email
-      const user = authService.getUser();
-      const emailForMigration = emailToSearch || user?.email;
-      console.log('🔄 Email for migration check:', emailForMigration || 'None');
-      
-      if (emailForMigration) {
-        console.log('🔄 Checking migration API for:', emailForMigration);
-        const baseUrl = getApiBaseUrl();
-        console.log('🔄 Migration API URL:', `${baseUrl}migration/restore-subscription`);
-        const migrationResponse = await fetch(`${baseUrl}migration/restore-subscription`, {
+      // Try migration API for OLD app users
+      if (emailForRestore) {
+        console.log('🔄 Checking migration API for:', emailForRestore);
+        console.log('🔄 Migration API URL:', `${baseUrl}/api/migration/restore-subscription`);
+        const migrationResponse = await fetch(`${baseUrl}/api/migration/restore-subscription`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: emailForMigration }),
+          body: JSON.stringify({ email: emailForRestore }),
         });
 
         const migrationData = await migrationResponse.json();
@@ -128,18 +158,18 @@ const PaywallPage: React.FC = () => {
           subscribe();
           setMigrationResult({
             type: 'success',
-            message: `Welcome back! Your subscription for ${emailForMigration} has been restored! 🎉`,
+            message: `Welcome back! Your subscription for ${emailForRestore} has been restored! 🎉`,
           });
           setTimeout(() => navigate('/home'), 2000);
           return;
         } else if (migrationData.found) {
           setMigrationResult({
             type: 'info',
-            message: migrationData.message || `Account found for ${emailForMigration} but subscription has expired.`,
+            message: migrationData.message || `Account found for ${emailForRestore} but subscription has expired.`,
           });
           return;
         } else {
-          setError(`No subscription found for ${emailForMigration}. Please contact hello@kbpublish.org if you believe this is an error.`);
+          setError(`No subscription found for ${emailForRestore}. Please contact hello@kbpublish.org if you believe this is an error.`);
           return;
         }
       }

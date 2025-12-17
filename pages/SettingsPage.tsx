@@ -101,7 +101,7 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  // Handle restore purchases from old Godly Kids app
+  // Handle restore purchases - checks RevenueCat/backend first, then migration API for old app
   const handleRestorePurchases = async () => {
     setIsRestoring(true);
     setRestoreResult(null);
@@ -119,25 +119,53 @@ const SettingsPage: React.FC = () => {
         return;
       }
 
-      console.log('🔄 Restore: Calling API for email:', user.email);
+      const userEmail = user.email.toLowerCase().trim();
+      console.log('🔄 Restore: Checking for email:', userEmail);
       const baseUrl = getApiBaseUrl();
-      const response = await fetch(`${baseUrl}migration/restore-subscription`, {
+      
+      // FIRST: Check RevenueCat/backend subscription status
+      console.log('🔄 Restore: Checking backend purchase-status...');
+      try {
+        const purchaseStatusResponse = await fetch(`${baseUrl}/api/webhooks/purchase-status/${encodeURIComponent(userEmail)}`);
+        if (purchaseStatusResponse.ok) {
+          const purchaseData = await purchaseStatusResponse.json();
+          console.log('🔄 Restore: Purchase status response:', purchaseData);
+          
+          if (purchaseData.isPremium) {
+            // Found active subscription in backend!
+            localStorage.setItem('godlykids_premium', 'true');
+            setIsSubscribed(true);
+            setRestoreResult({
+              type: 'success',
+              message: 'Your subscription has been restored! Welcome back! 🎉',
+            });
+            return;
+          }
+        }
+      } catch (purchaseError) {
+        console.log('⚠️ Purchase status check failed:', purchaseError);
+      }
+      
+      // SECOND: Try migration API for old Godly Kids 1.0 users
+      console.log('🔄 Restore: Checking migration API for old app subscription...');
+      const response = await fetch(`${baseUrl}/api/migration/restore-subscription`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: user.email }),
+        body: JSON.stringify({ email: userEmail }),
       });
 
       const data = await response.json();
-      console.log('🔄 Restore: API response:', data);
+      console.log('🔄 Restore: Migration API response:', data);
 
       if (!response.ok) {
         throw new Error(data.message || 'Failed to restore purchases');
       }
 
       if (data.subscriptionRestored) {
-        // Successfully restored subscription
+        // Successfully restored subscription from old app
+        localStorage.setItem('godlykids_premium', 'true');
         setIsSubscribed(true);
         setRestoreResult({
           type: 'success',
