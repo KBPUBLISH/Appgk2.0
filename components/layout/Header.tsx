@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Crown } from 'lucide-react';
+import { Crown, FileText } from 'lucide-react';
 const ShopModal = lazy(() => import('../features/ShopModal'));
 import AvatarDetailModal from '../features/AvatarDetailModal';
 import CoinHistoryModal from '../features/CoinHistoryModal';
+import ReportCardModal from '../features/ReportCardModal';
 import { useUser } from '../../context/UserContext';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { AVATAR_ASSETS } from '../avatar/AvatarAssets';
@@ -21,6 +22,7 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
   const [isShopOpen, setIsShopOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isCoinHistoryOpen, setIsCoinHistoryOpen] = useState(false);
+  const [isReportCardOpen, setIsReportCardOpen] = useState(false);
 
   // Check for openShop in navigation state
   useEffect(() => {
@@ -116,6 +118,15 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
                 </span>
               </button>
 
+              {/* Report Card Button */}
+              <button
+                onClick={() => setIsReportCardOpen(true)}
+                className="bg-[#2E7D32] hover:bg-[#388E3C] px-2 py-1.5 rounded-lg border-2 border-[#1B5E20] shadow-[0_4px_0_#0D3811] active:translate-y-[2px] active:shadow-none transition-all relative group flex items-center justify-center"
+                title="View Report Card"
+              >
+                <FileText className="w-5 h-5 text-white/90 group-hover:text-white transition-colors" />
+              </button>
+
               {/* Shop Sign Button */}
               <button
                 onClick={() => setIsShopOpen(true)}
@@ -158,6 +169,7 @@ const Header: React.FC<HeaderProps> = ({ isVisible, title = "GODLY KIDS" }) => {
         onOpenShop={() => setIsShopOpen(true)}
       />
       <AvatarDetailModal isOpen={isDetailOpen} onClose={() => setIsDetailOpen(false)} onEdit={() => setIsShopOpen(true)} />
+      <ReportCardModal isOpen={isReportCardOpen} onClose={() => setIsReportCardOpen(false)} />
     </>
   );
 };
