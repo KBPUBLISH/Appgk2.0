@@ -104,27 +104,49 @@ const SimplePagePreview: React.FC<{
         decoding="async"
       />
       
-      {/* Page image (fades in on top) */}
+      {/* Page image or video (fades in on top) */}
       {isActive && pageUrl && (
-        <img
-          src={pageUrl}
-          alt="Book page"
-          loading="eager"
-          decoding="async"
-          onLoad={() => setPageLoaded(true)}
-          onError={() => {
-            // Recover: drop bad cache + fall back to cover
-            try {
-              localStorage.removeItem(`gk_page_${bookId}`);
-            } catch {}
-            setShowPage(false);
-            setPageLoaded(false);
-            setPageUrl(null);
-          }}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
-            showPage ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
+        /\.(mp4|webm|mov|m4v)$/i.test(pageUrl) ? (
+          <video
+            src={pageUrl}
+            autoPlay
+            loop
+            muted
+            playsInline
+            onLoadedData={() => setPageLoaded(true)}
+            onError={() => {
+              try {
+                localStorage.removeItem(`gk_page_${bookId}`);
+              } catch {}
+              setShowPage(false);
+              setPageLoaded(false);
+              setPageUrl(null);
+            }}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+              showPage ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        ) : (
+          <img
+            src={pageUrl}
+            alt="Book page"
+            loading="eager"
+            decoding="async"
+            onLoad={() => setPageLoaded(true)}
+            onError={() => {
+              // Recover: drop bad cache + fall back to cover
+              try {
+                localStorage.removeItem(`gk_page_${bookId}`);
+              } catch {}
+              setShowPage(false);
+              setPageLoaded(false);
+              setPageUrl(null);
+            }}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+              showPage ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        )
       )}
       
       {/* Page edge effect when showing page */}
