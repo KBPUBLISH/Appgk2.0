@@ -471,8 +471,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const App: React.FC = () => {
-  // Initialize OneSignal notifications
+  // Check if we're in DeSpia wrapper - if so, skip risky initializations
+  const isDespia = typeof navigator !== 'undefined' && /despia/i.test(navigator.userAgent || '');
+
+  // Initialize OneSignal notifications (skip in DeSpia)
   useEffect(() => {
+    if (isDespia) {
+      console.log('⏭️ Skipping NotificationService in DeSpia');
+      try { (window as any).__GK_TRACE__?.('notifications_init_done', { reason: 'despia_skip' }); } catch {}
+      return;
+    }
     (async () => {
       try {
         try { (window as any).__GK_TRACE__?.('notifications_init_start'); } catch {}
@@ -483,10 +491,15 @@ const App: React.FC = () => {
         console.error('❌ NotificationService.init crashed:', e);
       }
     })();
-  }, []);
+  }, [isDespia]);
 
-  // Initialize activity tracking for Report Card
+  // Initialize activity tracking for Report Card (skip in DeSpia to avoid visibility handler issues)
   useEffect(() => {
+    if (isDespia) {
+      console.log('⏭️ Skipping activity tracking in DeSpia');
+      try { (window as any).__GK_TRACE__?.('activity_tracking_skip', { reason: 'despia' }); } catch {}
+      return;
+    }
     try { (window as any).__GK_TRACE__?.('activity_tracking_start'); } catch {}
     activityTrackingService.startTimeTracking();
     
@@ -494,7 +507,7 @@ const App: React.FC = () => {
       try { (window as any).__GK_TRACE__?.('activity_tracking_stop'); } catch {}
       activityTrackingService.stopTimeTracking();
     };
-  }, []);
+  }, [isDespia]);
 
   return (
     <ErrorBoundary>
