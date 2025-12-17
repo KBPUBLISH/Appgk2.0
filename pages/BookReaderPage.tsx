@@ -1324,11 +1324,11 @@ const BookReaderPage: React.FC = () => {
                             return;
                         }
                         
-                        const processedText = processTextWithEmotionalCues(textToSpeak);
+                        const processed = processTextWithEmotionalCues(textToSpeak);
                         // For non-English, strip emotional cues (multilingual model doesn't support them)
                         const ttsText = currentLang !== 'en' 
                             ? removeEmotionalCues(textToSpeak) 
-                            : processedText.ttsText;
+                            : processed.processedText;
                         
                         console.log(`🎤 Preloading TTS for page ${pageIndex + 1} in ${currentLang}: "${ttsText.substring(0, 50)}..."`);
                         

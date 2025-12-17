@@ -3,8 +3,11 @@
  * Handles emotional cues and text formatting for TTS
  */
 
-// Regex to match emotional cues like [happy], [sad], [excited], etc.
-const EMOTIONAL_CUE_REGEX = /\[([a-zA-Z]+)\]/g;
+// Regex to match emotional cues - supports:
+// - Single word: [happy], [sad], [laughs]
+// - Multi-word: [long pause], [clears throat], [gentle wind breeze]
+// - With special chars: [excitedly], [whispers softly]
+const EMOTIONAL_CUE_REGEX = /\[[^\]]+\]/g;
 
 /**
  * Process text with emotional cues for TTS
@@ -19,26 +22,30 @@ export function processTextWithEmotionalCues(text: string): {
   
   // Find all emotional cues
   let match;
-  while ((match = EMOTIONAL_CUE_REGEX.exec(text)) !== null) {
+  const regex = /\[[^\]]+\]/g; // Use fresh regex instance
+  while ((match = regex.exec(text)) !== null) {
     emotions.push({
-      emotion: match[1].toLowerCase(),
+      emotion: match[0].replace(/[\[\]]/g, '').toLowerCase(),
       position: match.index - position,
     });
     position += match[0].length;
   }
   
   // Remove emotional cues from text for clean TTS
-  const processedText = text.replace(EMOTIONAL_CUE_REGEX, '').trim();
+  const processedText = text.replace(EMOTIONAL_CUE_REGEX, '').replace(/\s+/g, ' ').trim();
   
   return { processedText, emotions };
 }
 
 /**
  * Remove emotional cues from text
- * Returns clean text without any [emotion] markers
+ * Returns clean text without any [bracketed content] markers
  */
 export function removeEmotionalCues(text: string): string {
-  return text.replace(EMOTIONAL_CUE_REGEX, '').trim();
+  return text
+    .replace(EMOTIONAL_CUE_REGEX, '') // Remove [bracketed content]
+    .replace(/\s+/g, ' ') // Normalize multiple spaces to single
+    .trim();
 }
 
 /**
