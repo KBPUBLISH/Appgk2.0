@@ -1364,27 +1364,33 @@ const BookReaderPage: React.FC = () => {
         }
     };
 
+    // Track previous language to detect changes
+    const prevLanguageRef = useRef<string>(selectedLanguage);
+    
     // Trigger audio preloading when page changes, voice changes, language changes, or translations load
     useEffect(() => {
+        const currentLang = selectedLanguageRef.current;
+        
+        // Check if language actually changed
+        if (prevLanguageRef.current !== currentLang) {
+            // Clear the audio cache when language changes (BEFORE preloading)
+            audioPreloadCacheRef.current.clear();
+            preloadingInProgressRef.current.clear();
+            console.log(`🌐 Language changed from ${prevLanguageRef.current} to ${currentLang}, cleared audio cache`);
+            prevLanguageRef.current = currentLang;
+        }
+        
         if (pages.length > 0 && selectedVoiceId) {
             // For non-English, only preload when translations are ready
-            const currentLang = selectedLanguageRef.current;
             if (currentLang !== 'en' && translatedContent.size === 0) {
                 console.log(`⏳ Waiting for translations before preloading audio (${currentLang})`);
                 return;
             }
             // Start preloading from current page
+            console.log(`🎵 Starting audio preload for ${currentLang}, page ${currentPageIndex + 1}`);
             preloadUpcomingAudio(currentPageIndex);
         }
     }, [currentPageIndex, selectedVoiceId, pages.length, selectedLanguage, translatedContent.size]);
-
-    // Clear audio cache when language changes (to force re-generation with new language)
-    useEffect(() => {
-        // Clear the preloaded audio cache when language changes
-        audioPreloadCacheRef.current.clear();
-        preloadingInProgressRef.current.clear();
-        console.log(`🌐 Language changed to ${selectedLanguage}, cleared audio cache`);
-    }, [selectedLanguage]);
 
     // Preload background images/videos for upcoming pages to prevent black flash
     const preloadBackgrounds = (startPageIndex: number) => {
