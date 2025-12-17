@@ -45,47 +45,60 @@ if (!(window as any).__GK_APP_BOOTED__) {
     );
   } catch {}
 
-  // In native wrappers, proactively unregister OneSignal SW to avoid stale-cache chunk failures on resume.
+  // In native wrappers (DeSpia/WKWebView), aggressively clear SW/caches.
+  // iOS WebViews are particularly prone to stale-cache "Script error" crashes on resume after deploys.
   try {
     // Manual override (for testing): localStorage.setItem('gk_force_onesignal', '1')
     let forceOneSignal = false;
     try {
       forceOneSignal = localStorage.getItem('gk_force_onesignal') === '1';
     } catch {}
-    if (forceOneSignal) {
-      // If you force-enable OneSignal, don't unregister its SW/caches.
-      // (This may reintroduce crash-on-resume in some iOS app shells.)
-    } else {
-    const ua = navigator.userAgent || '';
-    const platform = (navigator as any).platform || '';
-    const isIOS =
-      /iPad|iPhone|iPod/i.test(ua) ||
-      /iPad|iPhone|iPod/i.test(platform) ||
-      ((navigator as any).platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
-    const isCustomAppUA = /despia/i.test(ua);
-    const uaLower = ua.toLowerCase();
-    const isWKWebViewWrapper = uaLower.includes('wkwebview') && !uaLower.includes('safari');
+    if (!forceOneSignal) {
+      const ua = navigator.userAgent || '';
+      const platform = (navigator as any).platform || '';
+      const isIOS =
+        /iPad|iPhone|iPod/i.test(ua) ||
+        /iPad|iPhone|iPod/i.test(platform) ||
+        ((navigator as any).platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
+      const isCustomAppUA = /despia/i.test(ua);
+      const uaLower = ua.toLowerCase();
+      const isWKWebViewWrapper = uaLower.includes('wkwebview') && !uaLower.includes('safari');
 
-    // IMPORTANT: the app wrapper UA may not include "iPhone", so don't gate on isIOS for the custom-UA case.
-    if ((isCustomAppUA || (isIOS && isWKWebViewWrapper)) && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations?.().then((regs) => {
-        regs?.forEach((reg) => {
-          const scriptURL = (reg as any)?.active?.scriptURL || '';
-          if (scriptURL.includes('OneSignal') || scriptURL.includes('onesignal')) {
-            reg.unregister().catch(() => {});
+      // IMPORTANT: the app wrapper UA may not include "iPhone", so don't gate on isIOS for the custom-UA case.
+      const isNativeWrapper = isCustomAppUA || (isIOS && isWKWebViewWrapper);
+      if (isNativeWrapper) {
+        // Strip OneSignal/IDCC query params (often added on push-open). These can re-trigger broken flows.
+        try {
+          const url = new URL(window.location.href);
+          const before = url.toString();
+          Array.from(url.searchParams.keys()).forEach((k) => {
+            if (/^onesignal/i.test(k) || /^idcc/i.test(k)) url.searchParams.delete(k);
+          });
+          if (url.toString() !== before) {
+            window.history.replaceState({}, '', url.toString());
           }
-        });
-      });
+        } catch {}
 
-      // Also drop OneSignal-related caches when possible (stale SW + caches can cause resume crashes).
-      (window as any).caches?.keys?.().then((keys: string[]) => {
-        keys?.forEach((key) => {
-          if (/onesignal/i.test(key)) {
-            (window as any).caches.delete(key).catch?.(() => {});
+        // Unregister ALL service workers in wrappers (we don't want SW caching in WebViews).
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations?.().then((regs) => {
+            regs?.forEach((reg) => reg.unregister().catch(() => {}));
+          }).catch?.(() => {});
+        }
+
+        // Clear all caches in wrappers.
+        (window as any).caches?.keys?.().then((keys: string[]) => {
+          keys?.forEach((key) => (window as any).caches.delete(key).catch?.(() => {}));
+        }).catch?.(() => {});
+
+        // Clear OneSignal-related localStorage keys (defensive).
+        try {
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i) || '';
+            if (/onesignal/i.test(k) || /^idcc/i.test(k)) localStorage.removeItem(k);
           }
-        });
-      }).catch?.(() => {});
-    }
+        } catch {}
+      }
     }
   } catch {}
   
