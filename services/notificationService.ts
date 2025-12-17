@@ -1,14 +1,23 @@
-import OneSignal from 'react-onesignal';
+// OneSignal is dynamically imported to prevent loading Web SDK in Despia native app
+// The native app uses the Despia native OneSignal SDK instead
 
 // OneSignal App ID - set via environment variable
 const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID || '';
 
 let isInitialized = false;
+let OneSignal: any = null;
+
+const isDespia = (): boolean => {
+  if (typeof navigator === 'undefined') return false;
+  return navigator.userAgent.toLowerCase().includes('despia');
+};
 
 const shouldDisableOneSignal = (): boolean => {
   try {
-    // Some environments (iOS WKWebView / certain "app shell" wrappers) can crash on resume
-    // due to OneSignal Web SDK script behavior. We prefer stability over push here.
+    // Always disable the OneSignal *web* SDK inside our native wrapper UA.
+    // Notifications are handled by the native wrapper (OneSignal iOS/Android SDK via Despia).
+    if (isDespia()) return true;
+
     const ua = navigator.userAgent || '';
     const isIOS =
       /iPad|iPhone|iPod/i.test(ua) ||
@@ -17,18 +26,12 @@ const shouldDisableOneSignal = (): boolean => {
     const isStandalone =
       window.matchMedia?.('(display-mode: standalone)')?.matches ||
       (navigator as any).standalone === true;
-    const isCustomAppUA = /despia/i.test(ua);
-
-    // Always disable the OneSignal *web* SDK inside our native wrapper UA.
-    // Notifications should be handled by the native wrapper (OneSignal iOS SDK),
-    // and the web SDK can crash or behave unpredictably in WKWebView.
-    if (isCustomAppUA) return true;
 
     // If push isn't supported, don't initialize.
     const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window;
     if (!pushSupported) return true;
 
-    // Disable on iOS standalone (most crash-prone) and on our custom app UA.
+    // Disable on iOS standalone (most crash-prone).
     if (isIOS && isStandalone) return true;
 
     return false;
@@ -38,14 +41,39 @@ const shouldDisableOneSignal = (): boolean => {
   }
 };
 
+// Dynamically load OneSignal only when needed (not in Despia)
+const loadOneSignal = async (): Promise<any> => {
+  if (OneSignal) return OneSignal;
+  if (isDespia()) return null;
+  
+  try {
+    const module = await import('react-onesignal');
+    OneSignal = module.default;
+    return OneSignal;
+  } catch (error) {
+    console.error('Failed to load OneSignal:', error);
+    return null;
+  }
+};
+
 export const NotificationService = {
   /**
    * Initialize OneSignal
    * Call this once when the app loads
+   * 
+   * In Despia: This does nothing - native SDK handles push via DespiaService.setOneSignalUserId()
+   * On Web: Loads and initializes the OneSignal Web SDK
    */
   init: async (): Promise<boolean> => {
     // Log trace for debugging
     try { (window as any).__GK_TRACE__?.('notifications_init_start'); } catch {}
+
+    // Skip entirely in Despia - native SDK handles push
+    if (isDespia()) {
+      console.log('📱 Despia detected - using native OneSignal SDK (skipping web SDK)');
+      try { (window as any).__GK_TRACE__?.('notifications_init_done', { reason: 'despia_native' }); } catch {}
+      return false;
+    }
 
     if (isInitialized || !ONESIGNAL_APP_ID) {
       if (!ONESIGNAL_APP_ID) {
@@ -62,7 +90,14 @@ export const NotificationService = {
     }
 
     try {
-      await OneSignal.init({
+      // Dynamically import OneSignal only when needed
+      const OS = await loadOneSignal();
+      if (!OS) {
+        console.warn('⚠️ OneSignal could not be loaded');
+        return false;
+      }
+
+      await OS.init({
         appId: ONESIGNAL_APP_ID,
         allowLocalhostAsSecureOrigin: true, // For development
         notifyButton: {
@@ -92,7 +127,7 @@ export const NotificationService = {
       });
 
       isInitialized = true;
-      console.log('✅ OneSignal initialized successfully');
+      console.log('✅ OneSignal Web SDK initialized successfully');
       return true;
     } catch (error) {
       console.error('❌ OneSignal initialization failed:', error);
@@ -104,8 +139,10 @@ export const NotificationService = {
    * Prompt user to subscribe to notifications
    */
   promptForPermission: async (): Promise<void> => {
+    if (isDespia()) return; // Native SDK handles this
     try {
-      await OneSignal.Slidedown.promptPush();
+      const OS = await loadOneSignal();
+      if (OS) await OS.Slidedown.promptPush();
     } catch (error) {
       console.error('Error prompting for notification permission:', error);
     }
@@ -115,8 +152,11 @@ export const NotificationService = {
    * Check if user is subscribed
    */
   isSubscribed: async (): Promise<boolean> => {
+    if (isDespia()) return false; // Can't check native subscription from web
     try {
-      return await OneSignal.User.PushSubscription.optedIn;
+      const OS = await loadOneSignal();
+      if (!OS) return false;
+      return await OS.User.PushSubscription.optedIn;
     } catch (error) {
       console.error('Error checking subscription status:', error);
       return false;
@@ -127,8 +167,11 @@ export const NotificationService = {
    * Get the user's OneSignal Player ID (for targeting specific users)
    */
   getPlayerId: async (): Promise<string | null> => {
+    if (isDespia()) return null; // Native SDK handles player ID
     try {
-      return await OneSignal.User.PushSubscription.id || null;
+      const OS = await loadOneSignal();
+      if (!OS) return null;
+      return await OS.User.PushSubscription.id || null;
     } catch (error) {
       console.error('Error getting player ID:', error);
       return null;
@@ -139,8 +182,11 @@ export const NotificationService = {
    * Set external user ID (link to your user system)
    */
   setExternalUserId: async (userId: string): Promise<void> => {
+    if (isDespia()) return; // Use DespiaService.setOneSignalUserId() instead
     try {
-      await OneSignal.login(userId);
+      const OS = await loadOneSignal();
+      if (!OS) return;
+      await OS.login(userId);
       console.log('✅ External user ID set:', userId);
     } catch (error) {
       console.error('Error setting external user ID:', error);
@@ -151,8 +197,11 @@ export const NotificationService = {
    * Add tags to the user (for segmentation)
    */
   setTags: async (tags: Record<string, string>): Promise<void> => {
+    if (isDespia()) return;
     try {
-      await OneSignal.User.addTags(tags);
+      const OS = await loadOneSignal();
+      if (!OS) return;
+      await OS.User.addTags(tags);
       console.log('✅ Tags set:', tags);
     } catch (error) {
       console.error('Error setting tags:', error);
@@ -163,8 +212,11 @@ export const NotificationService = {
    * Remove tags from the user
    */
   removeTags: async (tagKeys: string[]): Promise<void> => {
+    if (isDespia()) return;
     try {
-      await OneSignal.User.removeTags(tagKeys);
+      const OS = await loadOneSignal();
+      if (!OS) return;
+      await OS.User.removeTags(tagKeys);
     } catch (error) {
       console.error('Error removing tags:', error);
     }
@@ -174,8 +226,11 @@ export const NotificationService = {
    * Opt out of notifications
    */
   optOut: async (): Promise<void> => {
+    if (isDespia()) return;
     try {
-      await OneSignal.User.PushSubscription.optOut();
+      const OS = await loadOneSignal();
+      if (!OS) return;
+      await OS.User.PushSubscription.optOut();
       console.log('✅ User opted out of notifications');
     } catch (error) {
       console.error('Error opting out:', error);
@@ -186,8 +241,11 @@ export const NotificationService = {
    * Opt back in to notifications
    */
   optIn: async (): Promise<void> => {
+    if (isDespia()) return;
     try {
-      await OneSignal.User.PushSubscription.optIn();
+      const OS = await loadOneSignal();
+      if (!OS) return;
+      await OS.User.PushSubscription.optIn();
       console.log('✅ User opted in to notifications');
     } catch (error) {
       console.error('Error opting in:', error);
@@ -196,6 +254,3 @@ export const NotificationService = {
 };
 
 export default NotificationService;
-
-
-
