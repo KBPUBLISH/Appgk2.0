@@ -2256,6 +2256,21 @@ const BookReaderPage: React.FC = () => {
                                             No voices available
                                         </div>
                                     )}
+
+                                    {/* Unlock New Voice Button - Always visible */}
+                                    <div className="border-t border-white/20 mt-1 pt-1">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowVoiceDropdown(false);
+                                                navigate('/profile', { state: { openShop: true, shopTab: 'voices' } });
+                                            }}
+                                            className="w-full px-4 py-3 text-sm font-bold text-[#FFD700] hover:bg-[#FFD700]/10 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <Sparkles className="w-4 h-4" />
+                                            <span>Unlock New Voices</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
