@@ -12,74 +12,6 @@ if (!(window as any).__GK_APP_BOOTED__) {
   (window as any).__GK_APP_BOOTED__ = true;
   console.log('🚀 APP BOOT (WebView created)', new Date().toISOString());
 
-  // Lightweight in-app log buffer (helps diagnose opaque iOS "Script error." with no stack).
-  try {
-    const LOG_KEY = 'gk_log_buffer';
-    const pushLog = (level: string, args: any[]) => {
-      try {
-        const entry = {
-          level,
-          msg: args?.map((a) => {
-            if (typeof a === 'string') return a;
-            try { return JSON.stringify(a); } catch { return String(a); }
-          }).join(' '),
-          url: window.location.href,
-          ts: new Date().toISOString(),
-        };
-        const existing = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
-        existing.push(entry);
-        localStorage.setItem(LOG_KEY, JSON.stringify(existing.slice(-30)));
-      } catch {}
-    };
-
-    const origLog = console.log.bind(console);
-    const origWarn = console.warn.bind(console);
-    const origErr = console.error.bind(console);
-    const origInfo = console.info.bind(console);
-
-    console.log = (...args: any[]) => { pushLog('log', args); origLog(...args); };
-    console.warn = (...args: any[]) => { pushLog('warn', args); origWarn(...args); };
-    console.error = (...args: any[]) => { pushLog('error', args); origErr(...args); };
-    console.info = (...args: any[]) => { pushLog('info', args); origInfo(...args); };
-  } catch {}
-
-  // DeSpia wrapper sometimes produces malformed URLs like:
-  // https://.../?topInset=0&bottomInset=0.0/book/XYZ
-  // where the intended route is appended into a query param. Normalize that early.
-  try {
-    const ua = (navigator.userAgent || '').toLowerCase();
-    const isCustomAppUA = ua.includes('despia');
-    if (isCustomAppUA) {
-      const url = new URL(window.location.href);
-      const insetKeys = ['topInset', 'bottomInset', 'leftInset', 'rightInset'];
-      let extractedPath: string | null = null;
-
-      insetKeys.forEach((k) => {
-        const raw = url.searchParams.get(k);
-        if (!raw) return;
-        // Extract leading number; capture any trailing path accidentally appended.
-        const m = raw.match(/^(-?\d+(?:\.\d+)?)(.*)$/);
-        if (!m) return;
-        const numPart = m[1];
-        const trailing = (m[2] || '').trim();
-        if (trailing && (trailing.startsWith('/') || trailing.startsWith('#'))) {
-          extractedPath = trailing.startsWith('#') ? trailing.slice(1) : trailing;
-        }
-        // Always normalize to numeric portion
-        url.searchParams.set(k, numPart);
-      });
-
-      // If we extracted a route, move it into the hash router.
-      if (extractedPath && !url.hash) {
-        url.hash = `#${extractedPath.startsWith('/') ? extractedPath : `/${extractedPath}`}`;
-      }
-
-      if (url.toString() !== window.location.href) {
-        window.history.replaceState({}, '', url.toString());
-      }
-    }
-  } catch {}
-
   // Capture resource load failures (chunk/script/css) which often show as "Script error."
   try {
     window.addEventListener(
@@ -89,131 +21,55 @@ if (!(window as any).__GK_APP_BOOTED__) {
         const isResourceError =
           target &&
           (target.tagName === 'SCRIPT' || target.tagName === 'LINK' || target.tagName === 'IMG');
-        const details = isResourceError
-          ? {
-              type: 'resource',
-              tagName: target.tagName,
-              src: target.src || target.href || '',
-              url: window.location.href,
-              userAgent: navigator.userAgent,
-              screen: `${window.innerWidth}x${window.innerHeight}`,
-              devicePixelRatio: window.devicePixelRatio,
-              visibility: document.visibilityState,
-              ts: new Date().toISOString(),
-            }
-          : {
-              type: 'error_event',
-              message: String(event?.message || ''),
-              filename: String(event?.filename || ''),
-              lineno: Number(event?.lineno || 0),
-              colno: Number(event?.colno || 0),
-              stack: String(event?.error?.stack || ''),
-              url: window.location.href,
-              userAgent: navigator.userAgent,
-              screen: `${window.innerWidth}x${window.innerHeight}`,
-              devicePixelRatio: window.devicePixelRatio,
-              visibility: document.visibilityState,
-              ts: new Date().toISOString(),
-            };
+        if (!isResourceError) return;
 
-        if (isResourceError) {
-          console.error('💥 RESOURCE LOAD ERROR:', details);
-        } else {
-          console.error('💥 ERROR EVENT:', details);
-        }
-
+        const details = {
+          type: 'resource',
+          tagName: target.tagName,
+          src: target.src || target.href || '',
+          url: window.location.href,
+          userAgent: navigator.userAgent,
+          screen: `${window.innerWidth}x${window.innerHeight}`,
+          devicePixelRatio: window.devicePixelRatio,
+          visibility: document.visibilityState,
+          ts: new Date().toISOString(),
+        };
+        console.error('💥 RESOURCE LOAD ERROR:', details);
         try {
           const existing = JSON.parse(localStorage.getItem('gk_last_errors') || '[]');
           existing.push(details);
-          localStorage.setItem('gk_last_errors', JSON.stringify(existing.slice(-8)));
+          localStorage.setItem('gk_last_errors', JSON.stringify(existing.slice(-5)));
         } catch {}
       },
       true
     );
   } catch {}
 
-  // In native wrappers (DeSpia/WKWebView), aggressively clear SW/caches.
-  // iOS WebViews are particularly prone to stale-cache "Script error" crashes on resume after deploys.
+  // On iOS standalone/custom app shells, proactively unregister OneSignal SW to avoid stale-cache chunk failures.
   try {
-    // Manual override (for testing): localStorage.setItem('gk_force_onesignal', '1')
-    let forceOneSignal = false;
-    try {
-      forceOneSignal = localStorage.getItem('gk_force_onesignal') === '1';
-    } catch {}
-    if (!forceOneSignal) {
-      const ua = navigator.userAgent || '';
-      const platform = (navigator as any).platform || '';
-      const isIOS =
-        /iPad|iPhone|iPod/i.test(ua) ||
-        /iPad|iPhone|iPod/i.test(platform) ||
-        ((navigator as any).platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
-      const isCustomAppUA = /despia/i.test(ua);
-      const uaLower = ua.toLowerCase();
-      const isWKWebViewWrapper = uaLower.includes('wkwebview') && !uaLower.includes('safari');
+    const ua = navigator.userAgent || '';
+    const isIOS =
+      /iPad|iPhone|iPod/i.test(ua) ||
+      ((navigator as any).platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
+    const isStandalone =
+      window.matchMedia?.('(display-mode: standalone)')?.matches ||
+      (navigator as any).standalone === true;
+    const isCustomAppUA = /despia/i.test(ua);
 
-      // IMPORTANT: the app wrapper UA may not include "iPhone", so don't gate on isIOS for the custom-UA case.
-      const isNativeWrapper = isCustomAppUA || (isIOS && isWKWebViewWrapper);
-      if (isNativeWrapper) {
-        // Strip OneSignal/IDCC query params (often added on push-open). These can re-trigger broken flows.
-        try {
-          const url = new URL(window.location.href);
-          const before = url.toString();
-          Array.from(url.searchParams.keys()).forEach((k) => {
-            if (/^onesignal/i.test(k) || /^idcc/i.test(k)) url.searchParams.delete(k);
-          });
-          if (url.toString() !== before) {
-            window.history.replaceState({}, '', url.toString());
+    if (isIOS && (isStandalone || isCustomAppUA) && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations?.().then((regs) => {
+        regs?.forEach((reg) => {
+          const scriptURL = (reg as any)?.active?.scriptURL || '';
+          if (scriptURL.includes('OneSignal') || scriptURL.includes('onesignal')) {
+            reg.unregister().catch(() => {});
           }
-        } catch {}
-
-        // Unregister ALL service workers in wrappers (we don't want SW caching in WebViews).
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations?.().then((regs) => {
-            regs?.forEach((reg) => reg.unregister().catch(() => {}));
-          }).catch?.(() => {});
-        }
-
-        // Clear all caches in wrappers.
-        (window as any).caches?.keys?.().then((keys: string[]) => {
-          keys?.forEach((key) => (window as any).caches.delete(key).catch?.(() => {}));
-        }).catch?.(() => {});
-
-        // Clear OneSignal-related localStorage keys (defensive).
-        try {
-          for (let i = localStorage.length - 1; i >= 0; i--) {
-            const k = localStorage.key(i) || '';
-            if (/onesignal/i.test(k) || /^idcc/i.test(k)) localStorage.removeItem(k);
-          }
-        } catch {}
-      }
+        });
+      });
     }
   } catch {}
   
   // GLOBAL ERROR HANDLERS - catch ALL JS errors, not just React ones
   window.onerror = (message, source, lineno, colno, error) => {
-    // Pull in last resource error if this is the opaque iOS "Script error." case.
-    let lastResourceError: any = null;
-    let lastErrorEvent: any = null;
-    let lastLogs: any[] = [];
-    try {
-      const existing = JSON.parse(localStorage.getItem('gk_last_errors') || '[]');
-      for (let i = existing.length - 1; i >= 0; i--) {
-        if (existing[i]?.type === 'resource') {
-          lastResourceError = existing[i];
-          break;
-        }
-      }
-      for (let i = existing.length - 1; i >= 0; i--) {
-        if (existing[i]?.type === 'error_event') {
-          lastErrorEvent = existing[i];
-          break;
-        }
-      }
-    } catch {}
-    try {
-      lastLogs = JSON.parse(localStorage.getItem('gk_log_buffer') || '[]');
-    } catch {}
-
     const details = {
       name: error?.name || 'Error',
       message: String(message || ''),
@@ -226,9 +82,6 @@ if (!(window as any).__GK_APP_BOOTED__) {
       screen: `${window.innerWidth}x${window.innerHeight}`,
       devicePixelRatio: window.devicePixelRatio,
       visibility: document.visibilityState,
-      lastResourceError,
-      lastErrorEvent,
-      lastLogs,
       ts: new Date().toISOString(),
     };
     console.error('💥 GLOBAL ERROR:', details);
@@ -243,28 +96,20 @@ if (!(window as any).__GK_APP_BOOTED__) {
     // Prevent white screen - show overlay so user knows what happened
     try {
       const escapeHtml = (s: any) => String(s ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const payload = JSON.stringify(details, null, 2);
-      const payloadEnc = encodeURIComponent(payload);
       const errorDiv = document.createElement('div');
       errorDiv.id = 'gk_global_error_overlay';
       errorDiv.innerHTML = `
         <div style="position:fixed;inset:0;background:#1a3a52;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;padding:20px;text-align:center;">
           <div style="font-size:48px;margin-bottom:16px;">🌊</div>
           <h1 style="color:white;font-size:20px;font-weight:bold;margin-bottom:8px;">Oops! Something went wrong</h1>
-          <p style="color:rgba(255,255,255,0.7);margin-bottom:12px;max-width:340px;">Tap “Copy details” and paste it into chat (or tap “Show details”).</p>
+          <p style="color:rgba(255,255,255,0.7);margin-bottom:12px;max-width:320px;">Tap “Show details” and screenshot it.</p>
 
-          <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;">
-            <button onclick="(function(){var t=decodeURIComponent('${payloadEnc}'); var done=false; try{navigator.clipboard&&navigator.clipboard.writeText&&navigator.clipboard.writeText(t).then(function(){done=true; alert('Copied! Paste it into chat.');}).catch(function(){});}catch(e){} try{if(done) return; var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.focus(); ta.select(); var ok=false; try{ok=document.execCommand('copy');}catch(e){} document.body.removeChild(ta); if(ok){alert('Copied! Paste it into chat.'); return;} }catch(e){} try{prompt('Copy the crash details below:', t);}catch(e){} })()"
-              style="background:rgba(255,255,255,0.25);color:white;font-weight:bold;padding:10px 18px;border-radius:9999px;border:none;">
-              Copy details
-            </button>
-            <button onclick="var el=document.getElementById('gk_err'); if(el) el.style.display='block';"
-              style="background:rgba(255,255,255,0.15);color:white;font-weight:bold;padding:10px 18px;border-radius:9999px;border:none;">
-              Show details
-            </button>
-          </div>
+          <button onclick="var el=document.getElementById('gk_err'); if(el) el.style.display='block';"
+            style="background:rgba(255,255,255,0.15);color:white;font-weight:bold;padding:10px 18px;border-radius:9999px;border:none;margin-bottom:10px;">
+            Show details
+          </button>
 
-          <pre id="gk_err" style="display:none;white-space:pre-wrap;text-align:left;max-width:380px;max-height:240px;overflow:auto;background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.85);padding:12px;border-radius:12px;font-size:12px;">${escapeHtml(payload)}</pre>
+          <pre id="gk_err" style="display:none;white-space:pre-wrap;text-align:left;max-width:380px;max-height:240px;overflow:auto;background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.85);padding:12px;border-radius:12px;font-size:12px;">${escapeHtml(JSON.stringify(details, null, 2))}</pre>
 
           <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;justify-content:center;">
             <button onclick="try{localStorage.removeItem('gk_api_lessons');}catch(e){}; try{sessionStorage.clear();}catch(e){}; location.reload();"

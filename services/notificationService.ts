@@ -7,36 +7,24 @@ let isInitialized = false;
 
 const shouldDisableOneSignal = (): boolean => {
   try {
-    // Manual override (for testing). Set in DevTools console:
-    // localStorage.setItem('gk_force_onesignal', '1')
-    // localStorage.removeItem('gk_force_onesignal')
-    try {
-      if (localStorage.getItem('gk_force_onesignal') === '1') return false;
-    } catch {}
-
     // Some environments (iOS WKWebView / certain "app shell" wrappers) can crash on resume
     // due to OneSignal Web SDK script behavior. We prefer stability over push here.
     const ua = navigator.userAgent || '';
-    const platform = (navigator as any).platform || '';
     const isIOS =
       /iPad|iPhone|iPod/i.test(ua) ||
-      /iPad|iPhone|iPod/i.test(platform) ||
       // iPadOS reports as Mac sometimes
       ((navigator as any).platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
+    const isStandalone =
+      window.matchMedia?.('(display-mode: standalone)')?.matches ||
+      (navigator as any).standalone === true;
     const isCustomAppUA = /despia/i.test(ua);
-    const uaLower = ua.toLowerCase();
-    const isWKWebViewWrapper = uaLower.includes('wkwebview') && !uaLower.includes('safari');
 
     // If push isn't supported, don't initialize.
     const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window;
     if (!pushSupported) return true;
 
-    // IMPORTANT:
-    // - iOS WebViews (WKWebView wrappers) don't reliably support Web Push.
-    // - We've observed resume crashes originating from OneSignal web SDK in our wrapper UA.
-    // So: disable OneSignal **web** SDK in native wrappers; native push should be handled by the wrapper.
-    if (isCustomAppUA) return true;
-    if (isIOS && isWKWebViewWrapper) return true;
+    // Disable on iOS standalone (most crash-prone) and on our custom app UA.
+    if (isIOS && (isStandalone || isCustomAppUA)) return true;
 
     return false;
   } catch {
