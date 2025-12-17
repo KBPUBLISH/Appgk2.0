@@ -1250,15 +1250,9 @@ const BookReaderPage: React.FC = () => {
 
     const handlePlayPage = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        console.log('▶️ Play button pressed');
-        console.log('  - playing:', playing);
-        console.log('  - currentPage:', currentPage?._id);
-        console.log('  - textBoxes:', currentPage?.textBoxes?.length || 0);
-        console.log('  - selectedVoiceId:', selectedVoiceId);
 
         // If already playing, pause/stop and disable auto-play
         if (playing) {
-            console.log('⏸️ Already playing, stopping...');
             stopAudio();
             setAutoPlayMode(false);
             return;
@@ -1272,10 +1266,7 @@ const BookReaderPage: React.FC = () => {
         if (currentPage.textBoxes && currentPage.textBoxes.length > 0) {
             const translatedTextBoxes = getTranslatedTextBoxes(currentPage);
             const firstBoxText = translatedTextBoxes[0]?.text || currentPage.textBoxes[0].text;
-            console.log('📖 First text box:', firstBoxText?.substring(0, 50) + '...');
             handlePlayText(firstBoxText, 0, e, true); // Pass autoPlay flag
-        } else {
-            console.warn('⚠️ No text boxes on current page!');
         }
     };
 
@@ -1451,12 +1442,6 @@ const BookReaderPage: React.FC = () => {
 
     const handlePlayText = async (text: string, index: number, e: React.MouseEvent, isAutoPlay: boolean = false) => {
         e.stopPropagation();
-        console.log('🎯 handlePlayText called');
-        console.log('  - text length:', text?.length || 0);
-        console.log('  - index:', index);
-        console.log('  - isAutoPlay:', isAutoPlay);
-        console.log('  - playing:', playing);
-        console.log('  - activeTextBoxIndex:', activeTextBoxIndex);
 
         // If already playing this text, pause it
         if (playing && activeTextBoxIndex === index) {
