@@ -268,53 +268,95 @@ const SignInPage: React.FC = () => {
               {/* Sign In Form */}
               <form onSubmit={handleEmailFormSubmit} className="space-y-3">
                 <div className="space-y-2">
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60 z-10 pointer-events-none" size={18} />
+                  <div style={{ position: 'relative' }}>
+                    <Mail 
+                      size={18} 
+                      style={{ 
+                        position: 'absolute', 
+                        left: '12px', 
+                        top: '50%', 
+                        transform: 'translateY(-50%)', 
+                        color: 'rgba(255,255,255,0.6)',
+                        pointerEvents: 'none',
+                        zIndex: 1,
+                      }} 
+                    />
                     <input
                       type="email"
                       placeholder="Email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       disabled={loading !== null}
-                      className="w-full bg-[rgba(255,255,255,0.15)] border border-white/20 rounded-xl py-3 pl-10 pr-4 placeholder:text-white/60 focus:outline-none focus:bg-[rgba(255,255,255,0.2)] focus:border-white/30 transition-colors"
+                      required
+                      autoComplete="email"
                       style={{ 
-                        fontSize: '16px', // Prevents iOS auto-zoom
-                        WebkitAppearance: 'none',
-                        caretColor: 'white',
+                        width: '100%',
+                        backgroundColor: 'rgba(255,255,255,0.15)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: '12px',
+                        padding: '12px 16px 12px 40px',
+                        fontSize: '16px',
                         color: 'white',
+                        caretColor: 'white',
+                        outline: 'none',
+                        WebkitAppearance: 'none',
                         WebkitTextFillColor: 'white',
                         opacity: 1,
                       }}
-                      required
-                      autoComplete="email"
                     />
                   </div>
                   
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60 z-10 pointer-events-none" size={18} />
+                  <div style={{ position: 'relative' }}>
+                    <Lock 
+                      size={18}
+                      style={{ 
+                        position: 'absolute', 
+                        left: '12px', 
+                        top: '50%', 
+                        transform: 'translateY(-50%)', 
+                        color: 'rgba(255,255,255,0.6)',
+                        pointerEvents: 'none',
+                        zIndex: 1,
+                      }} 
+                    />
                     <input
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       disabled={loading !== null}
-                      className="w-full bg-[rgba(255,255,255,0.15)] border border-white/20 rounded-xl py-3 pl-10 pr-10 placeholder:text-white/60 focus:outline-none focus:bg-[rgba(255,255,255,0.2)] focus:border-white/30 transition-colors"
+                      required
+                      autoComplete="current-password"
                       style={{ 
-                        fontSize: '16px', // Prevents iOS auto-zoom
-                        WebkitAppearance: 'none',
-                        caretColor: 'white',
+                        width: '100%',
+                        backgroundColor: 'rgba(255,255,255,0.15)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: '12px',
+                        padding: '12px 40px 12px 40px',
+                        fontSize: '16px',
                         color: 'white',
+                        caretColor: 'white',
+                        outline: 'none',
+                        WebkitAppearance: 'none',
                         WebkitTextFillColor: 'white',
                         opacity: 1,
                       }}
-                      required
-                      autoComplete="current-password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white/80 transition-colors"
                       tabIndex={-1}
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: 'rgba(255,255,255,0.6)',
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
+                      }}
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
