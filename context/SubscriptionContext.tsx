@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import RevenueCatService, { PREMIUM_ENTITLEMENT_ID } from '../services/revenueCatService';
+import { authService } from '../services/authService';
 
 interface SubscriptionContextType {
   // State
@@ -31,16 +32,25 @@ const getApiBaseUrl = (): string => {
 
 // Helper to get user ID for subscription check
 const getUserId = (): string | null => {
-  const userDataStr = localStorage.getItem('godlykids_user');
-  if (userDataStr) {
+  // Prefer authService user record (correct key: godly_kids_user)
+  const user = authService.getUser();
+  if (user) {
+    return (user as any)._id || (user as any).id || user.email || null;
+  }
+
+  // Back-compat: some older code stored this key
+  const legacyUserStr = localStorage.getItem('godlykids_user');
+  if (legacyUserStr) {
     try {
-      const userData = JSON.parse(userDataStr);
-      return userData._id || userData.id || userData.email || null;
+      const legacyUser = JSON.parse(legacyUserStr);
+      return legacyUser._id || legacyUser.id || legacyUser.email || null;
     } catch {
-      return null;
+      // ignore
     }
   }
-  return localStorage.getItem('godlykids_device_id');
+
+  // Fallback to device id
+  return localStorage.getItem('godlykids_device_id') || localStorage.getItem('device_id');
 };
 
 export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ children }) => {
@@ -119,6 +129,19 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
 
     initialize();
 
+    // When auth token changes (login/logout), re-check subscription automatically.
+    const handleAuthChange = async () => {
+      try {
+        const hasPremium = await checkSubscriptionFromAllSources();
+        setIsPremium(hasPremium);
+      } catch {
+        // ignore
+      }
+    };
+
+    window.addEventListener('authTokenUpdated', handleAuthChange);
+    window.addEventListener('authSignOut', handleAuthChange);
+
     // Listen for premium status changes from DeSpia
     const handlePremiumChange = (event: CustomEvent) => {
       console.log('📱 Premium status changed:', event.detail);
@@ -132,6 +155,8 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     window.addEventListener('despia:subscriptionChanged' as any, handlePremiumChange);
 
     return () => {
+      window.removeEventListener('authTokenUpdated', handleAuthChange);
+      window.removeEventListener('authSignOut', handleAuthChange);
       window.removeEventListener('revenuecat:premiumChanged' as any, handlePremiumChange);
       window.removeEventListener('despia:subscriptionChanged' as any, handlePremiumChange);
     };

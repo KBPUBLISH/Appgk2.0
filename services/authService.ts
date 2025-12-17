@@ -102,6 +102,15 @@ export const authService = {
   // Store user data
   setUser: (user: User): void => {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
+    // Back-compat / shared keys used by other services (RevenueCat, SubscriptionContext)
+    try {
+      if (user?.email) {
+        localStorage.setItem('godlykids_user_email', user.email);
+      }
+      localStorage.setItem('godlykids_user', JSON.stringify(user));
+    } catch {
+      // ignore
+    }
   },
 
   // Get user data

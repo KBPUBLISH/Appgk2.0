@@ -85,7 +85,7 @@ const BookReaderPage: React.FC = () => {
     const { bookId } = useParams<{ bookId: string }>();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { setGameMode, setMusicPaused, musicEnabled, toggleMusic } = useAudio();
+    const { setGameMode, setMusicPaused } = useAudio();
     const { isVoiceUnlocked, isSubscribed } = useUser();
     const wasMusicEnabledRef = useRef<boolean>(false);
     const [pages, setPages] = useState<Page[]>([]);
@@ -448,29 +448,9 @@ const BookReaderPage: React.FC = () => {
     useEffect(() => {
         console.log('📖 BookReaderPage MOUNTED - KILLING ALL APP MUSIC');
 
-        // 1. Save current music state before muting
-        const currentMusicState = musicEnabled;
-        wasMusicEnabledRef.current = currentMusicState;
-        localStorage.setItem('godly_kids_music_was_enabled', currentMusicState.toString());
-
-        // 2. Pause app background music immediately
+        // Pause app background music immediately (if any)
         setGameMode(false);
         setMusicPaused(true);
-
-        // 3. Force mute background music by directly toggling if enabled
-        if (currentMusicState) {
-            console.log('🎵 BookReader: Force muting background music');
-            // Directly toggle music off (this updates the state and stops audio)
-            toggleMusic();
-
-            // Also try clicking the button to ensure UI reflects the state
-            setTimeout(() => {
-                const musicButton = document.querySelector('button[title*="Music"], button[title*="music"]') as HTMLButtonElement;
-                if (musicButton && !musicButton.disabled) {
-                    musicButton.click();
-                }
-            }, 50);
-        }
 
         // 4. Nuclear Option: Kill all other audio elements (more aggressive)
         // BUT preserve book background music
@@ -2001,29 +1981,7 @@ const BookReaderPage: React.FC = () => {
                 <button
                     onClick={() => {
                         // Restore music before navigating back
-                        const wasEnabled = wasMusicEnabledRef.current || localStorage.getItem('godly_kids_music_was_enabled') === 'true';
-
-                        if (wasEnabled) {
-                            console.log('🎵 Back button: Restoring background music before navigating');
-
-                            // First, ensure music is enabled in state
-                            if (!musicEnabled) {
-                                toggleMusic();
-                            }
-
-                            // Then programmatically click the music button in the header after navigation
-                            // This ensures the audio context is unlocked and music actually plays
-                            setTimeout(() => {
-                                const musicButton = document.querySelector('button[title*="Music"]') as HTMLButtonElement;
-                                if (musicButton) {
-                                    console.log('🎵 Programmatically clicking music button to restore playback');
-                                    musicButton.click();
-                                }
-                            }, 150);
-
-                            // Clear the flag
-                            localStorage.removeItem('godly_kids_music_was_enabled');
-                        }
+                        // Background music toggle has been removed from Header. Nothing to restore here.
 
                         // Navigate back to book detail page explicitly
                         if (bookId) {
@@ -2131,29 +2089,7 @@ const BookReaderPage: React.FC = () => {
                         e.stopPropagation();
 
                         // Restore music before navigating back
-                        const wasEnabled = wasMusicEnabledRef.current || localStorage.getItem('godly_kids_music_was_enabled') === 'true';
-
-                        if (wasEnabled) {
-                            console.log('🎵 Back button: Restoring background music before navigating');
-
-                            // First, ensure music is enabled in state
-                            if (!musicEnabled) {
-                                toggleMusic();
-                            }
-
-                            // Then programmatically click the music button in the header after navigation
-                            // This ensures the audio context is unlocked and music actually plays
-                            setTimeout(() => {
-                                const musicButton = document.querySelector('button[title*="Music"]') as HTMLButtonElement;
-                                if (musicButton) {
-                                    console.log('🎵 Programmatically clicking music button to restore playback');
-                                    musicButton.click();
-                                }
-                            }, 150);
-
-                            // Clear the flag
-                            localStorage.removeItem('godly_kids_music_was_enabled');
-                        }
+                        // Background music toggle has been removed from Header. Nothing to restore here.
 
                         // Navigate back to book detail page explicitly
                         if (bookId) {
@@ -3098,16 +3034,7 @@ const BookReaderPage: React.FC = () => {
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         // Restore music before navigating
-                                        const wasEnabled = wasMusicEnabledRef.current || localStorage.getItem('godly_kids_music_was_enabled') === 'true';
-                                        if (wasEnabled && !musicEnabled) {
-                                            toggleMusic();
-                                        }
-                                        setTimeout(() => {
-                                            const musicButton = document.querySelector('button[title*="Music"]') as HTMLButtonElement;
-                                            if (musicButton) {
-                                                musicButton.click();
-                                            }
-                                        }, 150);
+                                        // Background music toggle has been removed from Header. Nothing to restore here.
                                         navigate('/home');
                                     }}
                                     className="bg-[#2196F3] hover:bg-[#1E88E5] text-white p-4 rounded-xl font-bold shadow-lg border-b-4 border-[#1565C0] active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 group"

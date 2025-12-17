@@ -803,7 +803,8 @@ const HomePage: React.FC = () => {
               color="#7c4dff"
             />
             {(() => {
-              const dayLessons = getLessonsForDay(lessons, selectedDayIndex);
+              // In kid profile we already loaded the selected day's planner lessons into `lessons`.
+              const dayLessons = currentProfileId ? lessons : getLessonsForDay(lessons, selectedDayIndex);
               const completedCount = dayLessons.filter((l: any) => isCompleted(l._id || l.id)).length;
               return dayLessons.length > 0 ? (
                 <span className="text-white/60 text-xs font-semibold">
@@ -842,7 +843,8 @@ const HomePage: React.FC = () => {
           {currentProfileId === null ? null : lessonsLoading ? (
             <div className="text-white/70 text-center py-8 px-4">Loading lessons...</div>
           ) : (() => {
-            const dayLessons = getLessonsForDay(lessons, selectedDayIndex);
+            // In kid profile we already loaded the selected day's planner lessons into `lessons`.
+            const dayLessons = lessons;
             const isFutureDay = selectedDayIndex > todayIndex && todayIndex !== -1;
 
             if (dayLessons.length === 0) {

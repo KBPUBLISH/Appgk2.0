@@ -636,10 +636,24 @@ const OnboardingPage: React.FC = () => {
   const [showParentGate, setShowParentGate] = useState(false);
   
 
-  // Reset user data when entering onboarding to ensure a fresh start
+  // IMPORTANT:
+  // Do NOT wipe existing kid profiles on every onboarding visit.
+  // Only reset if there is no existing saved state (fresh install) or if explicitly requested.
   useEffect(() => {
-    if (resetUser && typeof resetUser === 'function') {
-      resetUser();
+    try {
+      const hasSavedState = !!localStorage.getItem('godly_kids_data_v6');
+      const url = new URL(window.location.href);
+      const forceReset = url.searchParams.get('reset') === '1' || sessionStorage.getItem('godlykids_force_reset') === 'true';
+      if (forceReset) {
+        sessionStorage.removeItem('godlykids_force_reset');
+      }
+      if (!hasSavedState || forceReset) {
+        if (resetUser && typeof resetUser === 'function') {
+          resetUser();
+        }
+      }
+    } catch {
+      // If anything fails, do not reset to avoid data loss.
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

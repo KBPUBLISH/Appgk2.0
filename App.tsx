@@ -11,6 +11,62 @@ import HomePage from './pages/HomePage';
 if (!(window as any).__GK_APP_BOOTED__) {
   (window as any).__GK_APP_BOOTED__ = true;
   console.log('🚀 APP BOOT (WebView created)', new Date().toISOString());
+
+  // Capture resource load failures (chunk/script/css) which often show as "Script error."
+  try {
+    window.addEventListener(
+      'error',
+      (event: any) => {
+        const target = event?.target;
+        const isResourceError =
+          target &&
+          (target.tagName === 'SCRIPT' || target.tagName === 'LINK' || target.tagName === 'IMG');
+        if (!isResourceError) return;
+
+        const details = {
+          type: 'resource',
+          tagName: target.tagName,
+          src: target.src || target.href || '',
+          url: window.location.href,
+          userAgent: navigator.userAgent,
+          screen: `${window.innerWidth}x${window.innerHeight}`,
+          devicePixelRatio: window.devicePixelRatio,
+          visibility: document.visibilityState,
+          ts: new Date().toISOString(),
+        };
+        console.error('💥 RESOURCE LOAD ERROR:', details);
+        try {
+          const existing = JSON.parse(localStorage.getItem('gk_last_errors') || '[]');
+          existing.push(details);
+          localStorage.setItem('gk_last_errors', JSON.stringify(existing.slice(-5)));
+        } catch {}
+      },
+      true
+    );
+  } catch {}
+
+  // On iOS standalone/custom app shells, proactively unregister OneSignal SW to avoid stale-cache chunk failures.
+  try {
+    const ua = navigator.userAgent || '';
+    const isIOS =
+      /iPad|iPhone|iPod/i.test(ua) ||
+      ((navigator as any).platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
+    const isStandalone =
+      window.matchMedia?.('(display-mode: standalone)')?.matches ||
+      (navigator as any).standalone === true;
+    const isCustomAppUA = /despia/i.test(ua);
+
+    if (isIOS && (isStandalone || isCustomAppUA) && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations?.().then((regs) => {
+        regs?.forEach((reg) => {
+          const scriptURL = (reg as any)?.active?.scriptURL || '';
+          if (scriptURL.includes('OneSignal') || scriptURL.includes('onesignal')) {
+            reg.unregister().catch(() => {});
+          }
+        });
+      });
+    }
+  } catch {}
   
   // GLOBAL ERROR HANDLERS - catch ALL JS errors, not just React ones
   window.onerror = (message, source, lineno, colno, error) => {
