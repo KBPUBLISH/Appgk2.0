@@ -173,7 +173,7 @@ const BottomNavigation: React.FC = () => {
       {showWheelHint && (
         <div 
           className={`absolute z-[50] pointer-events-auto transition-all duration-500 ease-in-out ${
-            isPlayerActive ? 'bottom-[180px] md:bottom-[280px]' : 'bottom-[100px] md:bottom-[200px]'
+            isPlayerActive ? 'bottom-[180px] md:bottom-[220px]' : 'bottom-[100px] md:bottom-[140px]'
           }`}
           onClick={dismissHint}
         >
@@ -219,7 +219,7 @@ const BottomNavigation: React.FC = () => {
 
       {/* Active Indicator Jewel */}
       <div
-        className={`absolute z-[45] animate-bounce duration-[2000ms] transition-all duration-500 ease-in-out ${isPlayerActive ? 'bottom-[215px] md:bottom-[310px]' : 'bottom-[135px] md:bottom-[230px]'
+        className={`absolute z-[45] animate-bounce duration-[2000ms] transition-all duration-500 ease-in-out ${isPlayerActive ? 'bottom-[215px] md:bottom-[255px]' : 'bottom-[135px] md:bottom-[175px]'
           }`}
       >
         <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[12px] border-t-[#FFD700]"></div>
@@ -227,13 +227,13 @@ const BottomNavigation: React.FC = () => {
 
       {/* Static CSS Shadow */}
       <div
-        className={`absolute w-[340px] h-[340px] rounded-full bg-black/40 blur-xl pointer-events-none md:scale-[1.6] transition-all duration-500 ease-in-out ${isPlayerActive ? 'bottom-[-115px] md:bottom-[-90px]' : 'bottom-[-195px] md:bottom-[-170px]'
+        className={`absolute w-[340px] h-[340px] rounded-full bg-black/40 blur-xl pointer-events-none md:scale-[1.25] transition-all duration-500 ease-in-out ${isPlayerActive ? 'bottom-[-115px] md:bottom-[-120px]' : 'bottom-[-195px] md:bottom-[-200px]'
           }`}
       ></div>
 
       <div
         ref={wheelRef}
-        className={`absolute w-[400px] h-[400px] md:scale-[1.6] origin-center pointer-events-auto touch-none select-none flex items-center justify-center transition-all duration-500 ease-in-out ${isPlayerActive ? 'bottom-[-110px] md:bottom-[-85px]' : 'bottom-[-190px] md:bottom-[-165px]'
+        className={`absolute w-[400px] h-[400px] md:scale-[1.25] origin-center pointer-events-auto touch-none select-none flex items-center justify-center transition-all duration-500 ease-in-out ${isPlayerActive ? 'bottom-[-110px] md:bottom-[-115px]' : 'bottom-[-190px] md:bottom-[-195px]'
           }`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
