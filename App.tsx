@@ -290,8 +290,8 @@ if (!(window as any).__GK_APP_BOOTED__) {
   
   // GLOBAL ERROR HANDLERS - catch ALL JS errors, not just React ones
   window.onerror = (message, source, lineno, colno, error) => {
-    // In Despia, "Script error." with no details (lineno=0, colno=0) during WebView recreation
-    // is a cross-origin error from external scripts - this is NOT a real crash
+    // Opaque "Script error." with no details (lineno=0, colno=0) are cross-origin errors
+    // that provide NO useful debugging information
     const isOpaqueScriptError = 
       String(message || '').toLowerCase().includes('script error') && 
       (lineno === 0 || !lineno) && 
@@ -300,21 +300,28 @@ if (!(window as any).__GK_APP_BOOTED__) {
     
     const isDespia = (window as any).__GK_IS_DESPIA__;
     
-    // Check if this is happening during a Despia WebView recreation
+    // Check if this is happening during a Despia WebView recreation (for logging)
     let isDespiaTransition = false;
     if (isDespia) {
       try {
         const bootTimestamp = (window as any).__GK_BOOT_TIMESTAMP__ || 0;
         const timeSinceBoot = Date.now() - bootTimestamp;
-        // If error happens within 3 seconds of boot, it's likely a transition error
-        isDespiaTransition = timeSinceBoot < 3000;
+        // If error happens within 5 seconds of boot, it's likely a transition error
+        isDespiaTransition = timeSinceBoot < 5000;
       } catch {}
     }
     
-    // In Despia during transitions, opaque script errors are expected - just log and ignore
-    if (isDespia && isOpaqueScriptError && isDespiaTransition) {
-      console.log('📱 Ignoring opaque script error during Despia WebView transition');
-      try { (window as any).__GK_TRACE__?.('despia_transition_error_ignored', { message: String(message || '') }); } catch {}
+    // In Despia, ALWAYS suppress opaque script errors - they're cross-origin CDN errors
+    // that provide no useful information and would just confuse users
+    // These come from: aistudiocdn.com, analytics scripts, etc.
+    if (isDespia && isOpaqueScriptError) {
+      console.log('📱 Ignoring opaque script error in Despia (cross-origin)', isDespiaTransition ? '(during transition)' : '(post-transition)');
+      try { 
+        (window as any).__GK_TRACE__?.('despia_opaque_error_ignored', { 
+          message: String(message || ''),
+          isDespiaTransition 
+        }); 
+      } catch {}
       return true; // Suppress the error - don't show overlay or count as crash
     }
     
