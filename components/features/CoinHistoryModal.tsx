@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Coins, Gift, BookOpen, Gamepad2, Calendar, Users, ShoppingBag, TrendingUp, TrendingDown, Share2, Copy, Check, Sparkles, Mic, User, ArrowRight, Loader2 } from 'lucide-react';
 import { useUser, CoinTransaction } from '../../context/UserContext';
-import { getApiBaseUrl } from '../../services/apiService';
 import { authService } from '../../services/authService';
 
 interface CoinHistoryModalProps {
@@ -125,8 +124,11 @@ const CoinHistoryModal: React.FC<CoinHistoryModalProps> = ({ isOpen, onClose, on
       
       if (userId) {
         // Try backend API first (awards coins to both users + sends notification)
-        const baseUrl = getApiBaseUrl();
-        const response = await fetch(`${baseUrl}api/referrals/redeem`, {
+        // Use same URL pattern as SubscriptionContext for consistency
+        const apiBase = window.location.hostname === 'localhost' 
+          ? 'http://localhost:5001' 
+          : 'https://backendgk2-0.onrender.com';
+        const response = await fetch(`${apiBase}/api/referrals/redeem`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, codeToRedeem: codeInput })
