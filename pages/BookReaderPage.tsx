@@ -172,8 +172,27 @@ const BookReaderPage: React.FC = () => {
     const bookMusicConnectedElRef = useRef<HTMLAudioElement | null>(null);
 
     const ensureBookMusicGraph = useCallback((audioEl: HTMLAudioElement) => {
+        // Check if audio is cross-origin (CORS will block WebAudio connection)
+        const audioSrc = audioEl.src || '';
+        const isCrossOrigin = audioSrc.includes('storage.googleapis.com') || 
+                              audioSrc.includes('cloudfront') ||
+                              audioSrc.includes('amazonaws.com') ||
+                              (audioSrc.startsWith('http') && !audioSrc.includes(window.location.host));
+        
+        // For cross-origin audio, skip WebAudio entirely to avoid CORS silence
+        // Just use native audio element volume control
+        if (isCrossOrigin) {
+            audioEl.volume = musicVolume;
+            audioEl.muted = false;
+            console.log('🎵 Using direct volume control (CORS-safe):', musicVolume);
+            return;
+        }
+
         const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
-        if (!Ctx) return;
+        if (!Ctx) {
+            audioEl.volume = musicVolume;
+            return;
+        }
 
         if (!bookMusicCtxRef.current) {
             bookMusicCtxRef.current = new Ctx();
@@ -483,8 +502,13 @@ const BookReaderPage: React.FC = () => {
                             await resumeBookMusicContext();
                             if (bookMusicEnabledRef.current) {
                                 console.log('🎵 Book music ready - starting playback');
+                                // Set volume directly for cross-origin audio (CORS-safe)
+                                audio.volume = musicVolume;
+                                audio.muted = false;
                                 audio.play().catch(err => {
                                     console.warn('⚠️ Book music auto-play prevented:', err);
+                                    // Update UI to reflect that music isn't actually playing
+                                    setBookMusicEnabled(false);
                                 });
                             }
                         }, { once: true });
@@ -492,8 +516,12 @@ const BookReaderPage: React.FC = () => {
                         // Try to play immediately if already loaded
                         if (audio.readyState >= 3 && bookMusicEnabledRef.current) {
                             await resumeBookMusicContext();
+                            audio.volume = musicVolume;
+                            audio.muted = false;
                             audio.play().catch(err => {
                                 console.warn('⚠️ Book music immediate play prevented:', err);
+                                // Update UI to reflect that music isn't actually playing
+                                setBookMusicEnabled(false);
                             });
                         }
 
@@ -2134,13 +2162,26 @@ const BookReaderPage: React.FC = () => {
                                         // Step 4: Ensure graph is connected with proper volume
                                         ensureBookMusicGraph(audio);
                                         
-                                        // Step 5: Set volume directly as fallback (iOS sometimes ignores WebAudio)
-                                        if (bookMusicGainRef.current) {
+                                        // Step 5: Set volume directly (required for cross-origin audio due to CORS)
+                                        // For cross-origin audio, WebAudio GainNode won't work, so always use direct volume
+                                        const audioSrc = audio.src || '';
+                                        const isCrossOrigin = audioSrc.includes('storage.googleapis.com') || 
+                                                              audioSrc.includes('cloudfront') ||
+                                                              audioSrc.includes('amazonaws.com');
+                                        
+                                        if (isCrossOrigin) {
+                                            // Cross-origin: use direct volume (WebAudio outputs silence due to CORS)
+                                            audio.volume = musicVolume;
+                                            console.log('🎵 Direct volume set (CORS-safe):', musicVolume);
+                                        } else if (bookMusicGainRef.current) {
+                                            // Same-origin: use WebAudio GainNode
                                             bookMusicGainRef.current.gain.value = musicVolume;
+                                            audio.volume = 1.0;
                                             console.log('🎵 GainNode volume set to:', musicVolume);
+                                        } else {
+                                            // Fallback: direct volume
+                                            audio.volume = musicVolume;
                                         }
-                                        // Always also set element volume as fallback for iOS
-                                        audio.volume = bookMusicGainRef.current ? 1.0 : musicVolume;
                                         
                                         // Step 6: Play the audio with retry
                                         const tryPlay = async (attempt: number = 1): Promise<void> => {
