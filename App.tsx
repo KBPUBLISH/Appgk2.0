@@ -1,11 +1,13 @@
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import SignInPage from './pages/SignInPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import OnboardingPage from './pages/OnboardingPage';
 import HomePage from './pages/HomePage';
+import ReferralPromptModal from './components/features/ReferralPromptModal';
+import { useUser } from './context/UserContext';
 
 // Diagnostic: Log when the entire app JS module is evaluated (WebView recreation)
 if (!(window as any).__GK_APP_BOOTED__) {
@@ -583,6 +585,65 @@ const PanoramaBackground: React.FC = () => {
   );
 };
 
+// Wrapper component to show referral prompt on first open or when coins reach 0
+const ReferralPromptWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { coins, referralCode } = useUser();
+  const [showReferralPrompt, setShowReferralPrompt] = useState(false);
+  const [promptTrigger, setPromptTrigger] = useState<'first_open' | 'zero_coins' | 'manual'>('first_open');
+  const location = useLocation();
+  
+  // Check for first app open
+  useEffect(() => {
+    // Don't show on landing, signin, or onboarding pages
+    if (location.pathname === '/' || location.pathname === '/signin' || location.pathname === '/onboarding' || location.pathname === '/reset-password') {
+      return;
+    }
+    
+    const hasSeenReferralPrompt = localStorage.getItem('godlykids_seen_referral_prompt');
+    if (!hasSeenReferralPrompt && referralCode) {
+      // Small delay to let the page render first
+      const timer = setTimeout(() => {
+        setPromptTrigger('first_open');
+        setShowReferralPrompt(true);
+        localStorage.setItem('godlykids_seen_referral_prompt', 'true');
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname, referralCode]);
+  
+  // Check when coins reach 0
+  useEffect(() => {
+    // Don't show on landing, signin, or onboarding pages
+    if (location.pathname === '/' || location.pathname === '/signin' || location.pathname === '/onboarding' || location.pathname === '/reset-password') {
+      return;
+    }
+    
+    if (coins === 0 && referralCode) {
+      // Check if we recently showed this prompt for zero coins (don't spam)
+      const lastZeroCoinsPrompt = localStorage.getItem('godlykids_zero_coins_prompt_time');
+      const now = Date.now();
+      const oneHour = 60 * 60 * 1000;
+      
+      if (!lastZeroCoinsPrompt || (now - parseInt(lastZeroCoinsPrompt)) > oneHour) {
+        setPromptTrigger('zero_coins');
+        setShowReferralPrompt(true);
+        localStorage.setItem('godlykids_zero_coins_prompt_time', String(now));
+      }
+    }
+  }, [coins, location.pathname, referralCode]);
+  
+  return (
+    <>
+      {children}
+      <ReferralPromptModal
+        isOpen={showReferralPrompt}
+        onClose={() => setShowReferralPrompt(false)}
+        trigger={promptTrigger}
+      />
+    </>
+  );
+};
+
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   useEffect(() => {
@@ -734,6 +795,7 @@ const App: React.FC = () => {
           <SubscriptionProvider>
             <BooksProvider>
               <HashRouter>
+              <ReferralPromptWrapper>
               <Layout>
                 <Routes>
                   <Route path="/" element={<LandingPage />} />
@@ -765,6 +827,7 @@ const App: React.FC = () => {
                   <Route path="*" element={<Navigate to="/home" replace />} />
                 </Routes>
               </Layout>
+              </ReferralPromptWrapper>
             </HashRouter>
             </BooksProvider>
           </SubscriptionProvider>

@@ -65,11 +65,12 @@ const formatTimeAgo = (timestamp: number): string => {
 };
 
 const CoinHistoryModal: React.FC<CoinHistoryModalProps> = ({ isOpen, onClose, onOpenShop }) => {
-  const { coins, coinTransactions, referralCode, redeemCode } = useUser();
+  const { coins, coinTransactions, referralCode, redeemCode, addCoins } = useUser();
   const [copied, setCopied] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const [redeemMessage, setRedeemMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'earn' | 'history'>('earn');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Hide BottomNavigation when modal is open
   useEffect(() => {
@@ -84,10 +85,10 @@ const CoinHistoryModal: React.FC<CoinHistoryModalProps> = ({ isOpen, onClose, on
     };
   }, [isOpen]);
 
-  // Sync referral code and push notification to backend when modal opens
+  // Sync referral code, push notification, AND coins from backend when modal opens
   useEffect(() => {
     if (isOpen && referralCode) {
-      const syncReferralAndPush = async () => {
+      const syncReferralAndCoins = async () => {
         try {
           const user = authService.getUser();
           const userId = user?.email || user?._id || user?.id || localStorage.getItem('godlykids_user_email') || localStorage.getItem('device_id');
@@ -98,7 +99,7 @@ const CoinHistoryModal: React.FC<CoinHistoryModalProps> = ({ isOpen, onClose, on
             ? 'http://localhost:5001' 
             : 'https://backendgk2-0.onrender.com';
           
-          // Sync referral code
+          // Sync referral code first
           await fetch(`${apiBase}/api/referrals/sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -106,15 +107,37 @@ const CoinHistoryModal: React.FC<CoinHistoryModalProps> = ({ isOpen, onClose, on
           });
           console.log('✅ Referral code synced to backend:', referralCode);
           
-          // Also register for push notifications so they can receive referral alerts
+          // Also register for push notifications
           await NotificationService.registerPushWithBackend(userId);
+          
+          // Now fetch stats to sync coins from backend
+          setIsSyncing(true);
+          const statsResponse = await fetch(`${apiBase}/api/referrals/stats/${encodeURIComponent(userId)}`);
+          const statsData = await statsResponse.json();
+          
+          if (statsData.success && statsData.stats) {
+            const backendCoins = statsData.stats.coins || 0;
+            const referralCount = statsData.stats.referralCount || 0;
+            
+            console.log(`📊 Backend stats: ${backendCoins} coins, ${referralCount} referrals`);
+            
+            // If backend has more coins than local, sync the difference
+            // This happens when friends use your referral code
+            if (backendCoins > coins) {
+              const difference = backendCoins - coins;
+              console.log(`🔄 Syncing ${difference} coins from backend (referral rewards)`);
+              addCoins(difference, 'Referral rewards synced', 'referral');
+            }
+          }
+          setIsSyncing(false);
         } catch (error) {
-          console.warn('Failed to sync referral code:', error);
+          console.warn('Failed to sync referral data:', error);
+          setIsSyncing(false);
         }
       };
-      syncReferralAndPush();
+      syncReferralAndCoins();
     }
-  }, [isOpen, referralCode]);
+  }, [isOpen, referralCode, coins, addCoins]);
   
   const handleCopyCode = () => {
     navigator.clipboard.writeText(referralCode);
