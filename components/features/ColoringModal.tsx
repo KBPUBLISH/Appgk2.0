@@ -1,8 +1,8 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { X, Sparkles, Home, ShoppingBag, Star, Pin, PinOff } from 'lucide-react';
-import DrawingCanvas from './DrawingCanvas';
+import DrawingCanvas, { DrawingCanvasRef } from './DrawingCanvas';
 import { pinnedColoringService, parseColoringPageId } from '../../services/pinnedColoringService';
 
 interface ColoringModalProps {
@@ -78,31 +78,43 @@ const createCompositeImage = (
                 tempCanvas.width = lineArtImg.width;
                 tempCanvas.height = lineArtImg.height;
                 const tempCtx = tempCanvas.getContext('2d');
+                
+                let processedLineArt = false;
                 if (tempCtx) {
-                    tempCtx.drawImage(lineArtImg, 0, 0);
-                    const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-                    const data = imageData.data;
-                    
-                    // Make light pixels transparent, keep dark pixels as lines
-                    for (let i = 0; i < data.length; i += 4) {
-                        const brightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                        if (brightness > 200) {
-                            // Light pixel - make transparent
-                            data[i + 3] = 0;
-                        } else {
-                            // Dark pixel - make it black with appropriate alpha
-                            data[i] = 0;
-                            data[i + 1] = 0;
-                            data[i + 2] = 0;
-                            data[i + 3] = Math.min(255, (255 - brightness) * 2);
+                    try {
+                        tempCtx.drawImage(lineArtImg, 0, 0);
+                        // This getImageData call will throw if CORS blocks pixel access
+                        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                        const data = imageData.data;
+                        
+                        // Make light pixels transparent, keep dark pixels as lines
+                        for (let i = 0; i < data.length; i += 4) {
+                            const brightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                            if (brightness > 200) {
+                                // Light pixel - make transparent
+                                data[i + 3] = 0;
+                            } else {
+                                // Dark pixel - make it black with appropriate alpha
+                                data[i] = 0;
+                                data[i + 1] = 0;
+                                data[i + 2] = 0;
+                                data[i + 3] = Math.min(255, (255 - brightness) * 2);
+                            }
                         }
+                        tempCtx.putImageData(imageData, 0, 0);
+                        
+                        // 4. Draw processed line art on top (positioned with contain scaling)
+                        ctx.drawImage(tempCanvas, lineX, lineY, lineWidth, lineHeight);
+                        processedLineArt = true;
+                        console.log('📸 Line art processed and composited successfully');
+                    } catch (corsErr) {
+                        console.warn('📸 CORS blocked pixel access for line art:', corsErr);
                     }
-                    tempCtx.putImageData(imageData, 0, 0);
-                    
-                    // 4. Draw processed line art on top (positioned with contain scaling)
-                    ctx.drawImage(tempCanvas, lineX, lineY, lineWidth, lineHeight);
-                } else {
-                    // Fallback: draw line art with multiply blend mode
+                }
+                
+                if (!processedLineArt) {
+                    // Fallback: draw line art with multiply blend mode (works without pixel access)
+                    console.log('📸 Using multiply blend mode fallback for line art');
                     ctx.globalCompositeOperation = 'multiply';
                     ctx.drawImage(lineArtImg, lineX, lineY, lineWidth, lineHeight);
                     ctx.globalCompositeOperation = 'source-over';
@@ -131,12 +143,24 @@ const createCompositeImage = (
         };
         lineArtImg.onerror = (err) => {
             // If line art fails to load (CORS), just use the drawing alone
-            console.warn('Line art failed to load (likely CORS), using drawing only:', err);
+            console.warn('📸 Line art failed to load (likely CORS), using drawing only:', err);
             resolve(drawingDataUrl);
         };
         
         drawingImg.src = drawingDataUrl;
-        lineArtImg.src = lineArtUrl;
+        
+        // Try loading line art - if CORS blocks it, we'll fall back to drawing only
+        // First try without crossOrigin to see if it loads at all
+        const testImg = new Image();
+        testImg.onload = () => {
+            // Image loads without CORS, now try with crossOrigin for pixel access
+            lineArtImg.src = lineArtUrl;
+        };
+        testImg.onerror = () => {
+            console.warn('📸 Line art URL not accessible, using drawing only');
+            resolve(drawingDataUrl);
+        };
+        testImg.src = lineArtUrl;
     });
 };
 
@@ -164,6 +188,9 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
     const [resolvedImageUrl, setResolvedImageUrl] = useState<string>('');
     const [pinToast, setPinToast] = useState<string | null>(null);
     const [isPinning, setIsPinning] = useState(false);
+    
+    // Ref to DrawingCanvas for screenshot capture
+    const drawingCanvasRef = useRef<DrawingCanvasRef>(null);
 
     const parsedPage = useMemo(() => parseColoringPageId(pageId), [pageId]);
     const pinnedForBook = useMemo(() => {
@@ -196,33 +223,42 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
             return;
         }
         
-        // Get the drawing from localStorage
-        const drawingDataUrl = localStorage.getItem(`${DRAWING_STORAGE_PREFIX}${pageId}`);
-        if (!drawingDataUrl) {
-            setPinToast('No drawing found to pin');
-            window.setTimeout(() => setPinToast(null), 1500);
-            return;
-        }
-        
         setIsPinning(true);
-        setPinToast('Creating your artwork...');
+        setPinToast('📸 Taking a picture...');
         
         try {
-            let finalImageUrl = drawingDataUrl;
+            // Use screenshot method to capture the entire canvas with overlay
+            let finalImageUrl: string | null = null;
             
-            // If we have line art, composite them together
-            if (resolvedImageUrl) {
-                console.log('📌 Compositing drawing with line art...');
-                finalImageUrl = await createCompositeImage(drawingDataUrl, resolvedImageUrl);
-                console.log('📌 Composite created successfully');
+            if (drawingCanvasRef.current) {
+                console.log('📸 Taking screenshot of coloring page...');
+                finalImageUrl = await drawingCanvasRef.current.captureScreenshot();
+                console.log('📸 Screenshot captured:', finalImageUrl ? 'success' : 'failed');
             }
             
-            // Store the composite image
+            // Fallback to old method if screenshot fails
+            if (!finalImageUrl) {
+                console.log('📸 Screenshot failed, trying compositing...');
+                const drawingDataUrl = localStorage.getItem(`${DRAWING_STORAGE_PREFIX}${pageId}`);
+                if (drawingDataUrl && resolvedImageUrl) {
+                    finalImageUrl = await createCompositeImage(drawingDataUrl, resolvedImageUrl);
+                } else if (drawingDataUrl) {
+                    finalImageUrl = drawingDataUrl;
+                }
+            }
+            
+            if (!finalImageUrl) {
+                setPinToast('No drawing found to pin');
+                window.setTimeout(() => setPinToast(null), 1500);
+                return;
+            }
+            
+            // Store the screenshot/composite image
             const pinned = pinnedColoringService.pinWithComposite(pageId, finalImageUrl);
             console.log('📌 Pin result:', pinned);
             setPinToast(pinned ? 'Pinned to book! 🎨' : 'Could not pin (storage full?)');
         } catch (err) {
-            console.error('📌 Error creating composite:', err);
+            console.error('📌 Error creating screenshot:', err);
             // Fallback: pin without composite
             const pinned = pinnedColoringService.pinFromPageId(pageId, resolvedImageUrl || undefined);
             setPinToast(pinned ? 'Pinned to book!' : 'Could not pin');
@@ -275,6 +311,7 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
                 {/* Drawing Canvas - Takes remaining space */}
                 <div className="flex-1 w-full bg-white relative overflow-hidden">
                     <DrawingCanvas
+                        ref={drawingCanvasRef}
                         prompt="Color the picture!"
                         backgroundImageUrl={resolvedImageUrl}
                         onComplete={handleComplete}

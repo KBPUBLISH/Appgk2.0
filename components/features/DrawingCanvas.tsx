@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Eraser, RotateCcw, Download, Layers, Save } from 'lucide-react';
+import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { Eraser, RotateCcw, Download, Save } from 'lucide-react';
 
 interface DrawingCanvasProps {
     prompt: string;
@@ -9,6 +9,11 @@ interface DrawingCanvasProps {
     layeredMode?: boolean;
     // Unique key for saving/loading progress (e.g., "book-123-page-5")
     saveKey?: string;
+}
+
+// Exposed methods via ref
+export interface DrawingCanvasRef {
+    captureScreenshot: () => Promise<string | null>;
 }
 
 // Crayon colors - arranged like a real crayon box
@@ -62,10 +67,34 @@ const CrayonIcon: React.FC<{ color: string; isSelected: boolean; onClick: () => 
     </button>
 );
 
-const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUrl, onComplete, layeredMode = true, saveKey }) => {
+const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ prompt, backgroundImageUrl, onComplete, layeredMode = true, saveKey }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const overlayRef = useRef<HTMLImageElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    // Expose captureScreenshot method via ref
+    useImperativeHandle(ref, () => ({
+        captureScreenshot: async (): Promise<string | null> => {
+            if (!containerRef.current) return null;
+            
+            try {
+                // Dynamically import html2canvas to avoid SSR issues
+                const html2canvas = (await import('html2canvas')).default;
+                
+                const canvas = await html2canvas(containerRef.current, {
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#FFFFFF',
+                    scale: 2, // Higher quality
+                });
+                
+                return canvas.toDataURL('image/png');
+            } catch (err) {
+                console.error('📸 Screenshot capture failed:', err);
+                return null;
+            }
+        }
+    }), []);
     const [isDrawing, setIsDrawing] = useState(false);
     const [selectedColor, setSelectedColor] = useState(CRAYON_COLORS[0].color);
     const [brushSize, setBrushSize] = useState(18); // Crayon default size
@@ -99,62 +128,79 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
     const storageKey = saveKey ? `${STORAGE_PREFIX}${saveKey}` : null;
 
     // Process image to extract line art (remove white background, keep dark lines)
+    // Falls back to original image if CORS blocks pixel access
     const processImageForLayeredMode = useCallback((imageUrl: string): Promise<string> => {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             const img = new Image();
             img.crossOrigin = 'anonymous';
             
             img.onload = () => {
-                // Create temporary canvas for processing
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = img.width;
-                tempCanvas.height = img.height;
-                const tempCtx = tempCanvas.getContext('2d');
-                
-                if (!tempCtx) {
-                    reject(new Error('Could not get canvas context'));
-                    return;
-                }
-                
-                // Draw image
-                tempCtx.drawImage(img, 0, 0);
-                
-                // Get image data
-                const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-                const data = imageData.data;
-                
-                // Process each pixel: make white/light pixels transparent, keep dark pixels
-                for (let i = 0; i < data.length; i += 4) {
-                    const r = data[i];
-                    const g = data[i + 1];
-                    const b = data[i + 2];
+                try {
+                    // Create temporary canvas for processing
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = img.width;
+                    tempCanvas.height = img.height;
+                    const tempCtx = tempCanvas.getContext('2d');
                     
-                    // Calculate brightness (0-255)
-                    const brightness = (r + g + b) / 3;
-                    
-                    // If pixel is light (brightness > 200), make it transparent
-                    // Keep dark pixels (lines) visible
-                    if (brightness > 200) {
-                        data[i + 3] = 0; // Set alpha to 0 (transparent)
-                    } else {
-                        // For darker pixels, set to black with some transparency based on darkness
-                        data[i] = 0;     // R
-                        data[i + 1] = 0; // G
-                        data[i + 2] = 0; // B
-                        // Alpha based on how dark the pixel is (darker = more opaque)
-                        data[i + 3] = Math.min(255, (255 - brightness) * 2);
+                    if (!tempCtx) {
+                        console.log('🎨 Could not get canvas context, using original image');
+                        resolve(imageUrl);
+                        return;
                     }
+                    
+                    // Draw image
+                    tempCtx.drawImage(img, 0, 0);
+                    
+                    // Try to get image data - this will fail if CORS blocks it
+                    let imageData;
+                    try {
+                        imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                    } catch (corsError) {
+                        // CORS blocked pixel access - use original with CSS blend mode instead
+                        console.log('🎨 CORS blocked pixel access, using CSS multiply blend mode instead');
+                        resolve(imageUrl);
+                        return;
+                    }
+                    
+                    const data = imageData.data;
+                    
+                    // Process each pixel: make white/light pixels transparent, keep dark pixels
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
+                        
+                        // Calculate brightness (0-255)
+                        const brightness = (r + g + b) / 3;
+                        
+                        // If pixel is light (brightness > 200), make it transparent
+                        // Keep dark pixels (lines) visible
+                        if (brightness > 200) {
+                            data[i + 3] = 0; // Set alpha to 0 (transparent)
+                        } else {
+                            // For darker pixels, set to black with some transparency based on darkness
+                            data[i] = 0;     // R
+                            data[i + 1] = 0; // G
+                            data[i + 2] = 0; // B
+                            // Alpha based on how dark the pixel is (darker = more opaque)
+                            data[i + 3] = Math.min(255, (255 - brightness) * 2);
+                        }
+                    }
+                    
+                    // Put processed data back
+                    tempCtx.putImageData(imageData, 0, 0);
+                    
+                    // Convert to data URL
+                    console.log('🎨 Line art processed successfully');
+                    resolve(tempCanvas.toDataURL('image/png'));
+                } catch (err) {
+                    console.log('🎨 Error processing line art, using original:', err);
+                    resolve(imageUrl);
                 }
-                
-                // Put processed data back
-                tempCtx.putImageData(imageData, 0, 0);
-                
-                // Convert to data URL
-                resolve(tempCanvas.toDataURL('image/png'));
             };
             
             img.onerror = () => {
-                console.log('🎨 Could not process image for line art, using original');
+                console.log('🎨 Could not load image for line art processing, using original');
                 resolve(imageUrl); // Fall back to original image
             };
             
@@ -741,6 +787,8 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
             )}
         </div>
     );
-};
+});
+
+DrawingCanvas.displayName = 'DrawingCanvas';
 
 export default DrawingCanvas;
