@@ -355,6 +355,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     
+    // Skip persistence if signing out flag is set (survives page navigation)
+    if (sessionStorage.getItem('godlykids_signing_out') === 'true') {
+      return;
+    }
+    
+    // Skip persistence if user data is empty/reset (parentName is '' after signout)
+    // This prevents default values from being written back to localStorage
+    if (parentName === '' && kids.length === 0) {
+      return;
+    }
+    
     const stateToSave = {
       coins,
       coinTransactions,
@@ -988,6 +999,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resetUser = () => {
     // Set flag to prevent persistence effect from writing during reset
     isResetting.current = true;
+    
+    // Also set a session flag that survives until tab/app is closed
+    // This prevents re-initialization from writing default data back
+    sessionStorage.setItem('godlykids_signing_out', 'true');
     
     // Reset all in-memory state to defaults
     setCoins(500); // New users start with 500 gold coins

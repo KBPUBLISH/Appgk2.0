@@ -663,6 +663,8 @@ const OnboardingPage: React.FC = () => {
   const handleStep1Submit = () => {
     if (!pName.trim()) return;
     playClick();
+    // Clear the signing out flag since user is starting fresh
+    sessionStorage.removeItem('godlykids_signing_out');
     setParentName(pName);
     setEquippedAvatar(pAvatar);
     setStep(2);

@@ -175,6 +175,9 @@ const SignInPage: React.FC = () => {
       if (result.success) {
         console.log('✅ SignInPage: Login successful! Token stored.');
         
+        // Clear the signing out flag since user is logging in
+        sessionStorage.removeItem('godlykids_signing_out');
+        
         // Store user email for subscription/RevenueCat identification
         const loginEmail = emailValue || email;
         if (loginEmail && provider === 'email') {
