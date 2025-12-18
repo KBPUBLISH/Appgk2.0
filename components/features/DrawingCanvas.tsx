@@ -311,15 +311,14 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
                 ctx.fillStyle = '#FFFFFF';
                 ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-                // Calculate scale to FILL width (cover mode, not contain)
-                // This ensures the image fills the width while cropping from bottom if needed
-                const scale = Math.max(canvasWidth / img.width, canvasHeight / img.height);
+                // Calculate scale to fit entire image within canvas (contain mode)
+                const scale = Math.min(canvasWidth / img.width, canvasHeight / img.height);
                 const scaledWidth = img.width * scale;
                 const scaledHeight = img.height * scale;
                 
-                // Center horizontally, align to top vertically
+                // Center both horizontally and vertically
                 const x = (canvasWidth - scaledWidth) / 2;
-                const y = 0; // Top-aligned instead of centered
+                const y = (canvasHeight - scaledHeight) / 2;
 
                 try {
                     ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
@@ -553,12 +552,12 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
             const img = new Image();
             img.src = backgroundImageUrl;
             img.onload = () => {
-                // Use cover mode scaling (fill width, crop from bottom if needed)
-                const scale = Math.max(canvasWidth / img.width, canvasHeight / img.height);
+                // Use contain mode scaling (fit entire image)
+                const scale = Math.min(canvasWidth / img.width, canvasHeight / img.height);
                 const scaledWidth = img.width * scale;
                 const scaledHeight = img.height * scale;
                 const x = (canvasWidth - scaledWidth) / 2;
-                const y = 0; // Top-aligned
+                const y = (canvasHeight - scaledHeight) / 2;
 
                 ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
             };
@@ -577,21 +576,16 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
 
     return (
         <div className="flex flex-col h-full min-h-0">
-            {/* Prompt */}
-            <div className="mb-2 p-2 bg-white/10 backdrop-blur-sm rounded-lg">
-                <p className="text-white text-sm md:text-base font-semibold">{prompt}</p>
-            </div>
-
             {/* Canvas Container - Layered structure */}
             <div 
                 ref={containerRef}
                 className="flex-1 bg-white rounded-lg overflow-hidden shadow-lg mb-2 relative min-h-0"
+                style={{ maxHeight: 'calc(100% - 200px)' }} /* Leave room for crayons & tools */
             >
                 {/* Bottom Layer: Drawing Canvas (user colors here) */}
                 <canvas
                     ref={canvasRef}
                     className="absolute inset-0 w-full h-full touch-none cursor-crosshair"
-                    style={{ minHeight: '250px' }}
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}
@@ -608,8 +602,8 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ prompt, backgroundImageUr
                         style={{ 
                             zIndex: 10,
                             mixBlendMode: 'multiply', // Makes white transparent, keeps black lines
-                            objectFit: 'cover', // Fill the container width
-                            objectPosition: 'center top' // Keep top of image visible
+                            objectFit: 'contain', // Fit entire image within container
+                            objectPosition: 'center center' // Center the image
                         }}
                     />
                 )}

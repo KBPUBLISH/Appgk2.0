@@ -231,8 +231,8 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
 
             {/* Full Screen Container */}
             <div className="relative w-full h-full flex flex-col animate-in zoom-in-95 duration-300">
-                {/* Header */}
-                <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/50 to-transparent">
+                {/* Header - Fixed height */}
+                <div className="flex-shrink-0 z-20 flex items-center justify-between px-4 py-3 bg-[#5D4037]">
                     <h2 className="font-display font-extrabold text-xl text-white drop-shadow-lg tracking-wide uppercase flex items-center gap-2">
                         <Sparkles size={20} className="text-[#FFD700]" /> Coloring Time!
                     </h2>
@@ -244,8 +244,8 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
                     </button>
                 </div>
 
-                {/* Full Screen Drawing Canvas */}
-                <div className="flex-1 w-full h-full bg-white relative">
+                {/* Drawing Canvas - Takes remaining space */}
+                <div className="flex-1 w-full bg-white relative overflow-hidden">
                     <DrawingCanvas
                         prompt="Color the picture!"
                         backgroundImageUrl={resolvedImageUrl}
