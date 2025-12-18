@@ -461,16 +461,19 @@ const SettingsPage: React.FC = () => {
                 )}
             </section>
 
-            {/* Account Info */}
-            {authService.getUser()?.email && (
-                <section className="bg-[#fff8e1] rounded-2xl p-5 border-2 border-[#eecaa0] shadow-sm">
-                    <h3 className="font-display font-bold text-[#8B4513] text-lg mb-3 uppercase tracking-wide opacity-80">Account</h3>
-                    <div className="bg-white/50 rounded-xl p-4 border border-white/60">
-                        <p className="text-[#5c2e0b] text-sm font-semibold">Signed in as:</p>
-                        <p className="text-[#8B4513] text-base font-bold truncate">{authService.getUser()?.email}</p>
-                    </div>
-                </section>
-            )}
+            {/* Account Info - Check multiple sources for email */}
+            {(() => {
+                const userEmail = authService.getUser()?.email || localStorage.getItem('godlykids_user_email');
+                return userEmail ? (
+                    <section className="bg-[#fff8e1] rounded-2xl p-5 border-2 border-[#eecaa0] shadow-sm">
+                        <h3 className="font-display font-bold text-[#8B4513] text-lg mb-3 uppercase tracking-wide opacity-80">Account</h3>
+                        <div className="bg-white/50 rounded-xl p-4 border border-white/60">
+                            <p className="text-[#5c2e0b] text-sm font-semibold">Signed in as:</p>
+                            <p className="text-[#8B4513] text-base font-bold truncate">{userEmail}</p>
+                        </div>
+                    </section>
+                ) : null;
+            })()}
 
             {/* Subscription */}
             <section className="bg-[#fff8e1] rounded-2xl p-5 border-2 border-[#eecaa0] shadow-sm">

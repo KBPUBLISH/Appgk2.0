@@ -598,7 +598,7 @@ const PaywallStep: React.FC<{
 
 const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { setParentName, setEquippedAvatar, addKid, kids, removeKid, subscribe, resetUser, unlockVoice } = useUser();
+  const { setParentName, setEquippedAvatar, addKid, kids, removeKid, subscribe, resetUser, unlockVoice, parentName, equippedAvatar, equippedFrame } = useUser();
   const { playClick, playSuccess } = useAudio();
   const { purchase, isLoading: isSubscriptionLoading, isPremium } = useSubscription();
   
@@ -1441,32 +1441,46 @@ const OnboardingPage: React.FC = () => {
               onSubscribe={handleSubscribeClick}
               onSkip={() => {
                 // User skipped without subscribing - limit to 1 kid account
+                let finalKids = [...kids]; // Copy kids array
                 if (kids.length > 1) {
-                  // Remove all kids except the first one
-                  const kidsToRemove = kids.slice(1); // Get all kids after the first
+                  // Remove all kids except the first one from context
+                  const kidsToRemove = kids.slice(1);
                   kidsToRemove.forEach(kid => {
                     removeKid(kid.id);
                   });
-                  
-                  // Also update localStorage to only have one kid
-                  const savedProfiles = localStorage.getItem('godlykids_kid_profiles');
-                  if (savedProfiles) {
-                    try {
-                      const profiles = JSON.parse(savedProfiles);
-                      if (Array.isArray(profiles) && profiles.length > 0) {
-                        localStorage.setItem('godlykids_kid_profiles', JSON.stringify([profiles[0]]));
-                      }
-                    } catch (e) {
-                      console.error('Error trimming kid profiles:', e);
-                    }
-                  }
-                  
+                  finalKids = [kids[0]]; // Only keep first kid
                   console.log('🆓 Free account: Limited to 1 kid profile');
                 }
                 
                 // Mark as free user (not premium)
                 localStorage.setItem('godlykids_premium', 'false');
-                navigate('/home');
+                
+                // IMPORTANT: Force save user data to localStorage before navigation
+                // This ensures the data persists even if the useEffect doesn't fire in time
+                // Use the current state values from UserContext, not localStorage
+                const existingData = localStorage.getItem('godly_kids_data_v6');
+                const currentData = existingData ? JSON.parse(existingData) : {};
+                const dataToSave = {
+                  ...currentData,
+                  parentName: parentName || pName || currentData.parentName, // Use context, fallback to local state, then existing
+                  kids: finalKids,
+                  equippedAvatar: equippedAvatar || pAvatar || currentData.equippedAvatar,
+                  equippedFrame: equippedFrame || currentData.equippedFrame || 'border-[#8B4513]',
+                  isSubscribed: false,
+                  coins: currentData.coins ?? 500,
+                  ownedItems: currentData.ownedItems ?? ['f1', 'anim1']
+                };
+                localStorage.setItem('godly_kids_data_v6', JSON.stringify(dataToSave));
+                console.log('💾 Force saved user data before navigation:', { 
+                  parentName: dataToSave.parentName, 
+                  kidsCount: dataToSave.kids?.length,
+                  kidNames: dataToSave.kids?.map((k: any) => k.name)
+                });
+                
+                // Small delay to ensure localStorage is written
+                setTimeout(() => {
+                  navigate('/home');
+                }, 100);
               }}
               onRestore={handleRestorePurchases}
               isPurchasing={isPurchasing}
