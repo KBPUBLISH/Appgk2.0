@@ -414,6 +414,63 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [referralCode]); // Only run when referralCode is available (on mount)
 
+  // --- SYNC PROFILE TO BACKEND (including kids) ---
+  const syncProfileToBackend = useCallback(async (kidsToSync?: any[]) => {
+    try {
+      const user = authService.getUser();
+      const userId = user?.email || user?._id || user?.id || localStorage.getItem('godlykids_user_email') || localStorage.getItem('device_id');
+      
+      if (!userId || !referralCode) {
+        return; // Not ready to sync yet
+      }
+      
+      const apiBase = window.location.hostname === 'localhost' 
+        ? 'http://localhost:5001' 
+        : 'https://backendgk2-0.onrender.com';
+      
+      // Detect platform
+      const ua = navigator.userAgent.toLowerCase();
+      let platform = 'web';
+      if (/despia/i.test(ua)) {
+        platform = ua.includes('iphone') || ua.includes('ipad') ? 'ios' : 'android';
+      }
+      
+      const kidsData = kidsToSync || kids;
+      
+      await fetch(`${apiBase}/api/referrals/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          referralCode,
+          kidProfiles: kidsData.map(kid => ({
+            name: kid.name,
+            age: kid.age,
+            avatarSeed: kid.avatarSeed || kid.avatar,
+          })),
+          parentName,
+          coins,
+          platform
+        })
+      });
+      
+      console.log(`👶 Synced ${kidsData.length} kid profile(s) to backend`);
+    } catch (error) {
+      console.warn('Failed to sync profile to backend:', error);
+    }
+  }, [referralCode, kids, parentName, coins]);
+
+  // Sync profile when kids change
+  useEffect(() => {
+    if (kids.length > 0 && referralCode) {
+      // Debounce to avoid too many calls
+      const timer = setTimeout(() => {
+        syncProfileToBackend(kids);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [kids, referralCode, syncProfileToBackend]);
+
   // --- PERSISTENCE EFFECT ---
   useEffect(() => {
     // Skip persistence if we're in the middle of a reset/signout

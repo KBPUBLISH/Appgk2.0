@@ -779,6 +779,7 @@ const App: React.FC = () => {
       return;
     }
     try { (window as any).__GK_TRACE__?.('activity_tracking_start'); } catch {}
+    activityTrackingService.incrementSessionCount(); // Track new session
     activityTrackingService.startTimeTracking();
     
     return () => {

@@ -1,5 +1,6 @@
 // Activity Tracking Service - Tracks user activities for Report Card
 import { profileService } from './profileService';
+import { authService } from './authService';
 
 export interface ActivityStats {
   booksRead: number;
@@ -21,6 +22,8 @@ class ActivityTrackingService {
   private sessionStartTime: number | null = null;
   private lastActiveTime: number | null = null;
   private timeTrackingInterval: NodeJS.Timeout | null = null;
+  private syncInterval: NodeJS.Timeout | null = null;
+  private lastSyncTime: number = 0;
 
   // Get profile-specific storage key
   private getKey(key: string): string {
@@ -45,6 +48,17 @@ class ActivityTrackingService {
           console.error('Activity tracking update error:', e);
         }
       }, 60000); // Every minute
+      
+      // Sync stats to backend every 5 minutes
+      if (this.syncInterval) {
+        clearInterval(this.syncInterval);
+      }
+      this.syncInterval = setInterval(() => {
+        this.syncStatsToBackend();
+      }, 300000); // Every 5 minutes
+      
+      // Also sync on startup (with delay to let app initialize)
+      setTimeout(() => this.syncStatsToBackend(), 5000);
       
       // Also listen for visibility changes (but be defensive)
       if (typeof document !== 'undefined') {
@@ -285,6 +299,113 @@ class ActivityTrackingService {
     allEntries.sort((a, b) => b.timestamp - a.timestamp);
     
     return allEntries.slice(0, limit);
+  }
+
+  // Sync stats to backend for analytics dashboard
+  async syncStatsToBackend(): Promise<void> {
+    try {
+      // Get user ID
+      const user = authService.getUser();
+      const userId = user?.email || user?._id || user?.id || 
+        localStorage.getItem('godlykids_user_email') || 
+        localStorage.getItem('device_id');
+      
+      if (!userId) {
+        console.log('📊 No userId for stats sync');
+        return;
+      }
+
+      // Don't sync too frequently
+      const now = Date.now();
+      if (now - this.lastSyncTime < 60000) { // At least 1 minute between syncs
+        return;
+      }
+      this.lastSyncTime = now;
+
+      // Get all-time stats (not limited to a period)
+      const allTimeStats = this.getAllTimeStats();
+      
+      const apiBase = window.location.hostname === 'localhost' 
+        ? 'http://localhost:5001' 
+        : 'https://backendgk2-0.onrender.com';
+
+      const response = await fetch(`${apiBase}/api/analytics/sync-stats`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          stats: {
+            totalSessions: this.getSessionCount(),
+            totalTimeSpent: allTimeStats.timeSpentMinutes * 60, // Convert to seconds
+            booksRead: allTimeStats.booksRead,
+            playlistsPlayed: allTimeStats.songsListened, // Approximate
+            lessonsCompleted: allTimeStats.lessonsCompleted,
+            gamesPlayed: allTimeStats.gamesPlayed,
+            coloringSessions: 0, // TODO: track this
+          }
+        })
+      });
+
+      if (response.ok) {
+        console.log('📊 Stats synced to backend:', allTimeStats);
+      }
+    } catch (error) {
+      console.warn('📊 Failed to sync stats to backend:', error);
+    }
+  }
+
+  // Get all-time stats (no time cutoff)
+  private getAllTimeStats(): ActivityStats {
+    // Books read (all time)
+    const booksKey = this.getKey('activity_books_read');
+    const booksEntries = this.getActivityEntries(booksKey);
+    const booksRead = new Set(booksEntries.map(e => e.id)).size; // Unique books
+    
+    // Pages read (all time)
+    const pagesKey = this.getKey('activity_pages_read');
+    const pagesEntries = this.getActivityEntries(pagesKey);
+    const pagesRead = pagesEntries.length;
+    
+    // Songs listened (all time)
+    const songsKey = this.getKey('activity_songs_played');
+    const songsEntries = this.getActivityEntries(songsKey);
+    const songsListened = songsEntries.length;
+    
+    // Games played (all time)
+    const gamesKey = this.getKey('activity_games_played');
+    const gamesEntries = this.getActivityEntries(gamesKey);
+    const gamesPlayed = gamesEntries.length;
+    
+    // Lessons completed (all time)
+    const lessonsKey = this.getKey('activity_lessons_completed');
+    const lessonsEntries = this.getActivityEntries(lessonsKey);
+    const lessonsCompleted = new Set(lessonsEntries.map(e => e.id)).size; // Unique lessons
+    
+    // Total time spent
+    const totalTimeKey = this.getKey('total_time_spent_minutes');
+    const timeSpentMinutes = parseInt(localStorage.getItem(totalTimeKey) || '0');
+    
+    return {
+      booksRead,
+      pagesRead,
+      songsListened,
+      gamesPlayed,
+      lessonsCompleted,
+      timeSpentMinutes,
+    };
+  }
+
+  // Get session count
+  private getSessionCount(): number {
+    const key = this.getKey('session_count');
+    return parseInt(localStorage.getItem(key) || '1');
+  }
+
+  // Increment session count (call on app start)
+  incrementSessionCount(): void {
+    const key = this.getKey('session_count');
+    const current = parseInt(localStorage.getItem(key) || '0');
+    localStorage.setItem(key, (current + 1).toString());
   }
 }
 
