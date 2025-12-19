@@ -1135,7 +1135,11 @@ const BookReaderPage: React.FC = () => {
     // Get all translated text boxes for current page
     const getTranslatedTextBoxes = (page: Page): TextBox[] => {
         // Check both locations: content.textBoxes (primary) and textBoxes (legacy)
-        const sourceTextBoxes = page.content?.textBoxes || page.textBoxes;
+        // IMPORTANT: Empty array [] is truthy, so check length explicitly
+        const contentTextBoxes = page.content?.textBoxes;
+        const sourceTextBoxes = (contentTextBoxes && contentTextBoxes.length > 0) 
+            ? contentTextBoxes 
+            : page.textBoxes;
         if (!sourceTextBoxes || sourceTextBoxes.length === 0) return [];
         
         if (selectedLanguage === 'en') {
