@@ -1248,7 +1248,8 @@ const BookReaderPage: React.FC = () => {
 
         // Play the first text box on the page (use translated text if available)
         // Note: textBoxes is nested under content in the database schema
-        const pageTextBoxes = currentPage.content?.textBoxes || currentPage.textBoxes;
+        const contentBoxes = currentPage.content?.textBoxes;
+        const pageTextBoxes = (contentBoxes && contentBoxes.length > 0) ? contentBoxes : currentPage.textBoxes;
         if (pageTextBoxes && pageTextBoxes.length > 0) {
             const translatedTextBoxes = getTranslatedTextBoxes(currentPage);
             const firstBoxText = translatedTextBoxes[0]?.text || pageTextBoxes[0].text;
@@ -1269,7 +1270,8 @@ const BookReaderPage: React.FC = () => {
             if (pageIndex >= pages.length - 1) break; // Don't preload "The End" page
             
             const page = pages[pageIndex];
-            const pageTextBoxes = page?.content?.textBoxes || page?.textBoxes;
+            const pgContentBoxes = page?.content?.textBoxes;
+            const pageTextBoxes = (pgContentBoxes && pgContentBoxes.length > 0) ? pgContentBoxes : page?.textBoxes;
             if (!page || !pageTextBoxes) continue;
             
             // For non-English, check if translation is available before preloading
@@ -1823,7 +1825,8 @@ const BookReaderPage: React.FC = () => {
                                         // Check again if auto-play is still enabled and we're on the correct page
                                         if (autoPlayModeRef.current && currentPageIndexRef.current === nextPageIndex) {
                                             const nextPage = pages[nextPageIndex];
-                                            const nextPageTextBoxes = nextPage?.content?.textBoxes || nextPage?.textBoxes;
+                                            const nextContentBoxes = nextPage?.content?.textBoxes;
+                                            const nextPageTextBoxes = (nextContentBoxes && nextContentBoxes.length > 0) ? nextContentBoxes : nextPage?.textBoxes;
                                             if (nextPage && nextPageTextBoxes && nextPageTextBoxes.length > 0) {
                                                 // Use translated text if available
                                                 const translatedTextBoxes = getTranslatedTextBoxes(nextPage);
