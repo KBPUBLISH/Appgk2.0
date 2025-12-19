@@ -297,6 +297,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [equippedLegs, setEquippedLegs] = useState<string | null>(saved?.equippedLegs ?? null);
   const [equippedAnimation, setEquippedAnimation] = useState<string>(saved?.equippedAnimation ?? 'anim-breathe');
   
+  // Ship, Wheel, Pet equipment (for cloud sync)
+  const [equippedShip, setEquippedShip] = useState<string | null>(saved?.equippedShip ?? null);
+  const [equippedWheel, setEquippedWheel] = useState<string | null>(saved?.equippedWheel ?? null);
+  const [equippedPet, setEquippedPet] = useState<string | null>(saved?.equippedPet ?? null);
+  
   // Rotation State (Defaults to 0)
   const [equippedLeftArmRotation, setEquippedLeftArmRotation] = useState<number>(saved?.equippedLeftArmRotation ?? 0);
   const [equippedRightArmRotation, setEquippedRightArmRotation] = useState<number>(saved?.equippedRightArmRotation ?? 0);
@@ -560,6 +565,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       equippedRightArm,
       equippedLegs,
       equippedAnimation,
+      equippedShip,
+      equippedWheel,
+      equippedPet,
       equippedLeftArmRotation,
       equippedRightArmRotation,
       equippedLegsRotation,
