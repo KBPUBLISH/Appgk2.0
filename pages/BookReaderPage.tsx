@@ -1134,16 +1134,18 @@ const BookReaderPage: React.FC = () => {
 
     // Get all translated text boxes for current page
     const getTranslatedTextBoxes = (page: Page): TextBox[] => {
-        if (!page.content?.textBoxes) return [];
+        // Check both locations: content.textBoxes (primary) and textBoxes (legacy)
+        const sourceTextBoxes = page.content?.textBoxes || page.textBoxes;
+        if (!sourceTextBoxes || sourceTextBoxes.length === 0) return [];
         
         if (selectedLanguage === 'en') {
-            return page.content.textBoxes;
+            return sourceTextBoxes;
         }
         
         const cacheKey = `${page._id}_${selectedLanguage}`;
         const cached = translatedContent.get(cacheKey);
         
-        return page.content.textBoxes.map((tb, index) => {
+        return sourceTextBoxes.map((tb, index) => {
             const translatedText = cached?.textBoxes?.[index]?.translatedText || tb.text;
             return { ...tb, text: translatedText };
         });

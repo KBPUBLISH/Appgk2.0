@@ -24,13 +24,48 @@ class ActivityTrackingService {
   private timeTrackingInterval: NodeJS.Timeout | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
   private lastSyncTime: number = 0;
+  private backendSyncStarted: boolean = false;
 
   // Get profile-specific storage key
   private getKey(key: string): string {
     return profileService.getProfileKey(key);
   }
 
-  // Initialize time tracking when app starts
+  // Start backend sync only (for Despia mode)
+  startBackendSync(): void {
+    if (this.backendSyncStarted) return;
+    this.backendSyncStarted = true;
+    
+    try {
+      // Clear any existing sync interval
+      if (this.syncInterval) {
+        clearInterval(this.syncInterval);
+      }
+      
+      // Sync stats to backend every 5 minutes
+      this.syncInterval = setInterval(() => {
+        this.syncStatsToBackend();
+      }, 300000); // Every 5 minutes
+      
+      // Also sync on startup (with delay to let app initialize)
+      setTimeout(() => this.syncStatsToBackend(), 5000);
+      
+      console.log('📊 Backend sync started');
+    } catch (e) {
+      console.error('Backend sync start error:', e);
+    }
+  }
+
+  // Stop backend sync
+  stopBackendSync(): void {
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+      this.syncInterval = null;
+    }
+    this.backendSyncStarted = false;
+  }
+
+  // Initialize time tracking when app starts (full tracking with visibility handlers)
   startTimeTracking(): void {
     try {
       this.sessionStartTime = Date.now();
@@ -48,17 +83,6 @@ class ActivityTrackingService {
           console.error('Activity tracking update error:', e);
         }
       }, 60000); // Every minute
-      
-      // Sync stats to backend every 5 minutes
-      if (this.syncInterval) {
-        clearInterval(this.syncInterval);
-      }
-      this.syncInterval = setInterval(() => {
-        this.syncStatsToBackend();
-      }, 300000); // Every 5 minutes
-      
-      // Also sync on startup (with delay to let app initialize)
-      setTimeout(() => this.syncStatsToBackend(), 5000);
       
       // Also listen for visibility changes (but be defensive)
       if (typeof document !== 'undefined') {
@@ -304,26 +328,37 @@ class ActivityTrackingService {
   // Sync stats to backend for analytics dashboard
   async syncStatsToBackend(): Promise<void> {
     try {
-      // Get user ID
+      // Get user ID - try multiple sources
       const user = authService.getUser();
-      const userId = user?.email || user?._id || user?.id || 
+      let userId = user?.email || user?._id || user?.id || 
         localStorage.getItem('godlykids_user_email') || 
-        localStorage.getItem('device_id');
+        localStorage.getItem('device_id') ||
+        localStorage.getItem('godlykids_device_id');
       
+      // If no userId, generate a device ID for anonymous tracking
       if (!userId) {
-        console.log('📊 No userId for stats sync');
-        return;
+        userId = 'device_' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('godlykids_device_id', userId);
+        console.log('📊 Generated new device ID for tracking:', userId);
       }
 
-      // Don't sync too frequently
+      // Don't sync too frequently (but allow force sync on session start)
       const now = Date.now();
-      if (now - this.lastSyncTime < 60000) { // At least 1 minute between syncs
+      const timeSinceLastSync = now - this.lastSyncTime;
+      if (timeSinceLastSync < 30000 && this.lastSyncTime > 0) { // 30 seconds min between syncs
+        console.log('📊 Skipping sync (too recent):', timeSinceLastSync, 'ms ago');
         return;
       }
       this.lastSyncTime = now;
 
       // Get all-time stats (not limited to a period)
       const allTimeStats = this.getAllTimeStats();
+      const sessionCount = this.getSessionCount();
+      
+      console.log('📊 Syncing stats for:', userId);
+      console.log('  - Sessions:', sessionCount);
+      console.log('  - Books read:', allTimeStats.booksRead);
+      console.log('  - Songs listened:', allTimeStats.songsListened);
       
       const apiBase = window.location.hostname === 'localhost' 
         ? 'http://localhost:5001' 
@@ -335,7 +370,7 @@ class ActivityTrackingService {
         body: JSON.stringify({
           userId,
           stats: {
-            totalSessions: this.getSessionCount(),
+            totalSessions: sessionCount,
             totalTimeSpent: allTimeStats.timeSpentMinutes * 60, // Convert to seconds
             booksRead: allTimeStats.booksRead,
             playlistsPlayed: allTimeStats.songsListened, // Approximate
@@ -347,7 +382,10 @@ class ActivityTrackingService {
       });
 
       if (response.ok) {
-        console.log('📊 Stats synced to backend:', allTimeStats);
+        const data = await response.json();
+        console.log('📊 Stats synced successfully:', data);
+      } else {
+        console.warn('📊 Stats sync failed:', response.status, await response.text());
       }
     } catch (error) {
       console.warn('📊 Failed to sync stats to backend:', error);
@@ -405,7 +443,14 @@ class ActivityTrackingService {
   incrementSessionCount(): void {
     const key = this.getKey('session_count');
     const current = parseInt(localStorage.getItem(key) || '0');
-    localStorage.setItem(key, (current + 1).toString());
+    const newCount = current + 1;
+    localStorage.setItem(key, newCount.toString());
+    console.log(`📊 Session count incremented: ${newCount}`);
+    
+    // Trigger an immediate sync after incrementing (with small delay)
+    setTimeout(() => {
+      this.syncStatsToBackend();
+    }, 2000);
   }
 }
 

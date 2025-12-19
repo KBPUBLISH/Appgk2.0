@@ -771,20 +771,29 @@ const App: React.FC = () => {
     })();
   }, [isDespia]);
 
-  // Initialize activity tracking for Report Card (skip in DeSpia to avoid visibility handler issues)
+  // Initialize activity tracking for Report Card
+  // In DeSpia, we still track sessions and sync, just skip visibility handlers
   useEffect(() => {
+    try { (window as any).__GK_TRACE__?.('activity_tracking_start', { isDespia }); } catch {}
+    
+    // Always increment session count (works in both web and Despia)
+    activityTrackingService.incrementSessionCount();
+    
+    // Always start the backend sync (important for dashboard stats)
+    activityTrackingService.startBackendSync();
+    
     if (isDespia) {
-      console.log('⏭️ Skipping activity tracking in DeSpia');
-      try { (window as any).__GK_TRACE__?.('activity_tracking_skip', { reason: 'despia' }); } catch {}
-      return;
+      // In Despia, skip visibility handlers but still track basic stats
+      console.log('📱 Activity tracking (Despia mode - basic stats only)');
+    } else {
+      // In web mode, also start time tracking with visibility handlers
+      activityTrackingService.startTimeTracking();
     }
-    try { (window as any).__GK_TRACE__?.('activity_tracking_start'); } catch {}
-    activityTrackingService.incrementSessionCount(); // Track new session
-    activityTrackingService.startTimeTracking();
     
     return () => {
       try { (window as any).__GK_TRACE__?.('activity_tracking_stop'); } catch {}
       activityTrackingService.stopTimeTracking();
+      activityTrackingService.stopBackendSync();
     };
   }, [isDespia]);
 
