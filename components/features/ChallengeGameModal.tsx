@@ -52,8 +52,11 @@ interface Card {
 
 const ChallengeGameModal: React.FC<ChallengeGameModalProps> = ({ isOpen, onClose }) => {
   const { addCoins } = useUser();
-  const { playClick, playSuccess, playTab, playBack } = useAudio();
+  const { playClick, playSuccess, playTab, playBack, currentPlaylist } = useAudio();
   const { t } = useLanguage();
+  
+  // Check if MiniPlayer is visible (playlist is playing)
+  const hasMiniPlayer = !!currentPlaylist;
   
   const [gameState, setGameState] = useState<GameState>('intro');
   const [isClaiming, setIsClaiming] = useState(false);
@@ -230,7 +233,7 @@ const ChallengeGameModal: React.FC<ChallengeGameModalProps> = ({ isOpen, onClose
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 pointer-events-auto">
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center px-4 pointer-events-auto ${hasMiniPlayer ? 'pb-20' : ''}`}>
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, ArrowLeft, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAudio } from '../../context/AudioContext';
 
 interface GameWebViewProps {
   url: string;
@@ -12,6 +13,10 @@ const GameWebView: React.FC<GameWebViewProps> = ({ url, title, onClose }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const { currentPlaylist } = useAudio();
+  
+  // Check if MiniPlayer is visible (playlist is playing)
+  const hasMiniPlayer = !!currentPlaylist;
 
   useEffect(() => {
     // Reset loading state when URL changes
@@ -38,7 +43,7 @@ const GameWebView: React.FC<GameWebViewProps> = ({ url, title, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+    <div className={`fixed inset-0 z-[100] bg-black flex flex-col ${hasMiniPlayer ? 'pb-20' : ''}`}>
       {/* Header */}
       <div className="bg-[#1a103c] text-white px-4 py-3 flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-3 flex-1 min-w-0">

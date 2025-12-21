@@ -115,8 +115,11 @@ const PRAYER_TEXTS: Record<string, string[]> = {
 
 const PrayerGameModal: React.FC<PrayerGameModalProps> = ({ isOpen, onClose }) => {
   const { addCoins } = useUser();
-  const { playClick, playSuccess, playTab, setGameMode } = useAudio();
+  const { playClick, playSuccess, playTab, setGameMode, currentPlaylist } = useAudio();
   const { t } = useLanguage();
+  
+  // Check if MiniPlayer is visible (playlist is playing)
+  const hasMiniPlayer = !!currentPlaylist;
   
   const [gameState, setGameState] = useState<GameState>('intro');
   const [isClaiming, setIsClaiming] = useState(false);
@@ -368,7 +371,7 @@ const PrayerGameModal: React.FC<PrayerGameModalProps> = ({ isOpen, onClose }) =>
   const activeTopic = selectedTopics[currentTopicIndex];
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 pointer-events-auto">
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center px-4 pointer-events-auto ${hasMiniPlayer ? 'pb-20' : ''}`}>
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-[#1a103c]/90 backdrop-blur-md animate-in fade-in duration-300"
