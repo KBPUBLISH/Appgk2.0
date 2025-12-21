@@ -100,9 +100,12 @@ if (!(window as any).__GK_APP_BOOTED__) {
             lastFocusState = 'out';
             
             // Store the current route so we can restore it properly
+            // Skip game routes - they have query params that won't survive force quit
             try {
               const currentHash = window.location.hash || '#/home';
-              localStorage.setItem('gk_last_route', currentHash);
+              if (!currentHash.includes('/game')) {
+                localStorage.setItem('gk_last_route', currentHash);
+              }
             } catch {}
           }
         }, 100); // Longer debounce for focusout to ensure it's a real app blur
@@ -653,9 +656,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       
       // DESPIA FIX: Save current route for restoration after soft-close/reopen
       // This allows us to restore the user to their last location when the app returns from background
+      // SKIP saving game routes - they have query params that won't work after force quit
       if ((window as any).__GK_IS_DESPIA__ && location.pathname && location.pathname !== '/') {
-        const routeToSave = `#${location.pathname}${location.search || ''}`;
-        localStorage.setItem('gk_last_route', routeToSave);
+        // Don't save game routes since they require query params
+        if (location.pathname.startsWith('/game')) {
+          console.log('📱 Despia: Skipping route save for game page');
+          localStorage.removeItem('gk_last_route'); // Clear any previous game route
+        } else {
+          const routeToSave = `#${location.pathname}${location.search || ''}`;
+          localStorage.setItem('gk_last_route', routeToSave);
+        }
       }
     } catch {}
   }, [location.pathname, location.hash, location.search]);

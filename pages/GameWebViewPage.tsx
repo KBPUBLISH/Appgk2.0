@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Maximize2, Minimize2 } from 'lucide-react';
 
@@ -12,24 +12,37 @@ const GameWebViewPage: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const handleBack = () => {
-    navigate(-1);
+    // Clear any saved route that might have the game URL
+    localStorage.removeItem('gk_last_route');
+    // Navigate back or to home if no history
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate('/home', { replace: true });
+    }
   };
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
   };
 
+  // If no game URL provided, redirect to home immediately
+  // This handles the case where app reopens on this page after force quit
+  useEffect(() => {
+    if (!gameUrl) {
+      console.log('🎮 GameWebViewPage: No URL provided, redirecting to home');
+      localStorage.removeItem('gk_last_route');
+      navigate('/home', { replace: true });
+    }
+  }, [gameUrl, navigate]);
+
   if (!gameUrl) {
+    // Show loading while redirecting
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center">
         <div className="text-center text-white">
-          <p className="text-xl mb-4">No game URL provided</p>
-          <button
-            onClick={handleBack}
-            className="px-6 py-3 bg-[#4CAF50] rounded-full font-bold"
-          >
-            Go Back
-          </button>
+          <Loader2 size={48} className="animate-spin mx-auto mb-4" />
+          <p className="text-lg">Redirecting...</p>
         </div>
       </div>
     );
