@@ -610,48 +610,40 @@ const SettingsPage: React.FC = () => {
             {/* Logout */}
             <button 
                 onClick={() => {
-                    // IMPORTANT: Reset in-memory state FIRST to prevent persistence effect
-                    // from immediately re-writing data to localStorage
-                    resetUser();
+                    // STEP 1: Clear ALL localStorage items related to the app
+                    const allKeys = Object.keys(localStorage);
+                    allKeys.forEach(k => {
+                      if (k.startsWith('godlykids') || k.startsWith('gk_') || k.startsWith('godly_kids') || k === 'device_id') {
+                        localStorage.removeItem(k);
+                      }
+                    });
                     
-                    // Clear additional user data not handled by resetUser
-                    localStorage.removeItem('godlykids_app_language');
-                    localStorage.removeItem('godlykids_reader_language');
-                    // Clear subscription/identity data to prevent cross-account leakage
-                    localStorage.removeItem('godlykids_user_email');
-                    localStorage.removeItem('godlykids_premium');
-                    localStorage.removeItem('godlykids_device_id');
-                    localStorage.removeItem('godlykids_user');
-                    localStorage.removeItem('device_id');
-                    // Clear welcome screen seen flag so new user sees it again
-                    localStorage.removeItem('godlykids_welcome_seen');
-                    // Clear activity tracking data
-                    localStorage.removeItem('godlykids_activity_stats');
-                    // Clear Despia route restoration data (prevents redirect back to home)
-                    localStorage.removeItem('gk_last_route');
-                    localStorage.removeItem('gk_last_hidden_ts');
-                    // Clear the main user data storage key directly
-                    localStorage.removeItem('godly_kids_data_v7');
-                    // Clear auth token
-                    localStorage.removeItem('godlykids_auth_token');
-                    // Sign out from auth service (clears token and user)
+                    // Also clear sessionStorage
+                    sessionStorage.clear();
+                    
+                    // STEP 2: Sign out from auth service
                     authService.signOut();
                     
-                    // For Despia/WebView: Use setTimeout to ensure all cleanup completes
-                    // before navigation, and use a more aggressive reload approach
-                    setTimeout(() => {
-                      // Clear any remaining items
-                      const keysToRemove = Object.keys(localStorage).filter(k => 
-                        k.startsWith('godlykids') || k.startsWith('gk_') || k.startsWith('godly_kids')
-                      );
-                      keysToRemove.forEach(k => localStorage.removeItem(k));
-                      
-                      // Force navigation to landing page with full reload
-                      // This works better in WebViews than replace + reload
+                    // STEP 3: Reset React state
+                    resetUser();
+                    
+                    // STEP 4: Force navigation - use direct hash change for Despia compatibility
+                    // Despia WebViews work better with direct hash manipulation
+                    const isDespia = /despia/i.test(navigator.userAgent || '');
+                    
+                    if (isDespia) {
+                      // For Despia: Force hash change, then reload with cache bust
+                      window.location.hash = '#/';
+                      // Use setTimeout to ensure hash change is processed
+                      setTimeout(() => {
+                        // Force reload with cache bust
+                        window.location.href = window.location.origin + window.location.pathname + '?logout=' + Date.now() + '#/';
+                      }, 50);
+                    } else {
+                      // For web: Simple reload to landing
                       window.location.href = window.location.origin + window.location.pathname + '#/';
-                      // Additional reload after a short delay to ensure state is fully cleared
-                      setTimeout(() => window.location.reload(), 100);
-                    }, 50);
+                      setTimeout(() => window.location.reload(), 50);
+                    }
                 }}
                 className="w-full bg-[#ffcdd2] hover:bg-[#ef9a9a] text-[#c62828] font-bold py-4 rounded-xl border-b-4 border-[#e57373] active:border-b-0 active:translate-y-1 shadow-sm flex items-center justify-center gap-2 transition-all"
             >

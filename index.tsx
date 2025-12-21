@@ -12,9 +12,18 @@ import App from './App';
   try {
     const ua = navigator.userAgent || '';
     const isDespia = /despia/i.test(ua);
+    const url = new URL(window.location.href);
+    
+    // Check for logout flag - if present, force landing page and clean state
+    if (url.searchParams.has('logout')) {
+      console.log('🔒 Logout detected - forcing fresh state');
+      url.searchParams.delete('logout');
+      url.hash = '#/';
+      window.history.replaceState(null, '', url.toString());
+      return; // Skip rest of normalization, go straight to landing
+    }
     
     if (isDespia) {
-      const url = new URL(window.location.href);
       let needsUpdate = false;
       
       // 1. Strip OneSignal and other injected query params
