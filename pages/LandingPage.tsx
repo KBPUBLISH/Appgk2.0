@@ -66,13 +66,6 @@ const LandingPage: React.FC = () => {
   if (isChecking) {
     return (
       <div className="relative h-full w-full overflow-hidden flex items-center justify-center">
-        <div className="absolute inset-0 z-0 pointer-events-none">
-          <img 
-            src="/assets/images/ship.jpg" 
-            alt="Godly Kids Ship" 
-            className="w-full h-full object-cover"
-          />
-        </div>
         <div className="relative z-10 flex flex-col items-center">
           <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
           <p className="text-white mt-4 font-medium">Loading...</p>
@@ -87,15 +80,6 @@ const LandingPage: React.FC = () => {
         NOTE: Background (Sky, Stars, Sunrise) is now handled globally in App.tsx > PanoramaBackground
         to support the swipe navigation effect.
       */}
-
-      {/* --- FULL SCREEN SHIP BACKGROUND --- */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-         <img 
-           src="/assets/images/ship.jpg" 
-           alt="Godly Kids Ship" 
-           className="w-full h-full object-cover"
-         />
-      </div>
 
       {/* Language Selector Button - Hidden until more testing is done */}
       {false && <button

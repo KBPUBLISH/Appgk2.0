@@ -104,7 +104,9 @@ interface TrackEventParams {
 
 export const analyticsService = {
     /**
-     * Track a generic event (throttled to prevent duplicates)
+     * Track a generic event
+     * DISABLED: Apple rejected app for analytics tracking in Kids Category
+     * Keeping the interface so existing calls don't break
      */
     track: async ({
         eventType,
@@ -113,40 +115,9 @@ export const analyticsService = {
         targetTitle,
         metadata,
     }: TrackEventParams): Promise<void> => {
-        try {
-            // Create a key for throttling - same event type + target within 5s is ignored
-            const eventKey = `${eventType}_${targetType || ''}_${targetId || ''}`;
-            if (shouldThrottle(eventKey)) {
-                return; // Skip duplicate event
-            }
-
-            const baseUrl = getApiBaseUrl();
-            const payload = {
-                userId: getUserId(),
-                kidProfileId: getKidProfileId(),
-                sessionId: getSessionId(),
-                eventType,
-                targetType,
-                targetId,
-                targetTitle,
-                metadata: metadata || {},
-                platform: getPlatform(),
-                deviceType: getDeviceType(),
-                appVersion: '1.0.0',
-            };
-
-            // Fire and forget - don't await or block on analytics
-            fetch(`${baseUrl}analytics/track`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            }).catch(err => {
-                console.warn('Analytics track failed (non-blocking):', err.message);
-            });
-        } catch (error) {
-            // Don't throw - analytics should never break the app
-            console.warn('Analytics track error:', error);
-        }
+        // DISABLED - No analytics tracking for Kids Category compliance
+        // Just silently return without making any network requests
+        return;
     },
 
     // ==========================================
@@ -584,24 +555,20 @@ export const analyticsService = {
 };
 
 // Auto-initialize session on import
-if (typeof window !== 'undefined') {
-    // Track session start on page load
-    analyticsService.sessionStart();
-
-    // Track session end on page unload
-    window.addEventListener('beforeunload', () => {
-        analyticsService.sessionEnd();
-    });
-
-    // Also track on visibility change (for mobile)
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-            analyticsService.sessionEnd();
-        } else if (document.visibilityState === 'visible') {
-            analyticsService.sessionStart();
-        }
-    });
-}
+// DISABLED: Apple rejected app for analytics tracking in Kids Category
+// if (typeof window !== 'undefined') {
+//     analyticsService.sessionStart();
+//     window.addEventListener('beforeunload', () => {
+//         analyticsService.sessionEnd();
+//     });
+//     document.addEventListener('visibilitychange', () => {
+//         if (document.visibilityState === 'hidden') {
+//             analyticsService.sessionEnd();
+//         } else if (document.visibilityState === 'visible') {
+//             analyticsService.sessionStart();
+//         }
+//     });
+// }
 
 export default analyticsService;
 
