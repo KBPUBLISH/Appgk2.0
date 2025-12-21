@@ -566,21 +566,57 @@ const BookReaderPage: React.FC = () => {
         currentAudioRef.current = currentAudio;
     }, [currentAudio]);
 
-    // Effect: Stop TTS audio ONLY when component unmounts (empty dependency array)
+    // Helper function to stop all book audio
+    const stopAllBookAudio = useCallback(() => {
+        console.log('📖 Stopping ALL book audio');
+        // Stop TTS narration
+        if (currentAudioRef.current) {
+            currentAudioRef.current.pause();
+            currentAudioRef.current.src = '';
+        }
+        // Stop book background music
+        if (bookBackgroundMusicRef.current) {
+            bookBackgroundMusicRef.current.pause();
+            bookBackgroundMusicRef.current.src = '';
+        }
+        // Reset state
+        setPlaying(false);
+        setActiveTextBoxIndex(null);
+        setCurrentWordIndex(-1);
+        // Clear MediaSession
+        if ('mediaSession' in navigator) {
+            try {
+                navigator.mediaSession.metadata = null;
+                navigator.mediaSession.playbackState = 'none';
+            } catch (e) { }
+        }
+    }, []);
+
+    // Effect: Stop TTS audio when component unmounts OR when navigating away
     useEffect(() => {
+        // Listen for beforeunload (page refresh/close)
+        const handleBeforeUnload = () => {
+            stopAllBookAudio();
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        
+        // Listen for hash changes (React Router navigation with HashRouter)
+        const handleHashChange = () => {
+            // If we're no longer on a book reader page, stop audio
+            if (!window.location.hash.includes('/read/')) {
+                console.log('📖 Navigated away from book reader - stopping audio');
+                stopAllBookAudio();
+            }
+        };
+        window.addEventListener('hashchange', handleHashChange);
+
         return () => {
             console.log('📖 BookReaderPage - Stopping TTS audio on unmount');
-            // Stop any playing TTS narration using ref (not state, which would be stale)
-            if (currentAudioRef.current) {
-                currentAudioRef.current.pause();
-                currentAudioRef.current.src = '';
-            }
-            // Reset playing state
-            setPlaying(false);
-            setActiveTextBoxIndex(null);
-            setCurrentWordIndex(-1);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('hashchange', handleHashChange);
+            stopAllBookAudio();
         };
-    }, []); // Empty array = only runs on unmount
+    }, [stopAllBookAudio]); // Include stopAllBookAudio in deps
 
     // Effect: Stop audio when page becomes hidden (user switches tabs/apps)
     // Book music should NOT play in background - only playlists should do that
