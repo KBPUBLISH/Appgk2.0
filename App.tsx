@@ -456,13 +456,24 @@ import VideoLessonDemo from './pages/VideoLessonDemo';
 import GameWebViewPage from './pages/GameWebViewPage';
 import NewUserWelcomePage, { shouldShowWelcome } from './pages/NewUserWelcomePage';
 
-// Landing page wrapper - shows welcome screen first for brand new users
-const LandingPageWithWelcomeCheck: React.FC = () => {
-  // Brand new users should see welcome screen FIRST (before landing page)
-  if (shouldShowWelcome()) {
-    return <Navigate to="/welcome" replace />;
+// Home page wrapper - shows welcome screen for new users who completed onboarding
+const HomePageWithWelcomeCheck: React.FC = () => {
+  // Show welcome screen AFTER onboarding is complete (user has parent name or kids)
+  const savedData = localStorage.getItem('godly_kids_data_v7') || localStorage.getItem('godly_kids_data_v6');
+  const hasCompletedOnboarding = (() => {
+    if (!savedData) return false;
+    try {
+      const data = JSON.parse(savedData);
+      return (data.parentName && data.parentName !== 'Parent' && data.parentName !== '') || 
+             (data.kids && data.kids.length > 0);
+    } catch { return false; }
+  })();
+  
+  // Only show welcome screen if user completed onboarding AND hasn't seen welcome yet
+  if (hasCompletedOnboarding && shouldShowWelcome()) {
+    return <NewUserWelcomePage />;
   }
-  return <LandingPage />;
+  return <HomePage />;
 };
 
 import MiniPlayer from './components/audio/MiniPlayer';
@@ -596,52 +607,31 @@ const PanoramaBackground: React.FC = () => {
   );
 };
 
-// Wrapper component to show referral prompt on first open or when coins reach 0
+// Wrapper component to show referral prompt AFTER shop interaction
 const ReferralPromptWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { coins, referralCode } = useUser();
+  const { referralCode } = useUser();
   const [showReferralPrompt, setShowReferralPrompt] = useState(false);
   const [promptTrigger, setPromptTrigger] = useState<'first_open' | 'zero_coins' | 'manual'>('first_open');
-  const location = useLocation();
   
-  // Check for first app open
+  // Listen for shop close event to trigger referral prompt
   useEffect(() => {
-    // Don't show on landing, signin, or onboarding pages
-    if (location.pathname === '/' || location.pathname === '/signin' || location.pathname === '/onboarding' || location.pathname === '/reset-password') {
-      return;
-    }
-    
-    const hasSeenReferralPrompt = localStorage.getItem('godlykids_seen_referral_prompt');
-    if (!hasSeenReferralPrompt && referralCode) {
-      // Small delay to let the page render first
-      const timer = setTimeout(() => {
-        setPromptTrigger('first_open');
-        setShowReferralPrompt(true);
-        localStorage.setItem('godlykids_seen_referral_prompt', 'true');
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [location.pathname, referralCode]);
-  
-  // Check when coins reach 0
-  useEffect(() => {
-    // Don't show on landing, signin, or onboarding pages
-    if (location.pathname === '/' || location.pathname === '/signin' || location.pathname === '/onboarding' || location.pathname === '/reset-password') {
-      return;
-    }
-    
-    if (coins === 0 && referralCode) {
-      // Check if we recently showed this prompt for zero coins (don't spam)
-      const lastZeroCoinsPrompt = localStorage.getItem('godlykids_zero_coins_prompt_time');
-      const now = Date.now();
-      const oneHour = 60 * 60 * 1000;
-      
-      if (!lastZeroCoinsPrompt || (now - parseInt(lastZeroCoinsPrompt)) > oneHour) {
-        setPromptTrigger('zero_coins');
-        setShowReferralPrompt(true);
-        localStorage.setItem('godlykids_zero_coins_prompt_time', String(now));
+    const handleShopClosed = () => {
+      // Only show if user hasn't seen the referral prompt yet
+      const hasSeenReferralPrompt = localStorage.getItem('godlykids_seen_referral_prompt');
+      if (!hasSeenReferralPrompt && referralCode) {
+        // Small delay after shop closes
+        setTimeout(() => {
+          setPromptTrigger('first_open');
+          setShowReferralPrompt(true);
+          localStorage.setItem('godlykids_seen_referral_prompt', 'true');
+        }, 500);
       }
-    }
-  }, [coins, location.pathname, referralCode]);
+    };
+    
+    // Listen for custom event dispatched when shop modal closes
+    window.addEventListener('godlykids_shop_closed', handleShopClosed);
+    return () => window.removeEventListener('godlykids_shop_closed', handleShopClosed);
+  }, [referralCode]);
   
   return (
     <>
@@ -820,13 +810,13 @@ const App: React.FC = () => {
               <ReferralPromptWrapper>
               <Layout>
                 <Routes>
-                  <Route path="/" element={<LandingPageWithWelcomeCheck />} />
+                  <Route path="/" element={<LandingPage />} />
                   <Route path="/signin" element={<SignInPage />} />
                   <Route path="/sign-in" element={<SignInPage />} />
                   <Route path="/reset-password" element={<ResetPasswordPage />} />
                   <Route path="/onboarding" element={<OnboardingPage />} />
                   <Route path="/welcome" element={<NewUserWelcomePage />} />
-                  <Route path="/home" element={<HomePage />} />
+                  <Route path="/home" element={<HomePageWithWelcomeCheck />} />
                   <Route path="/listen" element={<ListenPage />} />
                   <Route path="/read" element={<ReadPage />} />
                   <Route path="/library" element={<LibraryPage />} />

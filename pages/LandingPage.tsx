@@ -81,6 +81,19 @@ const LandingPage: React.FC = () => {
         to support the swipe navigation effect.
       */}
 
+      {/* Ship Image - Decorative overlay in upper section */}
+      <div className="absolute top-0 left-0 right-0 h-[55%] z-10 pointer-events-none">
+        <img 
+          src="/assets/images/ship.jpg" 
+          alt="" 
+          className="w-full h-full object-cover object-center opacity-90"
+          style={{
+            maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)'
+          }}
+        />
+      </div>
+
       {/* Language Selector Button - Hidden until more testing is done */}
       {false && <button
         onClick={() => setShowLanguageModal(true)}

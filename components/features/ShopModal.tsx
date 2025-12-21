@@ -187,6 +187,13 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
     const menuContainerRef = useRef<HTMLDivElement>(null);
     const touchStartY = useRef<number>(0);
     const touchStartTime = useRef<number>(0);
+    
+    // Wrapper for onClose that dispatches event for referral prompt
+    const handleClose = () => {
+        // Dispatch custom event to trigger referral prompt after shop closes
+        window.dispatchEvent(new CustomEvent('godlykids_shop_closed'));
+        onClose();
+    };
 
     // Update tab when initialTab changes
     useEffect(() => {
@@ -378,7 +385,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
             // Check if user can purchase this voice
             if (item.isPremium && !isSubscribed) {
                 // Premium-only voice and user isn't subscribed - go to paywall
-                onClose();
+                handleClose();
                 navigate('/paywall');
                 return;
             }
@@ -409,7 +416,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
             }
         } else if (item.isPremium && !isSubscribed) {
             // Premium item requires subscription
-            onClose();
+            handleClose();
             navigate('/paywall');
         } else if (coins < item.price && item.price > 0) {
             // Not enough coins - redirect to Gold Coins page to earn more via referrals
@@ -579,7 +586,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
                         variant="gold"
                         fullWidth
                         className="text-[10px] py-1.5 flex items-center justify-center gap-1 border border-[#B8860B] shadow-[0_2px_0_#8B4513]"
-                        onClick={(e) => { e.stopPropagation(); onClose(); navigate('/paywall'); }}
+                        onClick={(e) => { e.stopPropagation(); handleClose(); navigate('/paywall'); }}
                     >
                         <Crown size={10} fill="currentColor" /> {t('premium').toUpperCase()}
                     </WoodButton>
@@ -708,7 +715,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
-                onClick={onClose}
+                onClick={handleClose}
             ></div>
 
             {/* Main Shop Card */}
@@ -735,7 +742,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ isOpen, onClose, initialTab }) =>
                         <span className="text-[#FFD700] font-bold font-display text-lg">{coins}</span>
                     </button>
 
-                    <button onClick={onClose} className="ml-2 text-[#eecaa0] hover:text-white active:scale-95 transition-transform">
+                    <button onClick={handleClose} className="ml-2 text-[#eecaa0] hover:text-white active:scale-95 transition-transform">
                         <X size={24} />
                     </button>
                 </div>
