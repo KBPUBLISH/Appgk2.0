@@ -80,37 +80,86 @@ const BookDetailPage: React.FC = () => {
   // Background music toggle has been removed from Header. Nothing to restore here.
 
   useEffect(() => {
-    if (books.length > 0) {
-      const found = books.find(b => b.id === id);
-      setBook(found || null);
+    const findOrFetchBook = async () => {
+      // First try to find in context
+      if (books.length > 0) {
+        const found = books.find(b => b.id === id);
+        if (found) {
+          setBook(found);
+          
+          // Track book view analytics when book is loaded
+          if (id) {
+            analyticsService.bookView(id, found.title);
+          }
+          
+          // Translate title and description
+          if (currentLanguage !== 'en') {
+            translateText(found.title).then(setTranslatedTitle);
+            if (found.description) {
+              translateText(found.description).then(setTranslatedDescription);
+            }
+          } else {
+            setTranslatedTitle(found.title);
+            setTranslatedDescription(found.description || '');
+          }
 
-      // Track book view analytics when book is loaded
-      if (found && id) {
-        analyticsService.bookView(id, found.title);
+          // Load reading progress for this book
+          if (id) {
+            const progress = readingProgressService.getProgress(id);
+            if (progress) {
+              setSavedPageIndex(progress.currentPageIndex);
+            } else {
+              setSavedPageIndex(null);
+            }
+          }
+          return;
+        }
       }
       
-      // Translate title and description
-      if (found && currentLanguage !== 'en') {
-        translateText(found.title).then(setTranslatedTitle);
-        if (found.description) {
-          translateText(found.description).then(setTranslatedDescription);
-        }
-      } else if (found) {
-        setTranslatedTitle(found.title);
-        setTranslatedDescription(found.description || '');
-      }
+      // If not found in context and we have an ID, try fetching directly from API
+      // This handles the case where user navigates directly (e.g., from welcome screen)
+      if (id && !book) {
+        try {
+          console.log('📖 Book not in context, fetching from API:', id);
+          const allBooks = await ApiService.getBooks();
+          const found = allBooks.find(b => b.id === id);
+          if (found) {
+            console.log('✅ Found book from API:', found.title);
+            setBook(found);
+            
+            if (id) {
+              analyticsService.bookView(id, found.title);
+            }
+            
+            if (currentLanguage !== 'en') {
+              translateText(found.title).then(setTranslatedTitle);
+              if (found.description) {
+                translateText(found.description).then(setTranslatedDescription);
+              }
+            } else {
+              setTranslatedTitle(found.title);
+              setTranslatedDescription(found.description || '');
+            }
 
-      // Load reading progress for this book
-      if (id) {
-        const progress = readingProgressService.getProgress(id);
-        if (progress) {
-          setSavedPageIndex(progress.currentPageIndex);
-        } else {
-          setSavedPageIndex(null);
+            if (id) {
+              const progress = readingProgressService.getProgress(id);
+              if (progress) {
+                setSavedPageIndex(progress.currentPageIndex);
+              } else {
+                setSavedPageIndex(null);
+              }
+            }
+          } else {
+            console.log('❌ Book not found even after API fetch:', id);
+          }
+        } catch (error) {
+          console.error('Error fetching book from API:', error);
         }
       }
-    }
-  }, [id, books]);
+    };
+    
+    findOrFetchBook();
+  }, [id, books, book]);
 
   // Load pinned coloring drawing ("fridge") for this book
   useEffect(() => {

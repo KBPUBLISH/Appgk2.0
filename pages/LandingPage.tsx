@@ -81,15 +81,18 @@ const LandingPage: React.FC = () => {
         to support the swipe navigation effect.
       */}
 
-      {/* Ship Image - Decorative overlay in upper section */}
+      {/* Ship Image - Full coverage background in upper section */}
       <div className="absolute top-0 left-0 right-0 h-[55%] z-10 pointer-events-none">
         <img 
           src="/assets/images/ship.jpg" 
           alt="" 
-          className="w-full h-full object-cover object-center opacity-90"
+          className="w-full h-full object-cover object-center"
+        />
+        {/* Gradient overlay at bottom to blend with content area */}
+        <div 
+          className="absolute bottom-0 left-0 right-0 h-24"
           style={{
-            maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)'
+            background: 'linear-gradient(to bottom, transparent, rgba(0, 30, 60, 0.9))'
           }}
         />
       </div>
