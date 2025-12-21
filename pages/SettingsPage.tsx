@@ -627,12 +627,17 @@ const SettingsPage: React.FC = () => {
                     localStorage.removeItem('godlykids_welcome_seen');
                     // Clear activity tracking data
                     localStorage.removeItem('godlykids_activity_stats');
+                    // Clear Despia route restoration data (prevents redirect back to home)
+                    localStorage.removeItem('gk_last_route');
+                    localStorage.removeItem('gk_last_hidden_ts');
                     // Sign out from auth service (clears token and user)
                     authService.signOut();
                     
                     // Force full page reload to clear all React state
+                    // Use hash format for HashRouter compatibility
                     // This ensures no ghost data persists in memory
-                    window.location.href = '/';
+                    window.location.replace(window.location.origin + window.location.pathname + '#/');
+                    window.location.reload();
                 }}
                 className="w-full bg-[#ffcdd2] hover:bg-[#ef9a9a] text-[#c62828] font-bold py-4 rounded-xl border-b-4 border-[#e57373] active:border-b-0 active:translate-y-1 shadow-sm flex items-center justify-center gap-2 transition-all"
             >

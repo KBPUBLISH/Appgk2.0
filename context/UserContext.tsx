@@ -1267,6 +1267,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('godlykids_play_counts');
     localStorage.removeItem('godlykids_default_voice');
     localStorage.removeItem('godlykids_welcome_seen');
+    // Clear Despia route restoration (prevents redirect to home on fresh start)
+    localStorage.removeItem('gk_last_route');
+    localStorage.removeItem('gk_last_hidden_ts');
     
     // Reset all in-memory state to defaults
     setCoins(500); // New users start with 500 gold coins

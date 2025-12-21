@@ -44,9 +44,10 @@ import App from './App';
         }
       }
       
-      // 3. Ensure hash exists for HashRouter (default to #/home if missing)
-      if (!targetHash || targetHash === '#' || targetHash === '#/') {
-        targetHash = '#/home';
+      // 3. Ensure hash exists for HashRouter (default to #/ landing page if missing)
+      // IMPORTANT: Fresh installs should go to landing page, not home
+      if (!targetHash || targetHash === '#') {
+        targetHash = '#/';
       }
       
       // 4. Remove trailing slashes from hash (but keep #/home not #/home/)
