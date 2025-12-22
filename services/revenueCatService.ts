@@ -581,12 +581,13 @@ export const RevenueCatService = {
     console.log('   Email:', userEmail);
     
     try {
-      // Get API base URL
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://backendgk2-0.onrender.com';
-      const apiUrl = API_BASE.endsWith('/api') ? API_BASE.replace('/api', '') : API_BASE;
+      // Get API base URL - strip any /api suffix to avoid double /api//api/
+      let API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://backendgk2-0.onrender.com';
+      // Remove trailing slashes and /api suffix
+      API_BASE = API_BASE.replace(/\/+$/, '').replace(/\/api$/, '');
       
       // Create Stripe checkout session via backend
-      const response = await fetch(`${apiUrl}/api/stripe/create-checkout-session`, {
+      const response = await fetch(`${API_BASE}/api/stripe/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
