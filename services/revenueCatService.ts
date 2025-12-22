@@ -10,11 +10,11 @@
  */
 
 // RevenueCat Web Billing API Key
-// Note: Web Billing requires a separate API key from RevenueCat dashboard
-// Format is typically 'rcb_...' for web billing
-// If not set up, users can use the native app or contact support
-const REVENUECAT_WEB_API_KEY = import.meta.env.VITE_REVENUECAT_WEB_KEY || 'app600608d495';
-const WEB_BILLING_ENABLED = import.meta.env.VITE_WEB_BILLING_ENABLED === 'true';
+// RevenueCat Web Billing configuration
+// Sandbox key for testing: rcb_sb_AGCrvdIvLfIRIFAzVNnddnjQT
+// Production key: rcb_mGsKFPuvjpOGRhvyyfnyTGypoHNF
+const REVENUECAT_WEB_API_KEY = 'rcb_sb_AGCrvdIvLfIRIFAzVNnddnjQT'; // Using sandbox for testing
+const WEB_BILLING_ENABLED = true;
 
 // Entitlement identifier for premium access
 export const PREMIUM_ENTITLEMENT_ID = 'premium';
