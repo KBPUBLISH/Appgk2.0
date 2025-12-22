@@ -256,7 +256,7 @@ const PaywallPage: React.FC = () => {
                 {/* Free Trial Badge */}
                 <div className="bg-gradient-to-r from-[#fdd835] to-[#ffca28] px-5 py-2 rounded-full mb-4 shadow-md animate-pulse border border-[#f9a825]/30">
                     <span className="text-[#3e2723] font-extrabold text-sm tracking-wide">
-                        🎁 START FREE FOR 3 DAYS
+                        🎁 START FREE FOR 7 DAYS
                     </span>
                 </div>
 
@@ -462,7 +462,7 @@ const PaywallPage: React.FC = () => {
             </div>
 
             <p className="text-white/40 text-[10px] font-medium mt-6 text-center px-6 max-w-xs">
-                Free trial for 3 days, then subscription automatically renews unless cancelled at least 24-hours before the trial ends. Cancel anytime in App Store or Google Play.
+                Free trial for 7 days, then subscription automatically renews unless cancelled at least 24-hours before the trial ends. Cancel anytime in App Store or Google Play.
             </p>
 
             {/* Debug info for development */}
