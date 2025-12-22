@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import WoodButton from '../ui/WoodButton';
 import { 
   X, Star, Brain, BookOpen, Fish, Flame, Crown, Anchor, Heart,
-  Sun, Moon, Music, Shield, Gift, Key, Bird, Droplets, Mountain
+  Sun, Moon, Music, Shield, Gift, Key, Bird, Droplets, Mountain, Cross
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import { useAudio } from '../../context/AudioContext';

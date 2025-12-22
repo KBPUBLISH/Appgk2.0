@@ -90,9 +90,7 @@ const HomePage: React.FC = () => {
   const [showChallengeGame, setShowChallengeGame] = useState(false);
   const [showPrayerGame, setShowPrayerGame] = useState(false);
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
-  const [hasEngagedMemory, setHasEngagedMemory] = useState(false);
-  const [hasEngagedDailyKey, setHasEngagedDailyKey] = useState(false);
-  const [hasEngagedPrayer, setHasEngagedPrayer] = useState(false);
+  // Game engagement tracking removed - games can be played unlimited times
   
   // Game purchase state - tracks purchased games to update UI without reload
   const [purchasedGamesState, setPurchasedGamesState] = useState<string[]>(() => {
@@ -215,31 +213,7 @@ const HomePage: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Check if games have been engaged today (per-profile) - resets daily
-  useEffect(() => {
-    const today = new Date().toDateString();
-    const lastEngagementDate = localStorage.getItem(getEngagementKey('daily_games_date'));
-    
-    // If it's a new day, reset all daily game engagements
-    if (lastEngagementDate !== today) {
-      localStorage.setItem(getEngagementKey('daily_games_date'), today);
-      localStorage.removeItem(getEngagementKey('memory_game_engaged'));
-      localStorage.removeItem(getEngagementKey('daily_key_engaged'));
-      localStorage.removeItem(getEngagementKey('prayer_game_engaged'));
-      setHasEngagedMemory(false);
-      setHasEngagedDailyKey(false);
-      setHasEngagedPrayer(false);
-    } else {
-      // Same day - check existing engagement flags
-      const memoryEngaged = localStorage.getItem(getEngagementKey('memory_game_engaged')) === 'true';
-      const dailyKeyEngaged = localStorage.getItem(getEngagementKey('daily_key_engaged')) === 'true';
-      const prayerEngaged = localStorage.getItem(getEngagementKey('prayer_game_engaged')) === 'true';
-      setHasEngagedMemory(memoryEngaged);
-      setHasEngagedDailyKey(dailyKeyEngaged);
-      setHasEngagedPrayer(prayerEngaged);
-    }
-
-    // Safeguard: If no books are loaded and we're not loading, try to refresh
+  // Safeguard: If no books are loaded and we're not loading, try to refresh
     if (!loading && books.length === 0) {
       // Use a small timeout to avoid conflict with initial load
       const timer = setTimeout(() => {
@@ -250,33 +224,18 @@ const HomePage: React.FC = () => {
   }, [loading, books, refreshBooks]);
 
   const handleDailyKeyClick = () => {
-    // Mark as engaged when user clicks (per-profile)
-    if (!hasEngagedDailyKey) {
-      localStorage.setItem(getEngagementKey('daily_key_engaged'), 'true');
-      setHasEngagedDailyKey(true);
-    }
     // Track game play for Report Card
     activityTrackingService.trackGamePlayed('daily_key', 'Daily Key');
     setShowDailyReward(true);
   };
 
   const handleMemoryClick = () => {
-    // Mark as engaged when user clicks (per-profile)
-    if (!hasEngagedMemory) {
-      localStorage.setItem(getEngagementKey('memory_game_engaged'), 'true');
-      setHasEngagedMemory(true);
-    }
     // Track game play for Report Card
     activityTrackingService.trackGamePlayed('memory_challenge', 'Memory Challenge');
     setShowChallengeGame(true);
   };
 
   const handlePrayerClick = async () => {
-    // Mark as engaged when user clicks (per-profile)
-    if (!hasEngagedPrayer) {
-      localStorage.setItem(getEngagementKey('prayer_game_engaged'), 'true');
-      setHasEngagedPrayer(true);
-    }
     // Track game play for Report Card
     activityTrackingService.trackGamePlayed('prayer_game', 'Prayer Game');
 
@@ -1105,14 +1064,10 @@ const HomePage: React.FC = () => {
               
               {/* Daily Key Task */}
               <div
-                className={`relative w-[52vw] max-w-[220px] flex-shrink-0 snap-center ${
-                  hasEngagedDailyKey ? 'cursor-default' : 'cursor-pointer'
-                }`}
-                onClick={() => !hasEngagedDailyKey && handleDailyKeyClick()}
+                className="relative w-[52vw] max-w-[220px] flex-shrink-0 snap-center cursor-pointer"
+                onClick={handleDailyKeyClick}
               >
-                <div className={`relative aspect-[9/16] rounded-2xl overflow-hidden transition-all border-3 shadow-xl ${
-                  hasEngagedDailyKey ? 'border-[#FFD700]/30' : 'border-[#FFD700]'
-                }`}>
+                <div className="relative aspect-[9/16] rounded-2xl overflow-hidden transition-all border-3 shadow-xl border-[#FFD700] hover:scale-[1.02] active:scale-[0.98]">
                   {/* Background Gradient */}
                   <div className="absolute inset-0 bg-gradient-to-br from-[#8B4513] to-[#5c2e0b]" />
                   
@@ -1133,29 +1088,15 @@ const HomePage: React.FC = () => {
                       Unlock rewards
                     </span>
                   </div>
-                  
-                  {/* Completed Overlay */}
-                  {hasEngagedDailyKey && (
-                    <>
-                      <div className="absolute inset-0 bg-black/50" />
-                      <div className="absolute top-3 right-3 bg-green-500 rounded-full p-1.5">
-                        <Check className="w-4 h-4 text-white" />
-                      </div>
-                    </>
-                  )}
                 </div>
               </div>
 
               {/* Memory Task */}
               <div
-                className={`relative w-[52vw] max-w-[220px] flex-shrink-0 snap-center ${
-                  hasEngagedMemory ? 'cursor-default' : 'cursor-pointer'
-                }`}
-                onClick={() => !hasEngagedMemory && handleMemoryClick()}
+                className="relative w-[52vw] max-w-[220px] flex-shrink-0 snap-center cursor-pointer"
+                onClick={handleMemoryClick}
               >
-                <div className={`relative aspect-[9/16] rounded-2xl overflow-hidden transition-all border-3 shadow-xl ${
-                  hasEngagedMemory ? 'border-[#3949ab]/30' : 'border-[#5c6bc0]'
-                }`}>
+                <div className="relative aspect-[9/16] rounded-2xl overflow-hidden transition-all border-3 shadow-xl border-[#5c6bc0] hover:scale-[1.02] active:scale-[0.98]">
                   {/* Background Gradient */}
                   <div className="absolute inset-0 bg-gradient-to-br from-[#1a237e] to-[#0d1442]" />
                   
@@ -1176,29 +1117,15 @@ const HomePage: React.FC = () => {
                       Bible challenge
                     </span>
                   </div>
-                  
-                  {/* Completed Overlay */}
-                  {hasEngagedMemory && (
-                    <>
-                      <div className="absolute inset-0 bg-black/50" />
-                      <div className="absolute top-3 right-3 bg-green-500 rounded-full p-1.5">
-                        <Check className="w-4 h-4 text-white" />
-                      </div>
-                    </>
-                  )}
                 </div>
               </div>
 
               {/* Prayer Task */}
               <div
-                className={`relative w-[52vw] max-w-[220px] flex-shrink-0 snap-center ${
-                  hasEngagedPrayer ? 'cursor-default' : 'cursor-pointer'
-                }`}
-                onClick={() => !hasEngagedPrayer && handlePrayerClick()}
+                className="relative w-[52vw] max-w-[220px] flex-shrink-0 snap-center cursor-pointer"
+                onClick={handlePrayerClick}
               >
-                <div className={`relative aspect-[9/16] rounded-2xl overflow-hidden transition-all border-3 shadow-xl ${
-                  hasEngagedPrayer ? 'border-[#AB47BC]/30' : 'border-[#BA68C8]'
-                }`}>
+                <div className="relative aspect-[9/16] rounded-2xl overflow-hidden transition-all border-3 shadow-xl border-[#BA68C8] hover:scale-[1.02] active:scale-[0.98]">
                   {/* Background Gradient */}
                   <div className="absolute inset-0 bg-gradient-to-br from-[#7B1FA2] to-[#4A148C]" />
                   
@@ -1219,16 +1146,6 @@ const HomePage: React.FC = () => {
                       Connect with God
                     </span>
                   </div>
-                  
-                  {/* Completed Overlay */}
-                  {hasEngagedPrayer && (
-                    <>
-                      <div className="absolute inset-0 bg-black/50" />
-                      <div className="absolute top-3 right-3 bg-green-500 rounded-full p-1.5">
-                        <Check className="w-4 h-4 text-white" />
-                      </div>
-                    </>
-                  )}
                 </div>
               </div>
 
