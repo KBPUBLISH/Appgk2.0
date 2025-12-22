@@ -16,11 +16,20 @@ import App from './App';
     
     // Check for logout flag - if present, force landing page and clean state
     if (url.searchParams.has('logout')) {
-      console.log('🔒 Logout detected - forcing fresh state');
+      console.log('🔒 Logout detected - forcing complete fresh state');
+      
+      // Clear any remaining storage (belt and suspenders)
+      try { localStorage.clear(); } catch (e) {}
+      try { sessionStorage.clear(); } catch (e) {}
+      
+      // Remove logout param and set to landing page
       url.searchParams.delete('logout');
       url.hash = '#/';
+      
+      // Replace history then force reload for completely fresh React state
       window.history.replaceState(null, '', url.toString());
-      return; // Skip rest of normalization, go straight to landing
+      window.location.reload();
+      return; // Skip rest - reload will handle it
     }
     
     if (isDespia) {

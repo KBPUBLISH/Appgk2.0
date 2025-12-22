@@ -610,40 +610,37 @@ const SettingsPage: React.FC = () => {
             {/* Logout */}
             <button 
                 onClick={() => {
-                    // STEP 1: Clear ALL localStorage items related to the app
-                    const allKeys = Object.keys(localStorage);
-                    allKeys.forEach(k => {
-                      if (k.startsWith('godlykids') || k.startsWith('gk_') || k.startsWith('godly_kids') || k === 'device_id') {
-                        localStorage.removeItem(k);
-                      }
-                    });
+                    console.log('🚪 LOGOUT: Starting clean logout...');
                     
-                    // Also clear sessionStorage
-                    sessionStorage.clear();
-                    
-                    // STEP 2: Sign out from auth service
+                    // STEP 1: Sign out from auth service FIRST (clears tokens)
                     authService.signOut();
                     
-                    // STEP 3: Reset React state
-                    resetUser();
-                    
-                    // STEP 4: Force navigation - use direct hash change for Despia compatibility
-                    // Despia WebViews work better with direct hash manipulation
-                    const isDespia = /despia/i.test(navigator.userAgent || '');
-                    
-                    if (isDespia) {
-                      // For Despia: Force hash change, then reload with cache bust
-                      window.location.hash = '#/';
-                      // Use setTimeout to ensure hash change is processed
-                      setTimeout(() => {
-                        // Force reload with cache bust
-                        window.location.href = window.location.origin + window.location.pathname + '?logout=' + Date.now() + '#/';
-                      }, 50);
-                    } else {
-                      // For web: Simple reload to landing
-                      window.location.href = window.location.origin + window.location.pathname + '#/';
-                      setTimeout(() => window.location.reload(), 50);
+                    // STEP 2: Clear ALL localStorage - be aggressive
+                    try {
+                      localStorage.clear(); // Nuclear option - clear everything
+                    } catch (e) {
+                      // Fallback: manual clear
+                      const allKeys = Object.keys(localStorage);
+                      allKeys.forEach(k => localStorage.removeItem(k));
                     }
+                    
+                    // STEP 3: Clear sessionStorage
+                    try {
+                      sessionStorage.clear();
+                    } catch (e) {
+                      console.log('sessionStorage clear failed');
+                    }
+                    
+                    // STEP 4: DON'T call resetUser() - it sets default values that cause ghost state
+                    // The page reload will handle fresh state
+                    
+                    // STEP 5: Force hard navigation with cache bust
+                    // Use replace to prevent back button from returning here
+                    const logoutUrl = window.location.origin + window.location.pathname + '?logout=' + Date.now();
+                    console.log('🚪 LOGOUT: Redirecting to:', logoutUrl);
+                    
+                    // Force immediate redirect
+                    window.location.replace(logoutUrl);
                 }}
                 className="w-full bg-[#ffcdd2] hover:bg-[#ef9a9a] text-[#c62828] font-bold py-4 rounded-xl border-b-4 border-[#e57373] active:border-b-0 active:translate-y-1 shadow-sm flex items-center justify-center gap-2 transition-all"
             >
