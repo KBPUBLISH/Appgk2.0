@@ -388,9 +388,9 @@ const PlaylistPlayerPage: React.FC = () => {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col items-center justify-center px-6 pt-20 pb-48 relative z-10 overflow-y-auto no-scrollbar">
-                {/* Album Art - With Pulse Animation */}
-                <div className={`w-[22rem] h-[22rem] mb-8 relative shrink-0 transition-all duration-300 ${isPlaying ? 'music-pulse' : 'hover:scale-105'}`}>
+            <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pt-20 pb-44 sm:pb-48 relative z-10 overflow-y-auto no-scrollbar">
+                {/* Album Art - With Pulse Animation - Responsive sizing */}
+                <div className={`w-[70vw] h-[70vw] max-w-[22rem] max-h-[22rem] mb-4 sm:mb-8 relative shrink-0 transition-all duration-300 ${isPlaying ? 'music-pulse' : 'hover:scale-105'}`}>
                     {/* Glow effect behind the cover */}
                     <div className={`absolute inset-[-20px] rounded-3xl transition-opacity duration-500 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}
                         style={{
@@ -437,25 +437,25 @@ const PlaylistPlayerPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Track Info - Updated for blurred background */}
-                <div className="w-full max-w-md text-center">
-                    <h2 className="text-3xl font-display font-black text-white mb-2 leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                {/* Track Info - Updated for blurred background - Responsive */}
+                <div className="w-full max-w-md text-center px-2">
+                    <h2 className="text-xl sm:text-3xl font-display font-black text-white mb-1 sm:mb-2 leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
                         {currentTrack.title}
                     </h2>
-                    <p className="text-white/80 font-sans text-lg font-bold mb-4 uppercase tracking-wider drop-shadow-md">
+                    <p className="text-white/80 font-sans text-sm sm:text-lg font-bold mb-2 sm:mb-4 uppercase tracking-wider drop-shadow-md">
                         {currentTrack.author || activePlaylist.author}
                     </p>
 
-                    <div className="inline-block px-4 py-2 rounded-full bg-black/30 backdrop-blur-md border border-white/20">
-                        <p className="text-white/90 text-sm font-bold">
+                    <div className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-black/30 backdrop-blur-md border border-white/20">
+                        <p className="text-white/90 text-xs sm:text-sm font-bold">
                             {activePlaylist.title} • Track {currentTrackIndex + 1}/{activePlaylist.items.length}
                         </p>
                     </div>
                 </div>
             </div>
 
-            {/* Bottom Player Control Bar */}
-            <div className="absolute bottom-0 left-0 right-0 h-48 bg-[#8B4513] z-30 rounded-t-[40px] shadow-[0_-10px_40px_rgba(0,0,0,0.4)] flex flex-col px-8 pt-8 overflow-hidden border-t-4 border-[#5c2e0b]">
+            {/* Bottom Player Control Bar - Responsive */}
+            <div className="absolute bottom-0 left-0 right-0 h-40 sm:h-48 bg-[#8B4513] z-30 rounded-t-[32px] sm:rounded-t-[40px] shadow-[0_-10px_40px_rgba(0,0,0,0.4)] flex flex-col px-4 sm:px-8 pt-5 sm:pt-8 overflow-hidden border-t-4 border-[#5c2e0b]">
                 {/* Wood Texture Background */}
                 <div className="absolute inset-0 pointer-events-none opacity-40 mix-blend-multiply"
                     style={{
@@ -478,65 +478,65 @@ const PlaylistPlayerPage: React.FC = () => {
                     onTouchStart={handleProgressTouchStart}
                     onTouchMove={handleProgressTouchMove}
                     onTouchEnd={handleProgressTouchEnd}
-                    className={`relative w-full h-3 bg-[#3E1F07] rounded-full mb-3 mt-4 z-40 group shadow-inner ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'}`}
+                    className={`relative w-full h-2 sm:h-3 bg-[#3E1F07] rounded-full mb-2 sm:mb-3 mt-2 sm:mt-4 z-40 group shadow-inner ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'}`}
                 >
                     <div
                         className="absolute top-0 left-0 h-full bg-[#FFD700] rounded-full"
                         style={{ width: `${progress}%` }}
                     ></div>
                     <div
-                        className={`absolute top-1/2 -translate-y-1/2 h-6 w-6 bg-[#f3e5ab] border-4 border-[#8B4513] rounded-full shadow-lg transition-transform ${isDragging ? 'scale-125' : 'group-hover:scale-110'}`}
+                        className={`absolute top-1/2 -translate-y-1/2 h-5 w-5 sm:h-6 sm:w-6 bg-[#f3e5ab] border-3 sm:border-4 border-[#8B4513] rounded-full shadow-lg transition-transform ${isDragging ? 'scale-125' : 'group-hover:scale-110'}`}
                         style={{ left: `${progress}%`, transform: 'translate(-50%, -50%)' }}
                     ></div>
                 </div>
 
                 {/* Time Labels */}
-                <div className="flex justify-between text-xs font-bold text-[#f3e5ab] mb-4 relative z-40">
+                <div className="flex justify-between text-[10px] sm:text-xs font-bold text-[#f3e5ab] mb-2 sm:mb-4 relative z-40">
                     <span>{formatTime(currentTime)}</span>
                     <span>{formatTime(duration)}</span>
                 </div>
 
-                {/* Controls Row */}
-                <div className="flex items-center justify-center gap-8 relative z-40">
+                {/* Controls Row - Responsive */}
+                <div className="flex items-center justify-center gap-4 sm:gap-8 relative z-40">
                     {/* Previous Track */}
                     <button
                         onClick={prevTrack}
                         disabled={currentTrackIndex === 0}
                         className="text-[#f3e5ab] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors transform active:scale-90"
                     >
-                        <SkipBack size={32} fill="currentColor" />
+                        <SkipBack size={28} className="sm:w-8 sm:h-8" fill="currentColor" />
                     </button>
 
                     {/* Skip Backward 30s */}
                     <button
                         onClick={handleSkipBackward}
-                        className="w-12 h-12 bg-[#5c2e0b] rounded-full border-2 border-[#8B4513] flex items-center justify-center text-[#f3e5ab] hover:bg-[#3e1f07] transition-colors transform active:scale-90 shadow-lg"
+                        className="w-10 h-10 sm:w-12 sm:h-12 bg-[#5c2e0b] rounded-full border-2 border-[#8B4513] flex items-center justify-center text-[#f3e5ab] hover:bg-[#3e1f07] transition-colors transform active:scale-90 shadow-lg"
                         title="Skip backward 30 seconds"
                     >
-                        <RotateCcw size={20} />
-                        <span className="absolute text-[10px] font-bold mt-1">30</span>
+                        <RotateCcw size={18} className="sm:w-5 sm:h-5" />
+                        <span className="absolute text-[8px] sm:text-[10px] font-bold mt-1">30</span>
                     </button>
 
                     {/* Play/Pause Button */}
                     <button
                         onClick={handlePlayPause}
-                        className="w-20 h-20 bg-gradient-to-b from-[#FFD700] to-[#FFA000] rounded-full border-[4px] border-[#5c2e0b] shadow-[0_4px_0_#3e1f07] active:translate-y-1 active:shadow-none flex items-center justify-center transition-all hover:brightness-110"
+                        className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-b from-[#FFD700] to-[#FFA000] rounded-full border-[4px] border-[#5c2e0b] shadow-[0_4px_0_#3e1f07] active:translate-y-1 active:shadow-none flex items-center justify-center transition-all hover:brightness-110"
                     >
                         {isPlaying ? (
-                            <Pause size={40} fill="#3e1f07" className="text-[#3e1f07]" />
+                            <Pause size={32} className="sm:w-10 sm:h-10" fill="#3e1f07" />
                         ) : (
-                            <Play size={40} fill="#3e1f07" className="text-[#3e1f07] ml-1" />
+                            <Play size={32} className="sm:w-10 sm:h-10 ml-1" fill="#3e1f07" />
                         )}
                     </button>
 
                     {/* Skip Forward 30s */}
                     <button
                         onClick={handleSkipForward}
-                        className="w-12 h-12 bg-[#5c2e0b] rounded-full border-2 border-[#8B4513] flex items-center justify-center text-[#f3e5ab] hover:bg-[#3e1f07] transition-colors transform active:scale-90 shadow-lg"
+                        className="w-10 h-10 sm:w-12 sm:h-12 bg-[#5c2e0b] rounded-full border-2 border-[#8B4513] flex items-center justify-center text-[#f3e5ab] hover:bg-[#3e1f07] transition-colors transform active:scale-90 shadow-lg"
                         title="Skip forward 30 seconds"
                     >
-                        <RotateCcw size={20} className="rotate-180" />
-                        <span className="absolute text-[10px] font-bold mt-1">30</span>
+                        <RotateCcw size={18} className="sm:w-5 sm:h-5 rotate-180" />
+                        <span className="absolute text-[8px] sm:text-[10px] font-bold mt-1">30</span>
                     </button>
 
                     {/* Next Track */}
@@ -545,7 +545,7 @@ const PlaylistPlayerPage: React.FC = () => {
                         disabled={!activePlaylist || currentTrackIndex === activePlaylist.items.length - 1}
                         className="text-[#f3e5ab] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors transform active:scale-90"
                     >
-                        <SkipForward size={32} fill="currentColor" />
+                        <SkipForward size={28} className="sm:w-8 sm:h-8" fill="currentColor" />
                     </button>
                 </div>
             </div>
