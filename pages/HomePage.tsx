@@ -214,6 +214,7 @@ const HomePage: React.FC = () => {
   }, []);
 
   // Safeguard: If no books are loaded and we're not loading, try to refresh
+  useEffect(() => {
     if (!loading && books.length === 0) {
       // Use a small timeout to avoid conflict with initial load
       const timer = setTimeout(() => {
