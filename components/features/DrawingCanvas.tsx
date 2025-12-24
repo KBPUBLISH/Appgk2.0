@@ -581,7 +581,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ prompt
         if (!canvas) return;
 
         const handleTouchStart = (e: TouchEvent) => {
-            // If zoom mode is enabled and 2 fingers, start pinch/pan
+            // Two fingers: pinch to zoom AND pan
             if (zoomMode && e.touches.length === 2) {
                 e.preventDefault();
                 lastPinchDistanceRef.current = getTouchDistance(e.touches);
@@ -590,22 +590,14 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ prompt
                 setIsPanning(true);
                 return;
             }
-            // Single finger - draw (only if not in zoom mode or scale is 1)
+            // Single finger: ALWAYS draw (even when zoomed)
             if (e.touches.length === 1) {
-                if (zoomMode && scale > 1) {
-                    // In zoom mode with zoom active, single finger pans
-                    e.preventDefault();
-                    lastPanPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                    setIsPanning(true);
-                } else {
-                    // Normal drawing
-                    startDrawing(e as any);
-                }
+                startDrawing(e as any);
             }
         };
 
         const handleTouchMove = (e: TouchEvent) => {
-            // Pinch zoom with 2 fingers
+            // Two fingers: pinch zoom AND pan simultaneously
             if (zoomMode && e.touches.length === 2) {
                 e.preventDefault();
                 
@@ -617,7 +609,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ prompt
                 }
                 lastPinchDistanceRef.current = newDistance;
 
-                // Pan while pinching
+                // Pan while pinching (two fingers move together)
                 const center = getTouchCenter(e.touches);
                 if (lastPanPosRef.current) {
                     const dx = center.x - lastPanPosRef.current.x;
@@ -628,20 +620,8 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ prompt
                 return;
             }
 
-            // Single finger pan when zoomed
-            if (zoomMode && scale > 1 && e.touches.length === 1 && isPanning) {
-                e.preventDefault();
-                if (lastPanPosRef.current) {
-                    const dx = e.touches[0].clientX - lastPanPosRef.current.x;
-                    const dy = e.touches[0].clientY - lastPanPosRef.current.y;
-                    setPanOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-                }
-                lastPanPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                return;
-            }
-
-            // Normal drawing
-            if (!isPanning) {
+            // Single finger: ALWAYS draw (even when zoomed)
+            if (e.touches.length === 1 && !isPanning) {
                 draw(e as any);
             }
         };
@@ -774,7 +754,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ prompt
                     {/* Bottom Layer: Drawing Canvas (user colors here) */}
                     <canvas
                         ref={canvasRef}
-                        className={`absolute inset-0 w-full h-full touch-none ${zoomMode && scale > 1 ? 'cursor-move' : 'cursor-crosshair'}`}
+                        className="absolute inset-0 w-full h-full touch-none cursor-crosshair"
                         onMouseDown={startDrawing}
                         onMouseMove={draw}
                         onMouseUp={stopDrawing}
@@ -906,7 +886,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ prompt
                     <ZoomIn size={14} />
                     <span>
                         {scale > 1 
-                            ? "Pinch or drag to pan • Tap zoom button to exit" 
+                            ? "Draw with 1 finger • Pan/zoom with 2 fingers" 
                             : "Pinch with two fingers to zoom in"}
                     </span>
                 </div>
