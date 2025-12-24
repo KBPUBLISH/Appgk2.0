@@ -839,6 +839,23 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ prompt
                         </span>
                     </div>
                 )}
+                
+                {/* Auto-save Status - inside container so it doesn't affect layout */}
+                {storageKey && !zoomMode && (
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 text-xs z-30 pointer-events-none">
+                        {lastSaved ? (
+                            <span className="text-green-600 bg-white/90 rounded-full px-3 py-1 flex items-center gap-1 shadow">
+                                <Save size={12} />
+                                Saved
+                            </span>
+                        ) : hasSavedProgress ? (
+                            <span className="text-blue-600 bg-white/90 rounded-full px-3 py-1 flex items-center gap-1 shadow">
+                                <Save size={12} />
+                                Restored
+                            </span>
+                        ) : null}
+                    </div>
+                )}
             </div>
 
             {/* Crayon Box - Looks like a real crayon set */}
@@ -933,26 +950,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ prompt
             </div>
 
 
-            {/* Auto-save Status */}
-            {storageKey && !zoomMode && (
-                <div className="flex items-center justify-center gap-2 mt-2 text-xs">
-                    {lastSaved ? (
-                        <span className="text-green-400 flex items-center gap-1">
-                            <Save size={12} />
-                            Progress saved
-                        </span>
-                    ) : hasSavedProgress ? (
-                        <span className="text-blue-400 flex items-center gap-1">
-                            <Save size={12} />
-                            Progress restored
-                        </span>
-                    ) : (
-                        <span className="text-white/40">
-                            Auto-save enabled
-                        </span>
-                    )}
-                </div>
-            )}
 
             {/* Complete Button */}
             {!isCompleted && onComplete && (
