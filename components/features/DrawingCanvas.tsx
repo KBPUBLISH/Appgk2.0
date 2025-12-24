@@ -812,8 +812,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ prompt
                             style={{ 
                                 zIndex: 10,
                                 mixBlendMode: 'multiply', // Makes white transparent, keeps black lines
-                                objectFit: 'contain', // Fit entire image within container
-                                objectPosition: 'center center' // Center the image
+                                // No objectFit - stretch to fill same as canvas for perfect alignment
                             }}
                         />
                     )}
