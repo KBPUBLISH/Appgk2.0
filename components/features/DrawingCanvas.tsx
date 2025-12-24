@@ -738,7 +738,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ prompt
     };
 
     return (
-        <div className="flex flex-col h-full min-h-0">
+        <div className="flex flex-col h-full min-h-0 bg-gradient-to-b from-[#3E1F07] to-[#5c2e0b] p-3 rounded-xl">
             {/* Canvas Container - Layered structure with zoom support */}
             <div 
                 ref={containerRef}
