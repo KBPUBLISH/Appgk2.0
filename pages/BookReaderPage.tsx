@@ -743,17 +743,27 @@ const BookReaderPage: React.FC = () => {
                 // Filter pages for the book flow:
                 // - Include all non-coloring pages
                 // - Include coloring pages that are NOT marked as "end modal only"
+                // Note: coloringEndModalOnly defaults to true, so only explicitly false values show inline
                 const regularPages = data.filter((p: any) => {
-                    // Debug logging for coloring pages
-                    if (p.isColoringPage) {
-                        console.log(`🎨 Processing coloring page ${p.pageNumber}:`, {
-                            isColoringPage: p.isColoringPage,
-                            coloringEndModalOnly: p.coloringEndModalOnly,
-                            showInline: p.coloringEndModalOnly === false
-                        });
+                    // Not a coloring page - always include
+                    if (!p.isColoringPage) {
+                        return true;
                     }
                     
-                    return !p.isColoringPage || (p.isColoringPage && p.coloringEndModalOnly === false);
+                    // This is a coloring page - check if it should show inline
+                    // coloringEndModalOnly: true (default) = show ONLY in end modal, not inline
+                    // coloringEndModalOnly: false = show inline in book AND in end modal
+                    const showInline = p.coloringEndModalOnly === false;
+                    
+                    console.log(`🎨 Coloring page ${p.pageNumber}:`, {
+                        isColoringPage: p.isColoringPage,
+                        coloringEndModalOnly: p.coloringEndModalOnly,
+                        coloringEndModalOnlyType: typeof p.coloringEndModalOnly,
+                        showInline,
+                        willShowIn: showInline ? 'book + end modal' : 'end modal only'
+                    });
+                    
+                    return showInline;
                 });
 
                 const theEndPage: Page = {
