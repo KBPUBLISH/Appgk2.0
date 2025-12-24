@@ -188,6 +188,7 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
     const [resolvedImageUrl, setResolvedImageUrl] = useState<string>('');
     const [pinToast, setPinToast] = useState<string | null>(null);
     const [isPinning, setIsPinning] = useState(false);
+    const [pinVersion, setPinVersion] = useState(0); // Triggers re-check of pinned state
     
     // Ref to DrawingCanvas for screenshot capture
     const drawingCanvasRef = useRef<DrawingCanvasRef>(null);
@@ -204,7 +205,7 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
     const pinnedForBook = useMemo(() => {
         if (!parsedPage?.bookId) return null;
         return pinnedColoringService.getPinned(parsedPage.bookId);
-    }, [parsedPage?.bookId, showReward, isOpen]);
+    }, [parsedPage?.bookId, showReward, isOpen, pinVersion]); // pinVersion triggers re-check after pin/unpin
     const isPinnedThisPage = !!(pinnedForBook && pageId && pinnedForBook.pageId === pageId);
 
     // Resolve the background image URL when it changes
@@ -226,6 +227,7 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
         
         if (isPinnedThisPage) {
             pinnedColoringService.unpinWithCleanup(parsedPage.bookId);
+            setPinVersion(v => v + 1); // Trigger re-check of pinned state
             setPinToast('Removed from fridge');
             window.setTimeout(() => setPinToast(null), 1500);
             return;
@@ -264,11 +266,13 @@ const ColoringModal: React.FC<ColoringModalProps> = ({ isOpen, onClose, backgrou
             // Store the screenshot/composite image
             const pinned = pinnedColoringService.pinWithComposite(pageId, finalImageUrl);
             console.log('📌 Pin result:', pinned);
+            setPinVersion(v => v + 1); // Trigger re-check of pinned state
             setPinToast(pinned ? 'Pinned to book! 🎨' : 'Could not pin (storage full?)');
         } catch (err) {
             console.error('📌 Error creating screenshot:', err);
             // Fallback: pin without composite
             const pinned = pinnedColoringService.pinFromPageId(pageId, resolvedImageUrl || undefined);
+            setPinVersion(v => v + 1); // Trigger re-check of pinned state
             setPinToast(pinned ? 'Pinned to book!' : 'Could not pin');
         } finally {
             setIsPinning(false);
