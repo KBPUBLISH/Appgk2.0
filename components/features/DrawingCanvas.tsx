@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { Eraser, RotateCcw, Download, Save } from 'lucide-react';
+import { Eraser, RotateCcw, Download, Save, ZoomIn, ZoomOut, Move } from 'lucide-react';
 
 interface DrawingCanvasProps {
     prompt: string;

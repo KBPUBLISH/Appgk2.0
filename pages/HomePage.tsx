@@ -92,7 +92,14 @@ const HomePage: React.FC = () => {
   const [showPrayerGame, setShowPrayerGame] = useState(false);
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
   const [showEmailSignup, setShowEmailSignup] = useState(false);
-  // Game engagement tracking removed - games can be played unlimited times
+  
+  // Clear any old game engagement localStorage on mount (legacy cleanup)
+  useEffect(() => {
+    localStorage.removeItem('memory_game_engaged');
+    localStorage.removeItem('daily_key_engaged');
+    localStorage.removeItem('strength_game_engaged');
+    localStorage.removeItem('prayer_game_engaged');
+  }, []);
   
   // Game purchase state - tracks purchased games to update UI without reload
   const [purchasedGamesState, setPurchasedGamesState] = useState<string[]>(() => {

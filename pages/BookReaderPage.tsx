@@ -12,6 +12,7 @@ import { readingProgressService } from '../services/readingProgressService';
 import { favoritesService } from '../services/favoritesService';
 import { readCountService } from '../services/readCountService';
 import { analyticsService } from '../services/analyticsService';
+import { bookCompletionService } from '../services/bookCompletionService';
 import { incrementActivityCounter } from '../components/features/ReviewPromptModal';
 import { BookPageRenderer, ScrollState } from '../components/features/BookPageRenderer';
 import { processTextWithEmotionalCues, removeEmotionalCues } from '../utils/textProcessing';
@@ -1044,6 +1045,8 @@ const BookReaderPage: React.FC = () => {
 
                     // Check if book is completed (reached "The End" page)
                     if (nextIndex >= pages.length - 1) {
+                        // Mark book as completed (unlocks games permanently)
+                        bookCompletionService.markBookCompleted(bookId);
                         // Increment read count when book is completed
                         readCountService.incrementReadCount(bookId);
                         // Track book completion analytics
@@ -1889,8 +1892,9 @@ const BookReaderPage: React.FC = () => {
                                 setAutoPlayMode(false);
                                 autoPlayModeRef.current = false;
                                 isAutoPlayingRef.current = false;
-                                // Increment read count when book is completed
+                                // Mark book as completed (unlocks games permanently)
                                 if (bookId) {
+                                    bookCompletionService.markBookCompleted(bookId);
                                     readCountService.incrementReadCount(bookId);
                                     // Track book completion analytics
                                     analyticsService.bookReadComplete(bookId, bookTitle);
@@ -1967,8 +1971,9 @@ const BookReaderPage: React.FC = () => {
                             setAutoPlayMode(false);
                             autoPlayModeRef.current = false;
                             isAutoPlayingRef.current = false;
-                            // Increment read count when book is completed
+                            // Mark book as completed (unlocks games permanently)
                             if (bookId) {
+                                bookCompletionService.markBookCompleted(bookId);
                                 readCountService.incrementReadCount(bookId);
                                 // Track book completion analytics
                                 analyticsService.bookReadComplete(bookId, bookTitle);
