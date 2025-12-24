@@ -827,6 +827,18 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ prompt
                         </div>
                     </div>
                 )}
+                
+                {/* Zoom Mode Hint - inside container so it doesn't affect layout */}
+                {zoomMode && (
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 text-xs text-white bg-black/70 rounded-full py-1.5 px-3 z-30 pointer-events-none whitespace-nowrap">
+                        <ZoomIn size={14} />
+                        <span>
+                            {scale > 1 
+                                ? "1 finger = draw • 2 fingers = zoom/pan" 
+                                : "Pinch to zoom in"}
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* Crayon Box - Looks like a real crayon set */}
@@ -920,17 +932,6 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ prompt
                 </div>
             </div>
 
-            {/* Zoom Mode Hint */}
-            {zoomMode && (
-                <div className="flex items-center justify-center gap-2 mt-2 text-xs text-[#4CAF50] bg-[#4CAF50]/10 rounded-lg py-1.5 px-3">
-                    <ZoomIn size={14} />
-                    <span>
-                        {scale > 1 
-                            ? "Draw with 1 finger • Pan/zoom with 2 fingers" 
-                            : "Pinch with two fingers to zoom in"}
-                    </span>
-                </div>
-            )}
 
             {/* Auto-save Status */}
             {storageKey && !zoomMode && (
