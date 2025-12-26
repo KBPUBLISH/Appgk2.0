@@ -33,6 +33,7 @@ interface PageData {
     scrollHeight?: number;
     scrollMidHeight?: number; // Mid scroll height % (default 30)
     scrollMaxHeight?: number; // Max scroll height % (default 60)
+    scrollOffsetY?: number; // Vertical offset from bottom in percentage (default 0)
     soundEffectUrl?: string;
     // Video sequence - multiple videos that play in order
     useVideoSequence?: boolean;
@@ -82,14 +83,25 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     const [bubblePopped, setBubblePopped] = useState(false);
     const [bubblePosition, setBubblePosition] = useState({ x: 75, y: 20 }); // Default position (top right area)
     
-    // Video sequence state
+    // Video sequence state - double buffer approach for seamless transitions
     const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+    const [activeBuffer, setActiveBuffer] = useState<'A' | 'B'>('A'); // Which buffer is currently playing
+    const videoRefA = useRef<HTMLVideoElement | null>(null);
+    const videoRefB = useRef<HTMLVideoElement | null>(null);
+    const [bufferAReady, setBufferAReady] = useState(false);
+    const [bufferBReady, setBufferBReady] = useState(false);
+    
     const sortedVideoSequence = React.useMemo(() => {
         if (!page.useVideoSequence || !page.videoSequence || page.videoSequence.length === 0) {
             return [];
         }
         return [...page.videoSequence].sort((a, b) => a.order - b.order);
     }, [page.useVideoSequence, page.videoSequence]);
+    
+    // Calculate next video index for preloading
+    const nextVideoIndex = sortedVideoSequence.length > 0 
+        ? (currentVideoIndex + 1) % sortedVideoSequence.length 
+        : 0;
     
     // Swipe detection for scroll height changes
     const touchStartY = useRef<number>(0);
@@ -172,18 +184,27 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
         };
     }, [page.soundEffectUrl]);
 
-    // Set video volume when video loads
+    // Set video volume when video loads - handle both buffers for video sequence
     useEffect(() => {
+        const activeRef = activeBuffer === 'A' ? videoRefA : videoRefB;
+        if (activeRef.current) {
+            activeRef.current.volume = 1.0; // Full volume for video's native audio
+            activeRef.current.muted = false;
+        }
+        // Also set up the single video ref for non-sequence videos
         if (videoRef.current) {
-            videoRef.current.volume = 1.0; // Full volume for video's native audio
+            videoRef.current.volume = 1.0;
             videoRef.current.muted = false;
         }
-    }, [currentVideoIndex, page.backgroundUrl]);
+    }, [currentVideoIndex, activeBuffer, page.backgroundUrl]);
 
     // Reset bubble and video sequence when page changes
     useEffect(() => {
         setBubblePopped(false);
         setCurrentVideoIndex(0); // Reset video sequence to first video
+        setActiveBuffer('A'); // Reset to buffer A
+        setBufferAReady(false);
+        setBufferBReady(false);
         // Randomize bubble position across different areas of the screen
         // Avoid the very center where text usually is, and edges where controls are
         const positions = [
@@ -199,18 +220,34 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
         setBubblePosition(randomPosition);
     }, [page.id]);
     
-    // Handle video sequence - move to next video when current one ends
+    // Handle video sequence - seamlessly switch to preloaded buffer
     const handleVideoEnded = () => {
         if (sortedVideoSequence.length > 0) {
             const nextIndex = (currentVideoIndex + 1) % sortedVideoSequence.length;
             console.log(`🎬 Video ${currentVideoIndex + 1} ended, switching to video ${nextIndex + 1} of ${sortedVideoSequence.length}`);
+            
+            // Switch to the other buffer (which should be preloaded)
+            const newActiveBuffer = activeBuffer === 'A' ? 'B' : 'A';
+            setActiveBuffer(newActiveBuffer);
             setCurrentVideoIndex(nextIndex);
+            
+            // Start playing the newly active buffer
+            const newActiveRef = newActiveBuffer === 'A' ? videoRefA : videoRefB;
+            if (newActiveRef.current) {
+                newActiveRef.current.currentTime = 0;
+                newActiveRef.current.play().catch(err => {
+                    console.warn('Could not autoplay next video:', err);
+                });
+            }
         }
     };
     
-    // Get current video URL for sequence playback
-    const currentSequenceVideoUrl = sortedVideoSequence.length > 0 
-        ? sortedVideoSequence[currentVideoIndex]?.url 
+    // Get video URLs for both buffers
+    const bufferAVideoUrl = sortedVideoSequence.length > 0 
+        ? sortedVideoSequence[activeBuffer === 'A' ? currentVideoIndex : nextVideoIndex]?.url 
+        : null;
+    const bufferBVideoUrl = sortedVideoSequence.length > 0 
+        ? sortedVideoSequence[activeBuffer === 'B' ? currentVideoIndex : nextVideoIndex]?.url 
         : null;
 
     const handleBubbleClick = (e: React.MouseEvent) => {
@@ -247,33 +284,66 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                     pointerEvents: 'none',
                 }}
             >
-                {/* Video Sequence Mode - multiple videos playing in sequence */}
-                {page.useVideoSequence && sortedVideoSequence.length > 0 && currentSequenceVideoUrl ? (
-                    <video
-                        ref={videoRef}
-                        key={`video-seq-${currentVideoIndex}`} // Force re-mount when video changes
-                        src={currentSequenceVideoUrl}
-                        className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full"
-                        autoPlay
-                        playsInline
-                        preload="auto"
-                        onEnded={handleVideoEnded} // Move to next video in sequence
-                        onLoadedData={() => {
-                            // Set full volume for video's native audio
-                            if (videoRef.current) {
-                                videoRef.current.volume = 1.0;
-                                videoRef.current.muted = false;
-                            }
-                        }}
-                        style={{
-                            objectFit: 'cover',
-                            width: '100%',
-                            height: '100%',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                        }}
-                    />
+                {/* Video Sequence Mode - double buffered for seamless transitions */}
+                {page.useVideoSequence && sortedVideoSequence.length > 0 ? (
+                    <>
+                        {/* Buffer A - current or preloading */}
+                        <video
+                            ref={videoRefA}
+                            src={bufferAVideoUrl || ''}
+                            className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full transition-opacity duration-300"
+                            autoPlay={activeBuffer === 'A'}
+                            playsInline
+                            preload="auto"
+                            onEnded={activeBuffer === 'A' ? handleVideoEnded : undefined}
+                            onLoadedData={() => {
+                                setBufferAReady(true);
+                                if (videoRefA.current && activeBuffer === 'A') {
+                                    videoRefA.current.volume = 1.0;
+                                    videoRefA.current.muted = false;
+                                }
+                            }}
+                            onCanPlayThrough={() => setBufferAReady(true)}
+                            style={{
+                                objectFit: 'cover',
+                                width: '100%',
+                                height: '100%',
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                opacity: activeBuffer === 'A' ? 1 : 0,
+                                zIndex: activeBuffer === 'A' ? 2 : 1,
+                            }}
+                        />
+                        {/* Buffer B - current or preloading */}
+                        <video
+                            ref={videoRefB}
+                            src={bufferBVideoUrl || ''}
+                            className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full transition-opacity duration-300"
+                            autoPlay={activeBuffer === 'B'}
+                            playsInline
+                            preload="auto"
+                            onEnded={activeBuffer === 'B' ? handleVideoEnded : undefined}
+                            onLoadedData={() => {
+                                setBufferBReady(true);
+                                if (videoRefB.current && activeBuffer === 'B') {
+                                    videoRefB.current.volume = 1.0;
+                                    videoRefB.current.muted = false;
+                                }
+                            }}
+                            onCanPlayThrough={() => setBufferBReady(true)}
+                            style={{
+                                objectFit: 'cover',
+                                width: '100%',
+                                height: '100%',
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                opacity: activeBuffer === 'B' ? 1 : 0,
+                                zIndex: activeBuffer === 'B' ? 2 : 1,
+                            }}
+                        />
+                    </>
                 ) : /* Auto-detect video based on backgroundType OR file extension */
                 (page.backgroundType === 'video' || 
                   (page.backgroundUrl && /\.(mp4|webm|mov|m4v)$/i.test(page.backgroundUrl))) ? (
@@ -326,14 +396,15 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
             {/* Scroll Image Layer - Three states: hidden, mid, max */}
             {page.scrollUrl && (
                 <div
-                    className={`absolute bottom-0 left-0 right-0 transition-all duration-500 ease-in-out z-15 ${
+                    className={`absolute left-0 right-0 transition-all duration-500 ease-in-out z-15 ${
                         scrollState === 'hidden' ? 'translate-y-full' : 'translate-y-0'
                     }`}
                     style={{ 
                         // Use scrollMidHeight/scrollMaxHeight if set, otherwise fallback to defaults
                         height: scrollState === 'max' 
                             ? `${page.scrollMaxHeight || 60}%` 
-                            : `${page.scrollMidHeight || 30}%`
+                            : `${page.scrollMidHeight || 30}%`,
+                        bottom: `${page.scrollOffsetY || 0}%` // Apply vertical offset
                     }}
                 >
                     <img
@@ -350,8 +421,8 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                     className="absolute left-1/2 transform -translate-x-1/2 z-20 pointer-events-none transition-all duration-500 ease-in-out"
                     style={{
                         bottom: scrollState === 'max' 
-                            ? `calc(${page.scrollMaxHeight || 60}% - 24px)` 
-                            : `calc(${page.scrollMidHeight || 30}% - 24px)`
+                            ? `calc(${page.scrollMaxHeight || 60}% + ${page.scrollOffsetY || 0}% - 24px)` 
+                            : `calc(${page.scrollMidHeight || 30}% + ${page.scrollOffsetY || 0}% - 24px)`
                     }}
                 >
                     <div className="flex flex-col items-center gap-0.5 opacity-50">
@@ -368,14 +439,41 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                 className="absolute inset-0 pointer-events-none z-20"
             >
                 {page.textBoxes?.map((box, idx) => {
-                    // Calculate scroll height based on state - use configured heights or defaults
-                    const scrollHeightVal = scrollState === 'max' 
-                        ? `${page.scrollMaxHeight || 60}%` 
-                        : `${page.scrollMidHeight || 30}%`;
-                    const scrollTopVal = `calc(100% - ${scrollHeightVal})`;
+                    // Calculate scroll heights - "design" height is what portal shows (mid), current depends on state
+                    const designScrollHeight = page.scrollMidHeight || 30; // What the portal shows when positioning text
+                    const designScrollTop = 100 - designScrollHeight; // e.g., 70% for 30% scroll
+                    
+                    const currentScrollHeightNum = scrollState === 'max' 
+                        ? (page.scrollMaxHeight || 60) 
+                        : (page.scrollMidHeight || 30);
+                    const scrollOffset = page.scrollOffsetY || 0;
+                    const currentScrollTop = 100 - currentScrollHeightNum - scrollOffset;
+                    
                     const isActive = activeTextBoxIndex === idx;
-                    // Text boxes should fade and slide with the scroll
                     const shouldHideTextBoxes = page.scrollUrl && scrollState === 'hidden';
+                    
+                    // Calculate text position that scales with scroll height
+                    // If text is inside the scroll area, maintain its offset from scroll top
+                    let textTopStyle: string;
+                    let textMaxHeightStyle: string;
+                    
+                    if (page.scrollUrl) {
+                        // Check if text was positioned inside the scroll area (in design/portal view)
+                        if (box.y >= designScrollTop) {
+                            // Text is inside scroll - calculate offset from scroll top and maintain it
+                            const offsetFromScrollTop = box.y - designScrollTop;
+                            textTopStyle = `calc(${currentScrollTop}% + ${offsetFromScrollTop}% + 12px)`;
+                            textMaxHeightStyle = `calc(100% - ${currentScrollTop}% - ${offsetFromScrollTop}% - 70px)`;
+                        } else {
+                            // Text is above scroll - keep absolute position
+                            textTopStyle = `${box.y}%`;
+                            textMaxHeightStyle = `calc(100% - ${box.y}% - 60px)`;
+                        }
+                    } else {
+                        // No scroll - use absolute position
+                        textTopStyle = `${box.y}%`;
+                        textMaxHeightStyle = `calc(100% - ${box.y}% - 60px)`;
+                    }
 
                     return (
                         <div
@@ -387,17 +485,13 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                                 // Add safe area padding for landscape mode (notch/Dynamic Island)
                                 // Use calc to ensure minimum 3% from edge + safe area
                                 left: `calc(max(${box.x}%, 3%) + env(safe-area-inset-left, 0px))`,
-                                top: page.scrollUrl 
-                                    ? `max(${box.y}%, calc(${scrollTopVal} + 12px))` 
-                                    : `${box.y}%`,
+                                top: textTopStyle,
                                 width: `min(${box.width || 30}%, calc(100% - max(${box.x}%, 3%) - 3% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)))`,
                                 textAlign: box.alignment || 'left',
                                 color: box.color || '#4a3b2a',
                                 fontFamily: box.fontFamily || 'Comic Sans MS',
                                 fontSize: `${box.fontSize || 24}px`,
-                                maxHeight: page.scrollUrl
-                                    ? `calc(100% - max(${box.y}%, ${scrollTopVal}) - 70px)`
-                                    : `calc(100% - ${box.y}% - 60px)`,
+                                maxHeight: textMaxHeightStyle,
                                 overflowY: 'auto',
                                 textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
                                 scrollBehavior: 'smooth',

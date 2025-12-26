@@ -46,6 +46,7 @@ interface Page {
     scrollHeight?: number;
     scrollMidHeight?: number; // Mid scroll height % (default 30)
     scrollMaxHeight?: number; // Max scroll height % (default 60)
+    scrollOffsetY?: number; // Vertical offset from bottom in percentage (default 0)
     // Video sequence - multiple videos that play in order
     useVideoSequence?: boolean;
     videoSequence?: VideoSequenceItem[];
@@ -471,17 +472,21 @@ const BookReaderPage: React.FC = () => {
                     // Increment book opened counter for review prompt
                     incrementActivityCounter('book');
                     
-                    // Check for intro video
-                    if ((book as any)?.introVideoUrl) {
-                        setIntroVideoUrl((book as any).introVideoUrl);
+                    // Set book orientation and intro video from raw data
+                    const rawData = (book as any)?.rawData;
+                    
+                    // Check for intro video (stored in rawData from API)
+                    const introVideo = rawData?.introVideoUrl || (book as any)?.introVideoUrl;
+                    if (introVideo) {
+                        console.log('🎬 Found intro video:', introVideo);
+                        setIntroVideoUrl(introVideo);
                         setShowIntroVideo(true);
                     }
                     
-                // Set book orientation
-                const rawData = (book as any)?.rawData;
-                const orientation = rawData?.orientation || (book as any)?.orientation || 'portrait';
-                setBookOrientation(orientation);
-                console.log('📖 Book orientation:', orientation);
+                    // Set book orientation
+                    const orientation = rawData?.orientation || (book as any)?.orientation || 'portrait';
+                    setBookOrientation(orientation);
+                    console.log('📖 Book orientation:', orientation);
                     
                     // Increment view count in database (when book is OPENED)
                     try {
@@ -2889,8 +2894,8 @@ const BookReaderPage: React.FC = () => {
                     bottom: scrollState === 'hidden' 
                         ? '1rem' 
                         : scrollState === 'max'
-                            ? `calc(${currentPage.scrollMaxHeight || 60}% + 1.5rem)` // Above max scroll
-                            : `calc(${currentPage.scrollMidHeight || 30}% + 1.5rem)` // Above mid scroll
+                            ? `calc(${currentPage.scrollMaxHeight || 60}% + ${currentPage.scrollOffsetY || 0}% + 1.5rem)` // Above max scroll + offset
+                            : `calc(${currentPage.scrollMidHeight || 30}% + ${currentPage.scrollOffsetY || 0}% + 1.5rem)` // Above mid scroll + offset
                 }}
             >
                 <WoodButton
