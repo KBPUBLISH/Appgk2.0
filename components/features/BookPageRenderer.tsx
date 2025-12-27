@@ -399,9 +399,10 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
             {/* Scroll Image Layer - Three states: hidden, mid, max */}
             {page.scrollUrl && (
                 <div
-                    className={`absolute left-0 right-0 transition-all duration-500 ease-in-out z-15 ${
+                    className={`absolute left-0 right-0 transition-all duration-500 ease-in-out ${
                         scrollState === 'hidden' ? 'translate-y-full' : 'translate-y-0'
                     }`}
+                    style={{ zIndex: 15 }} // Use inline style for z-index 15 (between z-10 and z-20)
                     style={{ 
                         // Use scrollMidHeight/scrollMaxHeight if set, otherwise fallback to defaults
                         height: scrollState === 'max' 
