@@ -402,8 +402,8 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                     className={`absolute left-0 right-0 transition-all duration-500 ease-in-out ${
                         scrollState === 'hidden' ? 'translate-y-full' : 'translate-y-0'
                     }`}
-                    style={{ zIndex: 15 }} // Use inline style for z-index 15 (between z-10 and z-20)
                     style={{ 
+                        zIndex: 15, // Between z-10 (gradient) and z-20 (text boxes)
                         // Use scrollMidHeight/scrollMaxHeight if set, otherwise fallback to defaults
                         height: scrollState === 'max' 
                             ? `${page.scrollMaxHeight || 60}%` 
