@@ -62,6 +62,9 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     highlightedWordIndex,
     wordAlignment
 }) => {
+    // DEBUG: Log scroll URL on every render
+    console.log('📜 BookPageRenderer - scrollUrl:', page.scrollUrl, '| scrollState:', scrollState, '| pageId:', page.id);
+    
     // DEBUG: Log highlighting props when they change
     useEffect(() => {
         if (activeTextBoxIndex !== null || highlightedWordIndex !== undefined) {
