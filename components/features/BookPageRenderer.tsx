@@ -48,6 +48,7 @@ interface PageData {
     useImageSequence?: boolean;
     imageSequence?: ImageSequenceItem[];
     imageSequenceDuration?: number; // seconds per image (default 3)
+    imageSequenceAnimation?: 'none' | 'panLeft' | 'panRight' | 'panUp' | 'panDown' | 'zoomIn' | 'zoomOut' | 'kenBurns'; // animation effect
 }
 
 // Scroll state types
@@ -397,9 +398,9 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                             }}
                         />
                     </>
-                ) : /* Image Sequence Mode - crossfade transitions */
+                ) : /* Image Sequence Mode - crossfade transitions with camera animation */
                 page.useImageSequence && sortedImageSequence.length > 0 ? (
-                    <div className="absolute inset-0 w-full h-full">
+                    <div className="absolute inset-0 w-full h-full overflow-hidden">
                         {/* Render current and next images for smooth crossfade */}
                         {sortedImageSequence.map((img, index) => {
                             const isCurrent = index === currentImageIndex;
@@ -407,21 +408,112 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                             // Only render current and next images for performance
                             if (!isCurrent && !isNext && sortedImageSequence.length > 2) return null;
                             
+                            // Get animation duration
+                            const animDuration = (page.imageSequenceDuration || 3);
+                            const animType = page.imageSequenceAnimation || 'kenBurns';
+                            
+                            // Define animation keyframes based on type
+                            // Each animation runs for the full duration of the image display
+                            const getAnimationStyle = (): React.CSSProperties => {
+                                if (!isCurrent || animType === 'none') {
+                                    return { transform: 'scale(1) translate(0, 0)' };
+                                }
+                                
+                                // For current image, apply the animation
+                                // We use CSS animation with keyframes defined inline
+                                const baseStyle: React.CSSProperties = {
+                                    animationDuration: `${animDuration}s`,
+                                    animationTimingFunction: 'ease-in-out',
+                                    animationFillMode: 'forwards',
+                                    animationIterationCount: 1,
+                                };
+                                
+                                switch (animType) {
+                                    case 'zoomIn':
+                                        return { ...baseStyle, animationName: 'imageZoomIn' };
+                                    case 'zoomOut':
+                                        return { ...baseStyle, animationName: 'imageZoomOut' };
+                                    case 'panLeft':
+                                        return { ...baseStyle, animationName: 'imagePanLeft' };
+                                    case 'panRight':
+                                        return { ...baseStyle, animationName: 'imagePanRight' };
+                                    case 'panUp':
+                                        return { ...baseStyle, animationName: 'imagePanUp' };
+                                    case 'panDown':
+                                        return { ...baseStyle, animationName: 'imagePanDown' };
+                                    case 'kenBurns':
+                                        // Alternate between different Ken Burns effects based on index
+                                        const kenBurnsVariants = ['imageKenBurns1', 'imageKenBurns2', 'imageKenBurns3', 'imageKenBurns4'];
+                                        return { ...baseStyle, animationName: kenBurnsVariants[index % kenBurnsVariants.length] };
+                                    default:
+                                        return {};
+                                }
+                            };
+                            
                             return (
                                 <img
-                                    key={img.url}
+                                    key={`${img.url}-${currentImageIndex}`}
                                     src={img.url}
                                     alt={`Background ${index + 1}`}
-                                    className="absolute inset-0 w-full h-full object-cover"
+                                    className="absolute w-full h-full object-cover"
                                     style={{
+                                        // Scale up slightly to allow room for pan/zoom effects
+                                        minWidth: '110%',
+                                        minHeight: '110%',
+                                        left: '-5%',
+                                        top: '-5%',
                                         opacity: isCurrent ? 1 : 0,
                                         transition: 'opacity 1s ease-in-out',
                                         zIndex: isCurrent ? 2 : 1,
+                                        ...getAnimationStyle(),
                                     }}
                                     loading={isCurrent ? 'eager' : 'lazy'}
                                 />
                             );
                         })}
+                        {/* CSS Keyframes for image animations */}
+                        <style>{`
+                            @keyframes imageZoomIn {
+                                from { transform: scale(1) translate(0, 0); }
+                                to { transform: scale(1.15) translate(0, 0); }
+                            }
+                            @keyframes imageZoomOut {
+                                from { transform: scale(1.15) translate(0, 0); }
+                                to { transform: scale(1) translate(0, 0); }
+                            }
+                            @keyframes imagePanLeft {
+                                from { transform: scale(1.1) translateX(3%); }
+                                to { transform: scale(1.1) translateX(-3%); }
+                            }
+                            @keyframes imagePanRight {
+                                from { transform: scale(1.1) translateX(-3%); }
+                                to { transform: scale(1.1) translateX(3%); }
+                            }
+                            @keyframes imagePanUp {
+                                from { transform: scale(1.1) translateY(3%); }
+                                to { transform: scale(1.1) translateY(-3%); }
+                            }
+                            @keyframes imagePanDown {
+                                from { transform: scale(1.1) translateY(-3%); }
+                                to { transform: scale(1.1) translateY(3%); }
+                            }
+                            @keyframes imageKenBurns1 {
+                                from { transform: scale(1) translate(0, 0); }
+                                to { transform: scale(1.12) translate(-2%, -1%); }
+                            }
+                            @keyframes imageKenBurns2 {
+                                from { transform: scale(1.12) translate(2%, 1%); }
+                                to { transform: scale(1) translate(-1%, 2%); }
+                            }
+                            @keyframes imageKenBurns3 {
+                                from { transform: scale(1) translate(1%, -1%); }
+                                to { transform: scale(1.1) translate(2%, 1%); }
+                            }
+                            @keyframes imageKenBurns4 {
+                                from { transform: scale(1.1) translate(-1%, 2%); }
+                                to { transform: scale(1) translate(0, -1%); }
+                            }
+                        `}</style>
                     </div>
                 ) : /* Auto-detect video based on backgroundType OR file extension */
                 (page.backgroundType === 'video' || 

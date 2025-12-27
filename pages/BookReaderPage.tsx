@@ -60,6 +60,7 @@ interface Page {
     useImageSequence?: boolean;
     imageSequence?: ImageSequenceItem[];
     imageSequenceDuration?: number; // seconds per image (default 3)
+    imageSequenceAnimation?: string; // animation effect type
     textBoxes?: TextBox[]; // Legacy: some pages may have textBoxes at root
     content?: {
         textBoxes?: TextBox[]; // Primary location of textBoxes from DB
@@ -1063,6 +1064,7 @@ const BookReaderPage: React.FC = () => {
             hasImageSequence: page.useImageSequence,
             imageSequenceCount: page.imageSequence?.length || 0,
             imageSequenceDuration: page.imageSequenceDuration,
+            imageSequenceAnimation: page.imageSequenceAnimation,
         });
         
         const mapped = {
