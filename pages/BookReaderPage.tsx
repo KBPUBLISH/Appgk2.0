@@ -1522,6 +1522,10 @@ const BookReaderPage: React.FC = () => {
         
         console.log('▶️ Auto-playing TTS on book start (intro video finished)');
         
+        // Enable auto-play mode so page turns automatically after TTS finishes
+        setAutoPlayMode(true);
+        autoPlayModeRef.current = true;
+        
         // Longer delay to ensure intro video transition is complete
         // and the first page is fully rendered
         setTimeout(() => {
