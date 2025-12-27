@@ -1483,6 +1483,7 @@ const BookReaderPage: React.FC = () => {
         // Don't auto-play if:
         // - Already auto-played this session
         // - Still loading
+        // - Intro video check not complete
         // - Intro video is still showing
         // - Not on first page
         // - No voice selected
@@ -1490,6 +1491,7 @@ const BookReaderPage: React.FC = () => {
         if (
             hasAutoPlayedOnStartRef.current ||
             loading ||
+            !introVideoChecked ||
             showIntroVideo ||
             currentPageIndex !== 0 ||
             !selectedVoiceId ||
@@ -1518,9 +1520,10 @@ const BookReaderPage: React.FC = () => {
         // Mark as auto-played to prevent repeating
         hasAutoPlayedOnStartRef.current = true;
         
-        console.log('▶️ Auto-playing TTS on book start');
+        console.log('▶️ Auto-playing TTS on book start (intro video finished)');
         
-        // Small delay to ensure everything is rendered
+        // Longer delay to ensure intro video transition is complete
+        // and the first page is fully rendered
         setTimeout(() => {
             // Get translated text if available
             const translatedTextBoxes = getTranslatedTextBoxes(currentPage);
@@ -1529,9 +1532,9 @@ const BookReaderPage: React.FC = () => {
             // Create synthetic event and trigger playback
             const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
             handlePlayText(firstBoxText, 0, syntheticEvent, true);
-        }, 500); // 500ms delay to let page settle
+        }, 1500); // 1.5s delay to let intro video fade out and page fully settle
         
-    }, [loading, showIntroVideo, currentPageIndex, selectedVoiceId, pages, translatedContent.size]);
+    }, [loading, introVideoChecked, showIntroVideo, currentPageIndex, selectedVoiceId, pages, translatedContent.size]);
 
     // Preload background images/videos for upcoming pages to prevent black flash
     const preloadBackgrounds = (startPageIndex: number) => {
