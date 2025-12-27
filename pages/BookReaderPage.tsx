@@ -162,6 +162,7 @@ const BookReaderPage: React.FC = () => {
     const currentPageIndexRef = useRef(0); // Track page index to avoid closure issues
     const isAutoPlayingRef = useRef(false); // Prevent multiple simultaneous auto-play calls
     const alignmentWarningShownRef = useRef(false); // Prevent alignment warning spam
+    const hasAutoPlayedOnStartRef = useRef(false); // Track if we've auto-played on book start
     const [isPageTurning, setIsPageTurning] = useState(false);
     const [flipState, setFlipState] = useState<{ direction: 'next' | 'prev', isFlipping: boolean } | null>(null);
     const touchStartX = useRef<number>(0);
@@ -1476,6 +1477,61 @@ const BookReaderPage: React.FC = () => {
             preloadUpcomingAudio(currentPageIndex);
         }
     }, [currentPageIndex, selectedVoiceId, pages.length, selectedLanguage, translatedContent.size]);
+
+    // Auto-play TTS when book first loads (after intro video if any)
+    useEffect(() => {
+        // Don't auto-play if:
+        // - Already auto-played this session
+        // - Still loading
+        // - Intro video is still showing
+        // - Not on first page
+        // - No voice selected
+        // - No pages loaded
+        if (
+            hasAutoPlayedOnStartRef.current ||
+            loading ||
+            showIntroVideo ||
+            currentPageIndex !== 0 ||
+            !selectedVoiceId ||
+            pages.length === 0
+        ) {
+            return;
+        }
+
+        const currentPage = pages[0];
+        if (!currentPage) return;
+
+        // Get text boxes from the first page
+        const pageTextBoxes = currentPage.textBoxes || currentPage.content?.textBoxes;
+        if (!pageTextBoxes || pageTextBoxes.length === 0) {
+            console.log('🔇 Auto-play: No text boxes on first page, skipping');
+            return;
+        }
+
+        // For non-English, wait for translations
+        const currentLang = selectedLanguageRef.current || 'en';
+        if (currentLang !== 'en' && translatedContent.size === 0) {
+            console.log('⏳ Auto-play: Waiting for translations...');
+            return;
+        }
+
+        // Mark as auto-played to prevent repeating
+        hasAutoPlayedOnStartRef.current = true;
+        
+        console.log('▶️ Auto-playing TTS on book start');
+        
+        // Small delay to ensure everything is rendered
+        setTimeout(() => {
+            // Get translated text if available
+            const translatedTextBoxes = getTranslatedTextBoxes(currentPage);
+            const firstBoxText = translatedTextBoxes[0]?.text || pageTextBoxes[0].text;
+            
+            // Create synthetic event and trigger playback
+            const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
+            handlePlayText(firstBoxText, 0, syntheticEvent, true);
+        }, 500); // 500ms delay to let page settle
+        
+    }, [loading, showIntroVideo, currentPageIndex, selectedVoiceId, pages, translatedContent.size]);
 
     // Preload background images/videos for upcoming pages to prevent black flash
     const preloadBackgrounds = (startPageIndex: number) => {
