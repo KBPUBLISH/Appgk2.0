@@ -1027,13 +1027,16 @@ const BookReaderPage: React.FC = () => {
         };
     }, [bookId, pages.length, bookTitle]);
 
-    // Helper to map page data to include soundEffectUrl
+    // Helper to map page data to include all file URLs
     const mapPage = (page: Page | undefined) => {
         if (!page) return null;
         return {
             ...page,
             id: page._id,
-            soundEffectUrl: page.files?.soundEffect?.url || page.soundEffectUrl
+            // Extract URLs from files object if not at root level
+            soundEffectUrl: page.files?.soundEffect?.url || page.soundEffectUrl,
+            scrollUrl: page.scrollUrl || page.files?.scroll?.url,
+            backgroundUrl: page.backgroundUrl || page.files?.background?.url,
         };
     };
 
