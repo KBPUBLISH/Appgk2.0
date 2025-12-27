@@ -112,6 +112,7 @@ const BookReaderPage: React.FC = () => {
     // Studio intro video state (per-book, set in portal)
     const [showIntroVideo, setShowIntroVideo] = useState(false);
     const [introVideoUrl, setIntroVideoUrl] = useState<string | null>(null);
+    const [introVideoChecked, setIntroVideoChecked] = useState(false); // Track if we've checked for intro video
     const introVideoRef = useRef<HTMLVideoElement>(null);
 
     // Keep ref in sync with state
@@ -482,6 +483,8 @@ const BookReaderPage: React.FC = () => {
                         setIntroVideoUrl(introVideo);
                         setShowIntroVideo(true);
                     }
+                    // Mark that we've checked for intro video (whether found or not)
+                    setIntroVideoChecked(true);
                     
                     // Set book orientation
                     const orientation = rawData?.orientation || (book as any)?.orientation || 'portrait';
@@ -559,6 +562,8 @@ const BookReaderPage: React.FC = () => {
                 }
             } catch (err) {
                 console.error('Failed to fetch book data:', err);
+                // Still mark intro video as checked on error
+                setIntroVideoChecked(true);
             }
         };
 
@@ -1030,13 +1035,33 @@ const BookReaderPage: React.FC = () => {
     // Helper to map page data to include all file URLs
     const mapPage = (page: Page | undefined) => {
         if (!page) return null;
+        
+        // Get scroll values - ensure they're different for 3-state scroll to work
+        const scrollMidHeight = page.scrollMidHeight || 30;
+        const scrollMaxHeight = page.scrollMaxHeight || 60;
+        
+        // Debug log for scroll heights
+        if (page.scrollUrl || (page as any).files?.scroll?.url) {
+            console.log('📜 Page scroll config:', {
+                pageNumber: page.pageNumber,
+                scrollMidHeight,
+                scrollMaxHeight,
+                scrollOffsetY: page.scrollOffsetY || 0,
+                raw: { mid: page.scrollMidHeight, max: page.scrollMaxHeight }
+            });
+        }
+        
         return {
             ...page,
             id: page._id,
             // Extract URLs from files object if not at root level
             soundEffectUrl: page.files?.soundEffect?.url || page.soundEffectUrl,
-            scrollUrl: page.scrollUrl || page.files?.scroll?.url,
+            scrollUrl: page.scrollUrl || (page as any).files?.scroll?.url,
             backgroundUrl: page.backgroundUrl || page.files?.background?.url,
+            // Ensure scroll heights are set with defaults
+            scrollMidHeight,
+            scrollMaxHeight,
+            scrollOffsetY: page.scrollOffsetY || 0,
         };
     };
 
@@ -2053,31 +2078,8 @@ const BookReaderPage: React.FC = () => {
         );
     }
 
-    if (pages.length === 0) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4">
-                <h2 className="text-2xl font-bold mb-4">No pages found</h2>
-                <button
-                    onClick={() => {
-                        // Restore music before navigating back
-                        // Background music toggle has been removed from Header. Nothing to restore here.
-
-                        // Navigate back to book detail page explicitly
-                        if (bookId) {
-                            navigate(`/book/${bookId}`);
-                        } else {
-                            navigate(-1);
-                        }
-                    }}
-                    className="bg-indigo-600 px-4 py-2 rounded hover:bg-indigo-700 transition"
-                >
-                    Go Back
-                </button>
-            </div>
-        );
-    }
-
     // Show intro video (studio animation) before the book starts
+    // Check this FIRST before showing any page content
     if (showIntroVideo && introVideoUrl) {
         return (
             <div className="fixed inset-0 bg-black flex items-center justify-center z-50">
@@ -2099,6 +2101,37 @@ const BookReaderPage: React.FC = () => {
                     className="absolute bottom-8 right-8 px-6 py-2 bg-white/20 hover:bg-white/30 text-white text-sm font-medium rounded-full backdrop-blur-sm transition-all"
                 >
                     Skip
+                </button>
+            </div>
+        );
+    }
+
+    // Show loading state while waiting for data AND intro video check
+    if (loading || !introVideoChecked) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mb-4"></div>
+                <p className="text-lg">Loading book...</p>
+            </div>
+        );
+    }
+
+    // No pages found after loading
+    if (pages.length === 0) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4">
+                <h2 className="text-2xl font-bold mb-4">No pages found</h2>
+                <button
+                    onClick={() => {
+                        if (bookId) {
+                            navigate(`/book/${bookId}`);
+                        } else {
+                            navigate(-1);
+                        }
+                    }}
+                    className="bg-indigo-600 px-4 py-2 rounded hover:bg-indigo-700 transition"
+                >
+                    Go Back
                 </button>
             </div>
         );
