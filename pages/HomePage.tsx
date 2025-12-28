@@ -591,17 +591,48 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // Compute recently read books when books are loaded
+  // Compute recently read items (books or series) when books and series are loaded
   useEffect(() => {
     if (books.length > 0) {
-      const recentBookIds = readingProgressService.getRecentlyReadBookIds(10);
-      const recentBooks = recentBookIds
-        .map(id => books.find(b => (b.id === id || (b as any)._id === id)))
-        .filter(Boolean);
-      setRecentlyReadBooks(recentBooks);
-      console.log('📚 Recently read books:', recentBooks.length);
+      const recentBookIds = readingProgressService.getRecentlyReadBookIds(20);
+      
+      // Build a map of bookId -> series for quick lookup
+      const bookToSeriesMap = new Map<string, any>();
+      bookSeries.forEach(series => {
+        series.books?.forEach((bookRef: any) => {
+          const bookId = bookRef.book?._id || bookRef.book;
+          if (bookId) {
+            bookToSeriesMap.set(bookId.toString(), series);
+          }
+        });
+      });
+      
+      // Track which series we've already added to avoid duplicates
+      const addedSeriesIds = new Set<string>();
+      const recentItems: any[] = [];
+      
+      recentBookIds.forEach(id => {
+        const book = books.find(b => (b.id === id || (b as any)._id === id));
+        if (!book) return;
+        
+        const bookId = book.id || (book as any)._id;
+        const series = bookToSeriesMap.get(bookId);
+        
+        if (series && !addedSeriesIds.has(series._id)) {
+          // This book is part of a series - show the series instead
+          addedSeriesIds.add(series._id);
+          recentItems.push({ ...series, _isSeries: true });
+        } else if (!series) {
+          // This book is standalone - show it directly
+          recentItems.push({ ...book, _isSeries: false });
+        }
+        // If series already added, skip this book
+      });
+      
+      setRecentlyReadBooks(recentItems.slice(0, 10));
+      console.log('📚 Recently read items:', recentItems.length, '(books + series)');
     }
-  }, [books]);
+  }, [books, bookSeries]);
 
   // Compute recently played playlists when playlists are loaded
   useEffect(() => {
@@ -1289,24 +1320,70 @@ const HomePage: React.FC = () => {
             />
             <div className="w-screen overflow-x-auto no-scrollbar pb-4 -mx-4">
               <div className="flex space-x-3 px-4">
-                {recentlyReadBooks.map((book) => {
-                  const isComplete = bookCompletionService.isBookCompleted(book.id || book._id);
-                  return (
-                    <div 
-                      key={book.id || book._id} 
-                      className="relative flex-shrink-0 w-[42vw] md:w-[30vw] lg:w-[23vw] max-w-[200px]"
-                    >
-                      <BookCard
-                        book={book}
-                        onClick={() => handleBookClick(book.id || book._id)}
-                      />
-                      {isComplete && (
-                        <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1 shadow-lg">
-                          <CheckCircle className="w-5 h-5 text-white" />
+                {recentlyReadBooks.map((item) => {
+                  // Check if this is a series or a standalone book
+                  if (item._isSeries) {
+                    // Render series card
+                    return (
+                      <div 
+                        key={`series-${item._id}`} 
+                        className="relative flex-shrink-0 w-[42vw] md:w-[30vw] lg:w-[23vw] max-w-[200px] cursor-pointer"
+                        onClick={() => navigate(`/book-series/${item._id}`)}
+                      >
+                        <div className="bg-white/10 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg border-2 border-white/20 hover:shadow-2xl hover:scale-105 transition-all">
+                          <div className="aspect-square bg-gradient-to-br from-purple-500 to-indigo-600 relative overflow-hidden">
+                            {item.coverImage ? (
+                              <img
+                                src={item.coverImage}
+                                alt={item.title}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span className="text-6xl">📚</span>
+                              </div>
+                            )}
+                            {/* Series badge */}
+                            <div className="absolute top-2 left-2 bg-purple-500/90 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-full">
+                              📚 Series
+                            </div>
+                            {/* Books count badge */}
+                            <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-md">
+                              {item.books?.length || 0} books
+                            </div>
+                          </div>
+                          <div className="p-2">
+                            <h3 className="text-white text-sm font-bold mb-0.5 truncate font-display">
+                              {item.title}
+                            </h3>
+                            {item.author && (
+                              <p className="text-white/70 text-xs truncate">{item.author}</p>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  );
+                      </div>
+                    );
+                  } else {
+                    // Render standalone book card
+                    const isComplete = bookCompletionService.isBookCompleted(item.id || item._id);
+                    return (
+                      <div 
+                        key={item.id || item._id} 
+                        className="relative flex-shrink-0 w-[42vw] md:w-[30vw] lg:w-[23vw] max-w-[200px]"
+                      >
+                        <BookCard
+                          book={item}
+                          onClick={() => handleBookClick(item.id || item._id)}
+                        />
+                        {isComplete && (
+                          <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1 shadow-lg">
+                            <CheckCircle className="w-5 h-5 text-white" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
                 })}
               </div>
             </div>
