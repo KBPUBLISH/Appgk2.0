@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Sparkles, Palette, Loader2, Music, ListMusic } from 'lucide-react';
+import { ChevronLeft, Sparkles, Palette, Loader2, Music, ListMusic, X, LogIn, UserPlus } from 'lucide-react';
 import { userPlaylistService, ArtStyle } from '../services/userPlaylistService';
 import { authService } from '../services/authService';
 
@@ -11,6 +11,7 @@ const CreatePlaylistPage: React.FC = () => {
     const [description, setDescription] = useState('');
     const [coverImage, setCoverImage] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
+    const [showSignUpPrompt, setShowSignUpPrompt] = useState(false);
     
     // AI Cover state
     const [showAiCover, setShowAiCover] = useState(false);
@@ -18,6 +19,16 @@ const CreatePlaylistPage: React.FC = () => {
     const [selectedStyle, setSelectedStyle] = useState('cartoon');
     const [coverPrompt, setCoverPrompt] = useState('');
     const [generatingCover, setGeneratingCover] = useState(false);
+    
+    // Check if user is logged in on mount
+    useEffect(() => {
+        const user = authService.getUser();
+        const userId = user?.email || user?._id;
+        if (!userId) {
+            // Show sign up prompt immediately for anonymous users
+            setShowSignUpPrompt(true);
+        }
+    }, []);
     
     useEffect(() => {
         const loadStyles = async () => {
@@ -266,6 +277,79 @@ const CreatePlaylistPage: React.FC = () => {
                     )}
                 </button>
             </div>
+            
+            {/* Sign Up Prompt Modal */}
+            {showSignUpPrompt && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="relative w-[90%] max-w-md bg-gradient-to-br from-[#3E1F07] to-[#5c2e0b] rounded-3xl p-6 shadow-2xl animate-in zoom-in-75 duration-500 border-2 border-[#8B4513]">
+                        <button
+                            onClick={() => {
+                                setShowSignUpPrompt(false);
+                                navigate('/library');
+                            }}
+                            className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"
+                        >
+                            <X size={24} />
+                        </button>
+                        
+                        {/* Fun illustration */}
+                        <div className="text-center mb-6">
+                            <div className="w-24 h-24 mx-auto bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mb-4 shadow-lg">
+                                <Music className="w-12 h-12 text-white" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-white font-display drop-shadow-md">
+                                🎵 Create Your Playlist!
+                            </h2>
+                            <p className="text-white/70 mt-2 text-sm">
+                                Sign up to save your playlists and access them anywhere!
+                            </p>
+                        </div>
+                        
+                        {/* Benefits */}
+                        <div className="space-y-3 mb-6">
+                            <div className="flex items-center gap-3 bg-white/10 rounded-xl p-3">
+                                <span className="text-2xl">💾</span>
+                                <p className="text-white text-sm">Save unlimited playlists</p>
+                            </div>
+                            <div className="flex items-center gap-3 bg-white/10 rounded-xl p-3">
+                                <span className="text-2xl">🎨</span>
+                                <p className="text-white text-sm">Create AI-generated covers</p>
+                            </div>
+                            <div className="flex items-center gap-3 bg-white/10 rounded-xl p-3">
+                                <span className="text-2xl">📱</span>
+                                <p className="text-white text-sm">Access on all your devices</p>
+                            </div>
+                        </div>
+                        
+                        {/* Action Buttons */}
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => navigate('/sign-in?redirect=/create-playlist')}
+                                className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-lg flex items-center justify-center gap-2 shadow-lg hover:from-amber-400 hover:to-orange-400 transition-all"
+                            >
+                                <UserPlus className="w-5 h-5" />
+                                Sign Up Free
+                            </button>
+                            <button
+                                onClick={() => navigate('/sign-in?redirect=/create-playlist')}
+                                className="w-full py-3 rounded-xl bg-white/10 text-white font-medium flex items-center justify-center gap-2 hover:bg-white/20 transition-all"
+                            >
+                                <LogIn className="w-5 h-5" />
+                                Already have an account? Sign In
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowSignUpPrompt(false);
+                                    navigate('/library');
+                                }}
+                                className="w-full py-2 text-white/50 hover:text-white/70 text-sm transition-colors"
+                            >
+                                Maybe later
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
