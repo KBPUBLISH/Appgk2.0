@@ -268,26 +268,37 @@ const BookDetailPage: React.FC = () => {
             }
           }
           
-          // Load reward voice info if book has one
-          const rewardVoiceId = rawData.rewardVoiceId || (fullBook as any).rewardVoiceId;
-          if (rewardVoiceId) {
-            try {
-              const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || 'https://backendgk2-0.onrender.com';
-              const voicesResponse = await fetch(`${API_BASE}/api/voices`);
-              if (voicesResponse.ok) {
-                const allVoices = await voicesResponse.json();
-                const voice = allVoices.find((v: any) => v.voiceId === rewardVoiceId);
-                if (voice) {
-                  setRewardVoice({
-                    voiceId: voice.voiceId,
-                    name: voice.customName || voice.name,
-                    characterImage: voice.characterImage,
-                  });
-                }
+        }
+        
+        // Load reward voice info if book has one (check multiple locations)
+        const rawData2 = (fullBook as any)?.rawData;
+        const rewardVoiceId = rawData2?.rewardVoiceId || (fullBook as any)?.rewardVoiceId;
+        console.log('🎁 Book reward voice check:', { 
+          hasRawData: !!rawData2, 
+          rewardVoiceId,
+          rawDataRewardVoiceId: rawData2?.rewardVoiceId,
+          directRewardVoiceId: (fullBook as any)?.rewardVoiceId
+        });
+        
+        if (rewardVoiceId) {
+          try {
+            const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || 'https://backendgk2-0.onrender.com';
+            const voicesResponse = await fetch(`${API_BASE}/api/voices`);
+            if (voicesResponse.ok) {
+              const allVoices = await voicesResponse.json();
+              console.log('🎁 Looking for voice:', rewardVoiceId, 'in', allVoices.length, 'voices');
+              const voice = allVoices.find((v: any) => v.voiceId === rewardVoiceId);
+              console.log('🎁 Found voice:', voice);
+              if (voice) {
+                setRewardVoice({
+                  voiceId: voice.voiceId,
+                  name: voice.customName || voice.name,
+                  characterImage: voice.characterImage,
+                });
               }
-            } catch (error) {
-              console.error('Error fetching reward voice:', error);
             }
+          } catch (error) {
+            console.error('Error fetching reward voice:', error);
           }
         }
 
