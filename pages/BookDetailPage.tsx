@@ -52,7 +52,7 @@ const BookDetailPage: React.FC = () => {
   const { books, loading } = useBooks();
   useAudio(); // keep hook call if needed elsewhere; background music UI is removed
   const { t, translateText, currentLanguage } = useLanguage();
-  const { isSubscribed, isVoiceUnlocked } = useUser();
+  const { isSubscribed, isVoiceUnlocked, unlockVoice } = useUser();
   const [translatedTitle, setTranslatedTitle] = useState<string>('');
   const [translatedDescription, setTranslatedDescription] = useState<string>('');
   const [book, setBook] = useState<Book | null>(null);
@@ -586,40 +586,68 @@ const BookDetailPage: React.FC = () => {
                 // Calculate pages read - cap at totalPages to avoid "5/4 pages" bug
                 const pagesRead = savedPageIndex !== null ? Math.min(savedPageIndex + 1, totalPages) : 0;
                 const progressPercent = totalPages > 0 ? Math.round((pagesRead / totalPages) * 100) : 0;
-                const canUnlock = isBookCompleted() && !isVoiceUnlocked(rewardVoice.voiceId);
+                const bookComplete = isBookCompleted();
+                const voiceAlreadyUnlocked = isVoiceUnlocked(rewardVoice.voiceId);
+                const canUnlock = bookComplete && !voiceAlreadyUnlocked;
+                
+                console.log('🎁 Voice unlock status:', { 
+                  bookComplete, 
+                  voiceAlreadyUnlocked, 
+                  canUnlock, 
+                  voiceId: rewardVoice.voiceId,
+                  pagesRead,
+                  totalPages 
+                });
+                
+                const handleUnlockTap = async () => {
+                  console.log('🎁 Unlock tapped!');
+                  if (!canUnlock) {
+                    console.log('🎁 Cannot unlock - canUnlock is false');
+                    return;
+                  }
+                  
+                  try {
+                    // Update local state immediately
+                    unlockVoice(rewardVoice.voiceId);
+                    console.log('🎁 Local state updated');
+                    
+                    // Also call API to persist
+                    const user = JSON.parse(localStorage.getItem('godly_kids_user') || '{}');
+                    const userId = user?.email || user?._id;
+                    console.log('🎁 User for API:', userId);
+                    
+                    if (userId) {
+                      const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || 'https://backendgk2-0.onrender.com';
+                      const baseUrl = API_BASE.replace(/\/api\/?$/, '');
+                      console.log('🎁 Calling API:', `${baseUrl}/api/voices/unlock`);
+                      
+                      const response = await fetch(`${baseUrl}/api/voices/unlock`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId, voiceId: rewardVoice.voiceId }),
+                      });
+                      const data = await response.json();
+                      console.log('🎁 API response:', data);
+                    }
+                    
+                    // Show success alert explaining it's added to their library
+                    alert(`🎉 ${rewardVoice.name} Voice Unlocked!\n\nThis voice has been added to your voice library. You can now use it to read any book!`);
+                  } catch (error) {
+                    console.error('🎁 Failed to unlock voice:', error);
+                    alert('Failed to unlock voice. Please try again.');
+                  }
+                };
                 
                 return (
                   <div 
                     className={`w-full max-w-sm mb-3 rounded-2xl p-3 border-2 ${
-                      isVoiceUnlocked(rewardVoice.voiceId) 
-                        ? 'bg-gradient-to-r from-green-600/80 to-emerald-700/80 border-green-400/70' 
+                      voiceAlreadyUnlocked 
+                        ? 'bg-gradient-to-r from-green-700/90 to-emerald-800/90 border-green-500/70' 
                         : canUnlock
-                          ? 'bg-gradient-to-r from-amber-600/90 to-yellow-600/90 border-amber-300 cursor-pointer hover:from-amber-500/90 hover:to-yellow-500/90 active:scale-[0.98] transition-all'
-                          : 'bg-gradient-to-r from-amber-700/70 to-yellow-700/70 border-amber-500/50'
+                          ? 'bg-gradient-to-r from-amber-800/95 to-orange-900/95 border-amber-400 cursor-pointer hover:from-amber-700/95 hover:to-orange-800/95 active:scale-[0.98] transition-all'
+                          : 'bg-gradient-to-r from-stone-800/90 to-stone-900/90 border-amber-600/50'
                     }`}
-                    onClick={canUnlock ? async () => {
-                      // Trigger voice unlock
-                      try {
-                        const user = JSON.parse(localStorage.getItem('godly_kids_user') || '{}');
-                        const userId = user?.email || user?._id;
-                        if (!userId) return;
-                        
-                        const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || 'https://backendgk2-0.onrender.com';
-                        const baseUrl = API_BASE.replace(/\/api\/?$/, '');
-                        const response = await fetch(`${baseUrl}/api/voices/unlock`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ userId, voiceId: rewardVoice.voiceId }),
-                        });
-                        const data = await response.json();
-                        if (data.success) {
-                          // Refresh the page to show unlocked state
-                          window.location.reload();
-                        }
-                      } catch (error) {
-                        console.error('Failed to unlock voice:', error);
-                      }
-                    } : undefined}
+                    onClick={canUnlock ? handleUnlockTap : undefined}
                   >
                     <div className="flex items-center gap-3">
                       {rewardVoice.characterImage ? (
@@ -627,44 +655,45 @@ const BookDetailPage: React.FC = () => {
                           src={rewardVoice.characterImage} 
                           alt={rewardVoice.name}
                           className={`w-14 h-14 rounded-full object-cover border-2 shadow-lg ${
-                            isVoiceUnlocked(rewardVoice.voiceId) ? 'border-green-300' : 'border-amber-200'
+                            voiceAlreadyUnlocked ? 'border-green-300' : 'border-amber-300'
                           }`}
                         />
                       ) : (
                         <div className={`w-14 h-14 rounded-full flex items-center justify-center border-2 ${
-                          isVoiceUnlocked(rewardVoice.voiceId) ? 'bg-green-400 border-green-300' : 'bg-amber-500 border-amber-300'
+                          voiceAlreadyUnlocked ? 'bg-green-500 border-green-300' : 'bg-amber-600 border-amber-400'
                         }`}>
-                          <span className="text-2xl">{isVoiceUnlocked(rewardVoice.voiceId) ? '✅' : '🎤'}</span>
+                          <span className="text-2xl">{voiceAlreadyUnlocked ? '✅' : '🎤'}</span>
                         </div>
                       )}
                       <div className="flex-1">
-                        {isVoiceUnlocked(rewardVoice.voiceId) ? (
+                        {voiceAlreadyUnlocked ? (
                           <>
-                            <p className="text-green-100 text-xs font-semibold flex items-center gap-1">
+                            <p className="text-green-200 text-xs font-semibold flex items-center gap-1">
                               <span>✨</span> Voice Unlocked!
                             </p>
                             <p className="text-white font-bold text-sm drop-shadow-sm">{rewardVoice.name} Voice</p>
+                            <p className="text-green-300/70 text-[10px] mt-0.5">Added to your voice library</p>
                           </>
                         ) : canUnlock ? (
                           <>
-                            <p className="text-amber-100 text-xs font-semibold animate-pulse">🎁 Tap to Unlock!</p>
+                            <p className="text-amber-300 text-xs font-semibold animate-pulse">🎁 Tap to Unlock!</p>
                             <p className="text-white font-bold text-sm drop-shadow-sm">{rewardVoice.name} Voice</p>
-                            <p className="text-amber-200 text-[10px] mt-1">Book completed! Tap to claim your reward</p>
+                            <p className="text-amber-200/80 text-[10px] mt-1">Add this voice to your library for all books!</p>
                           </>
                         ) : (
                           <>
-                            <p className="text-amber-100 text-xs font-semibold">🎁 Complete to Unlock</p>
+                            <p className="text-amber-300 text-xs font-semibold">🎁 Complete to Unlock</p>
                             <p className="text-white font-bold text-sm drop-shadow-sm">{rewardVoice.name} Voice</p>
                             {/* Progress Bar */}
                             {totalPages > 0 && (
                               <div className="mt-2">
-                                <div className="flex justify-between text-[10px] text-amber-100 mb-1 font-medium">
+                                <div className="flex justify-between text-[10px] text-amber-200 mb-1 font-medium">
                                   <span>{pagesRead} / {totalPages} pages</span>
                                   <span>{progressPercent}%</span>
                                 </div>
-                                <div className="h-2.5 bg-black/40 rounded-full overflow-hidden">
+                                <div className="h-2.5 bg-black/50 rounded-full overflow-hidden">
                                   <div 
-                                    className="h-full bg-gradient-to-r from-amber-300 to-yellow-200 rounded-full transition-all duration-500"
+                                    className="h-full bg-gradient-to-r from-amber-400 to-amber-300 rounded-full transition-all duration-500"
                                     style={{ width: `${Math.min(progressPercent, 100)}%` }}
                                   />
                                 </div>
@@ -673,7 +702,7 @@ const BookDetailPage: React.FC = () => {
                           </>
                         )}
                       </div>
-                      <span className="text-2xl">{isVoiceUnlocked(rewardVoice.voiceId) ? '🎉' : canUnlock ? '👆' : '✨'}</span>
+                      <span className="text-2xl">{voiceAlreadyUnlocked ? '🎉' : canUnlock ? '👆' : '✨'}</span>
                     </div>
                   </div>
                 );
