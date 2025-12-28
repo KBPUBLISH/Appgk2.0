@@ -199,6 +199,29 @@ class UserPlaylistService {
         ];
     }
     
+    // Generate a simple gradient placeholder as data URL
+    private generatePlaceholderDataUrl(text: string): string {
+        // Create a canvas-like SVG with gradient and text
+        const svg = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
+                <defs>
+                    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#9333ea;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+                <rect width="400" height="400" fill="url(#grad)"/>
+                <text x="200" y="200" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">
+                    ${text.substring(0, 20)}${text.length > 20 ? '...' : ''}
+                </text>
+                <text x="200" y="240" font-family="Arial, sans-serif" font-size="14" fill="rgba(255,255,255,0.7)" text-anchor="middle">
+                    🎵 Playlist
+                </text>
+            </svg>
+        `;
+        return `data:image/svg+xml;base64,${btoa(svg)}`;
+    }
+
     // Generate playlist cover with AI
     async generateCover(prompt: string, style: string, playlistName: string, userId: string): Promise<{ imageUrl: string; generationMethod: string } | null> {
         try {
@@ -219,14 +242,14 @@ class UserPlaylistService {
                 };
             }
             
-            // If AI generation fails, return a placeholder
-            console.warn('⚠️ AI generation failed, using placeholder');
-            const placeholderUrl = `https://via.placeholder.com/400x400/8B4513/FFFFFF?text=${encodeURIComponent(playlistName || 'Playlist')}`;
+            // If AI generation fails, return a local placeholder
+            console.warn('⚠️ AI generation failed, using local placeholder');
+            const placeholderUrl = this.generatePlaceholderDataUrl(playlistName || 'My Playlist');
             return { imageUrl: placeholderUrl, generationMethod: 'placeholder' };
         } catch (error) {
             console.error('Error generating cover:', error);
-            // Return placeholder on error
-            const placeholderUrl = `https://via.placeholder.com/400x400/8B4513/FFFFFF?text=${encodeURIComponent(playlistName || 'Playlist')}`;
+            // Return local placeholder on error
+            const placeholderUrl = this.generatePlaceholderDataUrl(playlistName || 'My Playlist');
             return { imageUrl: placeholderUrl, generationMethod: 'placeholder' };
         }
     }
