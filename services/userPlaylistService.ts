@@ -184,56 +184,69 @@ class UserPlaylistService {
         }
     }
     
-    // Get available art styles for cover generation
+    // Get available art styles for cover generation (hardcoded for now)
     async getArtStyles(): Promise<ArtStyle[]> {
-        try {
-            const response = await fetch(`${this.baseUrl}/ai-generate/styles`);
-            if (response.ok) {
-                return await response.json();
-            }
-            return [];
-        } catch (error) {
-            console.error('Error fetching art styles:', error);
-            return [];
-        }
+        // Return static art styles - no need for API call
+        return [
+            { id: 'cartoon', name: 'Cartoon', description: 'Fun and colorful cartoon style', prompt: 'cartoon style, vibrant colors, fun' },
+            { id: 'watercolor', name: 'Watercolor', description: 'Soft watercolor painting', prompt: 'watercolor painting, soft colors, artistic' },
+            { id: 'pixel', name: 'Pixel Art', description: 'Retro pixel art style', prompt: 'pixel art, 8-bit, retro gaming' },
+            { id: 'storybook', name: 'Storybook', description: 'Classic children\'s book illustration', prompt: 'children\'s book illustration, whimsical, classic' },
+            { id: 'anime', name: 'Anime', description: 'Japanese anime style', prompt: 'anime style, manga, japanese art' },
+            { id: 'papercraft', name: 'Paper Craft', description: 'Paper cut-out style', prompt: 'paper craft, cut-out, layered paper' },
+            { id: 'crayon', name: 'Crayon', description: 'Crayon drawing style', prompt: 'crayon drawing, child-like, colorful' },
+            { id: 'claymation', name: 'Claymation', description: 'Clay animation style', prompt: 'claymation, 3d clay, stop motion' },
+        ];
     }
     
     // Generate playlist cover with AI
     async generateCover(prompt: string, style: string, playlistName: string, userId: string): Promise<{ imageUrl: string; generationMethod: string } | null> {
         try {
-            const response = await fetch(`${this.baseUrl}/ai-generate/playlist-cover`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt, style, playlistName, userId }),
-            });
-            if (response.ok) {
-                const data = await response.json();
-                return { imageUrl: data.imageUrl, generationMethod: data.generationMethod };
-            }
-            return null;
-        } catch (error) {
-            console.error('Error generating cover:', error);
-            return null;
-        }
-    }
-    
-    // Enhance prompt with AI
-    async enhancePrompt(prompt: string, style: string): Promise<string> {
-        try {
-            const response = await fetch(`${this.baseUrl}/ai-generate/enhance-prompt`, {
+            console.log('🎨 Generating cover:', { prompt, style, playlistName });
+            
+            const response = await fetch(`${this.baseUrl}/ai/generate-image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prompt, style }),
             });
+            
             if (response.ok) {
                 const data = await response.json();
-                return data.enhancedPrompt || prompt;
+                console.log('🎨 Cover generated:', data);
+                return { 
+                    imageUrl: data.imageUrl, 
+                    generationMethod: data.message?.includes('placeholder') ? 'placeholder' : 'ai' 
+                };
             }
-            return prompt;
+            
+            // If AI generation fails, return a placeholder
+            console.warn('⚠️ AI generation failed, using placeholder');
+            const placeholderUrl = `https://via.placeholder.com/400x400/8B4513/FFFFFF?text=${encodeURIComponent(playlistName || 'Playlist')}`;
+            return { imageUrl: placeholderUrl, generationMethod: 'placeholder' };
         } catch (error) {
-            console.error('Error enhancing prompt:', error);
-            return prompt;
+            console.error('Error generating cover:', error);
+            // Return placeholder on error
+            const placeholderUrl = `https://via.placeholder.com/400x400/8B4513/FFFFFF?text=${encodeURIComponent(playlistName || 'Playlist')}`;
+            return { imageUrl: placeholderUrl, generationMethod: 'placeholder' };
         }
+    }
+    
+    // Enhance prompt with AI (simplified - just return original for now)
+    async enhancePrompt(prompt: string, style: string): Promise<string> {
+        // For now, just enhance the prompt locally
+        const stylePrompts: Record<string, string> = {
+            cartoon: 'cartoon style, vibrant colors, fun',
+            watercolor: 'watercolor painting, soft colors',
+            pixel: 'pixel art, 8-bit, retro',
+            storybook: 'children\'s book illustration',
+            anime: 'anime style, manga',
+            papercraft: 'paper craft, layered',
+            crayon: 'crayon drawing, colorful',
+            claymation: 'claymation, 3d clay',
+        };
+        
+        const styleText = stylePrompts[style] || style;
+        return `${prompt}, ${styleText}, for kids, safe for children, playlist cover art`;
     }
 }
 

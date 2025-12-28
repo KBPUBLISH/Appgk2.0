@@ -692,6 +692,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isResetPassword = location.pathname === '/reset-password';
   const isBookSeries = location.pathname.startsWith('/book-series/');
   const isWelcome = location.pathname === '/welcome';
+  const isCreatePlaylist = location.pathname === '/create-playlist';
+  const isMyPlaylist = location.pathname.startsWith('/my-playlist/');
 
   return (
     <div className="relative h-screen w-full overflow-hidden text-white flex flex-col">
@@ -707,7 +709,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <MiniPlayer />
 
       {/* Only show BottomNavigation on main tab pages */}
-      {!isLanding && !isSignIn && !isOnboarding && !isWelcome && !isBookDetail && !isPlayer && !isProfile && !isCreateProfile && !isEditProfile && !isPaywall && !isSettings && !isBookReader && !isAudioPage && !isLessonPage && !isGamePage && !isResetPassword && !isBookSeries && <BottomNavigation />}
+      {!isLanding && !isSignIn && !isOnboarding && !isWelcome && !isBookDetail && !isPlayer && !isProfile && !isCreateProfile && !isEditProfile && !isPaywall && !isSettings && !isBookReader && !isAudioPage && !isLessonPage && !isGamePage && !isResetPassword && !isBookSeries && !isCreatePlaylist && !isMyPlaylist && <BottomNavigation />}
     </div>
   );
 };
