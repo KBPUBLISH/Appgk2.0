@@ -74,6 +74,9 @@ const BookDetailPage: React.FC = () => {
   const [pinnedDrawing, setPinnedDrawing] = useState<{ pageRef: string; pageId: string; dataUrl: string; backgroundUrl?: string } | null>(null);
   const [showDrawingModal, setShowDrawingModal] = useState(false);
   
+  // Voice reward info
+  const [rewardVoice, setRewardVoice] = useState<{ voiceId: string; name: string; characterImage?: string } | null>(null);
+  
   // Check if book is locked (members only and user not subscribed)
   const isLocked = isMembersOnly && !isSubscribed;
 
@@ -264,6 +267,28 @@ const BookDetailPage: React.FC = () => {
               console.error('Error fetching associated games:', error);
             }
           }
+          
+          // Load reward voice info if book has one
+          const rewardVoiceId = rawData.rewardVoiceId || (fullBook as any).rewardVoiceId;
+          if (rewardVoiceId) {
+            try {
+              const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || 'https://backendgk2-0.onrender.com';
+              const voicesResponse = await fetch(`${API_BASE}/api/voices`);
+              if (voicesResponse.ok) {
+                const allVoices = await voicesResponse.json();
+                const voice = allVoices.find((v: any) => v.voiceId === rewardVoiceId);
+                if (voice) {
+                  setRewardVoice({
+                    voiceId: voice.voiceId,
+                    name: voice.customName || voice.name,
+                    characterImage: voice.characterImage,
+                  });
+                }
+              }
+            } catch (error) {
+              console.error('Error fetching reward voice:', error);
+            }
+          }
         }
 
         // Fetch pages to determine total count
@@ -384,8 +409,8 @@ const BookDetailPage: React.FC = () => {
 
   const handleContinue = () => {
     if (id && savedPageIndex !== null && savedPageIndex >= 0) {
-      // Navigate to book reader with the saved page
-      navigate(`/read/${id}?page=${savedPageIndex + 1}`); // +1 because URL uses 1-based, but we store 0-based
+      // Navigate with continue flag to resume from saved progress
+      navigate(`/read/${id}?continue=true`);
     } else {
       // No saved progress, just start from beginning
       navigate(`/read/${id}`);
@@ -539,6 +564,28 @@ const BookDetailPage: React.FC = () => {
           ) : (
             // --- STANDARD BOOK ACTIONS ---
             <>
+              {/* Voice Reward Indicator */}
+              {rewardVoice && (
+                <div className="w-full max-w-sm mb-3 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 backdrop-blur-sm rounded-2xl p-3 border-2 border-amber-400/50 flex items-center gap-3">
+                  {rewardVoice.characterImage ? (
+                    <img 
+                      src={rewardVoice.characterImage} 
+                      alt={rewardVoice.name}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-amber-300 shadow-lg"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-amber-400 flex items-center justify-center border-2 border-amber-300">
+                      <span className="text-2xl">🎤</span>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <p className="text-amber-100 text-xs font-medium">🎁 Complete to Unlock</p>
+                    <p className="text-white font-bold text-sm">{rewardVoice.name} Voice</p>
+                  </div>
+                  <span className="text-2xl">✨</span>
+                </div>
+              )}
+              
               {/* Read / Continue Buttons */}
               <div className="flex w-full gap-3 max-w-sm">
                 {!bookDetailsLoaded ? (

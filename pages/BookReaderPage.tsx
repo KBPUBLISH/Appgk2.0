@@ -849,8 +849,14 @@ const BookReaderPage: React.FC = () => {
                 setPages([...regularPages, theEndPage]);
 
                 // Check if page is specified in URL (from Continue button)
+                // URL param "page" = continue from specific page
+                // URL param "continue=true" = resume from saved progress
+                // No URL params = start fresh from page 1
                 const pageParam = searchParams.get('page');
+                const continueParam = searchParams.get('continue');
+                
                 if (pageParam) {
+                    // Specific page requested (e.g., from Continue button)
                     const pageNum = parseInt(pageParam, 10);
                     if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= data.length) {
                         const pageIndex = pageNum - 1; // Convert to 0-based
@@ -858,14 +864,18 @@ const BookReaderPage: React.FC = () => {
                         currentPageIndexRef.current = pageIndex;
                         console.log(`📖 Navigated to page ${pageNum} from URL`);
                     }
-                } else {
-                    // Load saved reading progress if no URL param
+                } else if (continueParam === 'true') {
+                    // Continue reading - load saved progress
                     const progress = readingProgressService.getProgress(bookId);
                     if (progress && progress.currentPageIndex >= 0 && progress.currentPageIndex < data.length) {
                         setCurrentPageIndex(progress.currentPageIndex);
                         currentPageIndexRef.current = progress.currentPageIndex;
                         console.log(`📖 Restored reading progress: Page ${progress.currentPageIndex + 1} of ${data.length}`);
                     }
+                } else {
+                    // "Read" button - start fresh from page 1
+                    console.log(`📖 Starting book from page 1`);
+                    // Page index is already 0 by default
                 }
             } catch (err) {
                 console.error('Failed to fetch pages:', err);
@@ -1110,8 +1120,10 @@ const BookReaderPage: React.FC = () => {
 
     // Handle unlocking the reward voice when book is completed
     const handleUnlockRewardVoice = async () => {
+        console.log('🎁 handleUnlockRewardVoice called, bookRewardVoiceId:', bookRewardVoiceId);
+        
         if (!bookRewardVoiceId) {
-            console.log('📚 No reward voice for this book');
+            console.log('📚 No reward voice for this book (bookRewardVoiceId is null/empty)');
             return;
         }
         
@@ -1119,12 +1131,14 @@ const BookReaderPage: React.FC = () => {
             const user = authService.getUser();
             const userId = user?.email || user?._id;
             
+            console.log('🎁 User info:', { email: user?.email, id: user?._id, userId });
+            
             if (!userId) {
                 console.log('⚠️ No user logged in, skipping voice unlock');
                 return;
             }
             
-            console.log(`🎁 Attempting to unlock reward voice: ${bookRewardVoiceId}`);
+            console.log(`🎁 Attempting to unlock reward voice: ${bookRewardVoiceId} for user: ${userId}`);
             
             const response = await fetch(`${API_BASE_URL}/api/voices/unlock`, {
                 method: 'POST',
@@ -1135,7 +1149,9 @@ const BookReaderPage: React.FC = () => {
                 }),
             });
             
+            console.log('🎁 Unlock response status:', response.status);
             const data = await response.json();
+            console.log('🎁 Unlock response data:', data);
             
             if (data.success && !data.alreadyUnlocked) {
                 // Voice was just unlocked - show celebration!
@@ -1147,9 +1163,11 @@ const BookReaderPage: React.FC = () => {
                 setShowVoiceUnlockModal(true);
             } else if (data.alreadyUnlocked) {
                 console.log('✓ Voice was already unlocked');
+            } else {
+                console.log('⚠️ Unlock failed or unexpected response:', data);
             }
         } catch (error) {
-            console.error('Failed to unlock voice:', error);
+            console.error('❌ Failed to unlock voice:', error);
         }
     };
 
@@ -2568,14 +2586,26 @@ const BookReaderPage: React.FC = () => {
                                 e.stopPropagation();
                                 setShowVoiceDropdown(!showVoiceDropdown);
                             }}
-                            className="bg-black/40 backdrop-blur-md rounded-full px-2.5 py-1.5 flex items-center gap-1.5 hover:bg-black/60 transition-colors"
+                            className={`backdrop-blur-md rounded-full px-2.5 py-1.5 flex items-center gap-1.5 hover:bg-black/60 transition-colors ${
+                                bookDefaultVoiceId ? 'bg-amber-600/60 ring-2 ring-amber-400/50' : 'bg-black/40'
+                            }`}
                         >
                             <Volume2 className="w-4 h-4 text-white" />
                             <span className="text-white text-xs max-w-[100px] truncate">
-                                {voices.find(v => v.voice_id === selectedVoiceId)?.name ||
+                                {/* Show the effective voice (book default overrides user selection) */}
+                                {bookDefaultVoiceId ? (
+                                    <>
+                                        {voices.find(v => v.voice_id === bookDefaultVoiceId)?.name || 
+                                         voices.find(v => v.voice_id === bookDefaultVoiceId)?.customName ||
+                                         'Book Voice'}
+                                    </>
+                                ) : (
+                                    voices.find(v => v.voice_id === selectedVoiceId)?.name ||
                                     clonedVoices.find(v => v.voice_id === selectedVoiceId)?.name ||
-                                    'Voice'}
+                                    'Voice'
+                                )}
                             </span>
+                            {bookDefaultVoiceId && <span className="text-amber-300 text-[10px]">📖</span>}
                         </button>
 
                         {/* Dropdown Menu */}
