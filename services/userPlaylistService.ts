@@ -201,25 +201,19 @@ class UserPlaylistService {
     
     // Generate a simple gradient placeholder as data URL
     private generatePlaceholderDataUrl(text: string): string {
-        // Create a canvas-like SVG with gradient and text
-        const svg = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">
-                <defs>
-                    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#9333ea;stop-opacity:1" />
-                        <stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />
-                    </linearGradient>
-                </defs>
-                <rect width="400" height="400" fill="url(#grad)"/>
-                <text x="200" y="200" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">
-                    ${text.substring(0, 20)}${text.length > 20 ? '...' : ''}
-                </text>
-                <text x="200" y="240" font-family="Arial, sans-serif" font-size="14" fill="rgba(255,255,255,0.7)" text-anchor="middle">
-                    🎵 Playlist
-                </text>
-            </svg>
-        `;
-        return `data:image/svg+xml;base64,${btoa(svg)}`;
+        // Sanitize text - remove special characters that could break SVG/base64
+        const safeText = text.replace(/[^\w\s]/gi, '').substring(0, 18);
+        const displayText = safeText || 'My Playlist';
+        
+        // Create a canvas-like SVG with gradient and text (no emojis for btoa compatibility)
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#9333ea"/><stop offset="100%" style="stop-color:#ec4899"/></linearGradient></defs><rect width="400" height="400" fill="url(#grad)"/><circle cx="200" cy="160" r="50" fill="rgba(255,255,255,0.2)"/><polygon points="185,140 185,180 220,160" fill="white"/><text x="200" y="250" font-family="Arial" font-size="22" font-weight="bold" fill="white" text-anchor="middle">${displayText}</text><text x="200" y="280" font-family="Arial" font-size="14" fill="rgba(255,255,255,0.7)" text-anchor="middle">Playlist</text></svg>`;
+        
+        try {
+            return `data:image/svg+xml;base64,${btoa(svg)}`;
+        } catch {
+            // Fallback to URL encoding if btoa fails
+            return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+        }
     }
 
     // Generate playlist cover with AI
