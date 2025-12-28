@@ -17,6 +17,9 @@ import { incrementActivityCounter } from '../components/features/ReviewPromptMod
 import { BookPageRenderer, ScrollState } from '../components/features/BookPageRenderer';
 import { processTextWithEmotionalCues, removeEmotionalCues } from '../utils/textProcessing';
 import { activityTrackingService } from '../services/activityTrackingService';
+import { authService } from '../services/authService';
+
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://backendgk2-0.onrender.com';
 
 interface TextBox {
     text: string;
@@ -144,6 +147,15 @@ const BookReaderPage: React.FC = () => {
     const [voices, setVoices] = useState<any[]>([]);
     const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
     const [selectedVoiceId, setSelectedVoiceId] = useState<string>('21m00Tcm4TlvDq8ikWAM'); // Default Rachel
+    
+    // Book-specific voice settings (from portal)
+    const [bookDefaultVoiceId, setBookDefaultVoiceId] = useState<string | null>(null);
+    const [bookRewardVoiceId, setBookRewardVoiceId] = useState<string | null>(null);
+    const [showVoiceUnlockModal, setShowVoiceUnlockModal] = useState(false);
+    const [unlockedVoice, setUnlockedVoice] = useState<{ name: string; characterImage?: string } | null>(null);
+    
+    // Get the effective voice ID to use for TTS (book's default overrides user's selection)
+    const effectiveVoiceId = bookDefaultVoiceId || selectedVoiceId;
     const [wordAlignment, setWordAlignment] = useState<{ words: Array<{ word: string; start: number; end: number }> } | null>(null);
     const [currentWordIndex, setCurrentWordIndex] = useState<number>(-1);
     const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
@@ -505,6 +517,18 @@ const BookReaderPage: React.FC = () => {
                     const orientation = rawData?.orientation || (book as any)?.orientation || 'portrait';
                     setBookOrientation(orientation);
                     console.log('📖 Book orientation:', orientation);
+                    
+                    // Load book-specific voice settings
+                    const defaultVoice = rawData?.defaultVoiceId || (book as any)?.defaultVoiceId;
+                    const rewardVoice = rawData?.rewardVoiceId || (book as any)?.rewardVoiceId;
+                    if (defaultVoice) {
+                        console.log('🎤 Book has default voice:', defaultVoice);
+                        setBookDefaultVoiceId(defaultVoice);
+                    }
+                    if (rewardVoice) {
+                        console.log('🎁 Book has reward voice:', rewardVoice);
+                        setBookRewardVoiceId(rewardVoice);
+                    }
                     
                     // Increment view count in database (when book is OPENED)
                     try {
@@ -1084,6 +1108,51 @@ const BookReaderPage: React.FC = () => {
     const currentPage = mapPage(pages[currentPageIndex]);
     const isTheEndPage = currentPage?.id === 'the-end-page' || currentPageIndex === pages.length - 1;
 
+    // Handle unlocking the reward voice when book is completed
+    const handleUnlockRewardVoice = async () => {
+        if (!bookRewardVoiceId) {
+            console.log('📚 No reward voice for this book');
+            return;
+        }
+        
+        try {
+            const user = authService.getUser();
+            const userId = user?.email || user?._id;
+            
+            if (!userId) {
+                console.log('⚠️ No user logged in, skipping voice unlock');
+                return;
+            }
+            
+            console.log(`🎁 Attempting to unlock reward voice: ${bookRewardVoiceId}`);
+            
+            const response = await fetch(`${API_BASE_URL}/api/voices/unlock`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId,
+                    voiceId: bookRewardVoiceId,
+                }),
+            });
+            
+            const data = await response.json();
+            
+            if (data.success && !data.alreadyUnlocked) {
+                // Voice was just unlocked - show celebration!
+                console.log('🎉 Voice unlocked!', data.voice);
+                setUnlockedVoice({
+                    name: data.voice.name,
+                    characterImage: data.voice.characterImage,
+                });
+                setShowVoiceUnlockModal(true);
+            } else if (data.alreadyUnlocked) {
+                console.log('✓ Voice was already unlocked');
+            }
+        } catch (error) {
+            console.error('Failed to unlock voice:', error);
+        }
+    };
+
     const handleNext = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (isPageTurning) return;
@@ -1130,6 +1199,8 @@ const BookReaderPage: React.FC = () => {
                         readCountService.incrementReadCount(bookId);
                         // Track book completion analytics
                         analyticsService.bookReadComplete(bookId, bookTitle);
+                        // Unlock reward voice if book has one
+                        handleUnlockRewardVoice();
                     }
                 }
             }, 850); // Slightly after 0.8s animation completes
@@ -1409,7 +1480,7 @@ const BookReaderPage: React.FC = () => {
                 if (!textBox.text) continue;
                 
                 // Include language in cache key for multilingual support
-                const audioCacheKey = `${pageIndex}-${textBoxIndex}-${selectedVoiceId}${currentLang !== 'en' ? `-${currentLang}` : ''}`;
+                const audioCacheKey = `${pageIndex}-${textBoxIndex}-${effectiveVoiceId}${currentLang !== 'en' ? `-${currentLang}` : ''}`;
                 
                 // Skip if already cached or currently preloading
                 if (audioPreloadCacheRef.current.has(audioCacheKey) || preloadingInProgressRef.current.has(audioCacheKey)) {
@@ -1443,7 +1514,7 @@ const BookReaderPage: React.FC = () => {
                         
                         const result = await ApiService.generateTTS(
                             ttsText,
-                            selectedVoiceId,
+                            effectiveVoiceId,
                             bookId || undefined,
                             currentLang !== 'en' ? currentLang : undefined
                         );
@@ -1481,7 +1552,7 @@ const BookReaderPage: React.FC = () => {
             prevLanguageRef.current = currentLang;
         }
         
-        if (pages.length > 0 && selectedVoiceId) {
+        if (pages.length > 0 && effectiveVoiceId) {
             // For non-English, only preload when translations are ready
             if (currentLang !== 'en' && translatedContent.size === 0) {
                 console.log(`⏳ Waiting for translations before preloading audio (${currentLang})`);
@@ -1491,7 +1562,7 @@ const BookReaderPage: React.FC = () => {
             console.log(`🎵 Starting audio preload for ${currentLang}, page ${currentPageIndex + 1}`);
             preloadUpcomingAudio(currentPageIndex);
         }
-    }, [currentPageIndex, selectedVoiceId, pages.length, selectedLanguage, translatedContent.size]);
+    }, [currentPageIndex, effectiveVoiceId, pages.length, selectedLanguage, translatedContent.size]);
 
     // Auto-play TTS when book first loads (after intro video if any)
     useEffect(() => {
@@ -1509,7 +1580,7 @@ const BookReaderPage: React.FC = () => {
             !introVideoChecked ||
             showIntroVideo ||
             currentPageIndex !== 0 ||
-            !selectedVoiceId ||
+            !effectiveVoiceId ||
             pages.length === 0
         ) {
             return;
@@ -1553,7 +1624,7 @@ const BookReaderPage: React.FC = () => {
             handlePlayText(firstBoxText, 0, syntheticEvent, true);
         }, 1500); // 1.5s delay to let intro video fade out and page fully settle
         
-    }, [loading, introVideoChecked, showIntroVideo, currentPageIndex, selectedVoiceId, pages, translatedContent.size]);
+    }, [loading, introVideoChecked, showIntroVideo, currentPageIndex, effectiveVoiceId, pages, translatedContent.size]);
 
     // Preload background images/videos for upcoming pages to prevent black flash
     const preloadBackgrounds = (startPageIndex: number) => {
@@ -1660,7 +1731,7 @@ const BookReaderPage: React.FC = () => {
             // Use ref for language to get latest value in async context
             const currentLang = selectedLanguageRef.current;
             // Include language in cache key for multilingual support
-            const cacheKey = `${actualPageIndex}-${index}-${selectedVoiceId}${currentLang !== 'en' ? `-${currentLang}` : ''}`;
+            const cacheKey = `${actualPageIndex}-${index}-${effectiveVoiceId}${currentLang !== 'en' ? `-${currentLang}` : ''}`;
             let result = audioPreloadCacheRef.current.get(cacheKey);
             
             // Get translated text if available
@@ -1692,7 +1763,7 @@ const BookReaderPage: React.FC = () => {
                 
                 result = await ApiService.generateTTS(
                     ttsText,
-                    selectedVoiceId,
+                    effectiveVoiceId,
                     bookId || undefined,
                     currentLang !== 'en' ? currentLang : undefined
                 ) || undefined;
@@ -2039,6 +2110,8 @@ const BookReaderPage: React.FC = () => {
                                     readCountService.incrementReadCount(bookId);
                                     // Track book completion analytics
                                     analyticsService.bookReadComplete(bookId, bookTitle);
+                                    // Unlock reward voice if book has one
+                                    handleUnlockRewardVoice();
                                 }
                             } else if (isAutoPlayingRef.current) {
                                 console.log('⏸️ Auto-play: Already processing, skipping');
@@ -3382,6 +3455,64 @@ const BookReaderPage: React.FC = () => {
                     }
                 }}
             />
+            
+            {/* Voice Unlock Celebration Modal */}
+            {showVoiceUnlockModal && unlockedVoice && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="relative w-[90%] max-w-md bg-gradient-to-b from-amber-400 via-yellow-500 to-amber-600 rounded-3xl p-8 shadow-2xl animate-in zoom-in-75 duration-500">
+                        {/* Sparkles decoration */}
+                        <div className="absolute -top-4 -left-4 w-8 h-8 text-yellow-300 animate-pulse">✨</div>
+                        <div className="absolute -top-2 -right-6 w-10 h-10 text-yellow-300 animate-pulse delay-100">✨</div>
+                        <div className="absolute -bottom-3 left-8 w-6 h-6 text-yellow-300 animate-pulse delay-200">✨</div>
+                        <div className="absolute -bottom-5 -right-3 w-7 h-7 text-yellow-300 animate-pulse delay-300">✨</div>
+                        
+                        {/* Content */}
+                        <div className="text-center">
+                            <div className="text-5xl mb-4 animate-bounce">🎉</div>
+                            <h2 className="text-3xl font-bold text-white drop-shadow-lg mb-2">
+                                Voice Unlocked!
+                            </h2>
+                            <p className="text-amber-100 text-lg mb-6">
+                                You just unlocked a new narrator voice!
+                            </p>
+                            
+                            {/* Voice Character Image */}
+                            {unlockedVoice.characterImage ? (
+                                <div className="relative w-32 h-32 mx-auto mb-4">
+                                    <div className="absolute inset-0 bg-gradient-to-r from-yellow-300 to-amber-400 rounded-full animate-pulse"></div>
+                                    <img
+                                        src={unlockedVoice.characterImage}
+                                        alt={unlockedVoice.name}
+                                        className="relative w-full h-full object-cover rounded-full border-4 border-white shadow-lg"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="w-32 h-32 mx-auto mb-4 bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full flex items-center justify-center border-4 border-white shadow-lg">
+                                    <Mic className="w-16 h-16 text-white" />
+                                </div>
+                            )}
+                            
+                            <h3 className="text-2xl font-bold text-white drop-shadow mb-2">
+                                {unlockedVoice.name}
+                            </h3>
+                            <p className="text-amber-100 text-sm mb-6">
+                                Now available in your voice library!
+                            </p>
+                            
+                            {/* Close Button */}
+                            <button
+                                onClick={() => {
+                                    setShowVoiceUnlockModal(false);
+                                    setUnlockedVoice(null);
+                                }}
+                                className="bg-white text-amber-600 font-bold px-8 py-3 rounded-full shadow-lg hover:bg-amber-50 transition-colors text-lg"
+                            >
+                                Awesome! 🎤
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
