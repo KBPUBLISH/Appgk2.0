@@ -220,27 +220,57 @@ const PlaylistPlayerPage: React.FC = () => {
         setIsLiked(favoritesService.getLikes().includes(trackId));
     };
 
-    // Handle share track/episode
+    // Handle share track/episode with cover image
     const handleShare = async () => {
         const playlistToUse = currentPlaylist || localPlaylist;
         if (!playlistToUse || !playlistToUse.items[currentTrackIndex]) return;
         
         const currentTrack = playlistToUse.items[currentTrackIndex];
         const isAudiobook = playlistToUse.type === 'Audiobook';
-        const shareUrl = `${window.location.origin}/#/playlist/${playlistToUse._id}/${currentTrackIndex}`;
+        // Use app.godlykids.com for consistent deep linking
+        const shareUrl = `https://app.godlykids.com/#/playlist/${playlistToUse._id}/${currentTrackIndex}`;
         const shareTitle = currentTrack.title;
         const emoji = isAudiobook ? '📖' : '🎵';
         const shareText = `${emoji} Listen to "${shareTitle}" from ${playlistToUse.title} on GodlyKids!`;
         
+        // Get the cover image (track cover or playlist cover)
+        const trackCover = currentTrack.coverImage || playlistToUse.coverImage;
+        
         // Try native Web Share API first (works great on mobile)
         if (navigator.share) {
             try {
-                await navigator.share({
-                    title: shareTitle,
+                let shareData: ShareData = {
+                    title: `${emoji} ${shareTitle} - GodlyKids`,
                     text: shareText,
                     url: shareUrl,
-                });
-                console.log('📤 Track shared successfully via Web Share API');
+                };
+                
+                // Try to include cover image if browser supports file sharing
+                if (trackCover && navigator.canShare) {
+                    try {
+                        console.log('📷 Attempting to fetch cover image for sharing...');
+                        const response = await fetch(trackCover);
+                        const blob = await response.blob();
+                        const fileName = `${shareTitle.replace(/[^a-z0-9]/gi, '_')}.jpg`;
+                        const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' });
+                        
+                        // Check if we can share with files
+                        const testShare = { files: [file] };
+                        if (navigator.canShare(testShare)) {
+                            shareData = {
+                                title: `${emoji} ${shareTitle} - GodlyKids`,
+                                text: `${shareText}\n\n🔗 ${shareUrl}`,
+                                files: [file],
+                            };
+                            console.log('✅ Sharing with cover image');
+                        }
+                    } catch (imgErr) {
+                        console.log('📷 Could not include image in share:', imgErr);
+                    }
+                }
+                
+                await navigator.share(shareData);
+                console.log('📤 Track shared successfully');
             } catch (err) {
                 // User cancelled or share failed - that's ok
                 if ((err as Error).name !== 'AbortError') {
@@ -250,7 +280,7 @@ const PlaylistPlayerPage: React.FC = () => {
         } else {
             // Fallback: Copy link to clipboard
             try {
-                await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
+                await navigator.clipboard.writeText(`${shareText}\n\n🔗 ${shareUrl}`);
                 alert('📋 Link copied to clipboard! Share it with your friends.');
             } catch (err) {
                 // Final fallback: prompt user

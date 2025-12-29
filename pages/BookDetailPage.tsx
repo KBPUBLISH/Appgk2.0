@@ -414,23 +414,50 @@ const BookDetailPage: React.FC = () => {
     }
   };
 
-  // Handle share book
+  // Handle share book with cover image
   const handleShare = async () => {
     if (!book) return;
     
-    const shareUrl = `${window.location.origin}/#/book-details/${id}`;
+    // Use app.godlykids.com for consistent deep linking
+    const shareUrl = `https://app.godlykids.com/#/book-details/${id}`;
     const shareTitle = translatedTitle || book.title;
-    const shareText = `📚 Check out "${shareTitle}" on GodlyKids! ${translatedDescription || book.description || 'A wonderful book for kids!'}`;
+    const shareText = `📚 Check out "${shareTitle}" on GodlyKids!\n\n${translatedDescription || book.description || 'A wonderful book for kids!'}`;
     
     // Try native Web Share API first (works great on mobile)
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: shareTitle,
+        let shareData: ShareData = {
+          title: `📚 ${shareTitle} - GodlyKids`,
           text: shareText,
           url: shareUrl,
-        });
-        console.log('📤 Book shared successfully via Web Share API');
+        };
+        
+        // Try to include cover image if browser supports file sharing
+        if (book.coverUrl && navigator.canShare) {
+          try {
+            console.log('📷 Attempting to fetch cover image for sharing...');
+            const response = await fetch(book.coverUrl);
+            const blob = await response.blob();
+            const fileName = `${shareTitle.replace(/[^a-z0-9]/gi, '_')}.jpg`;
+            const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' });
+            
+            // Check if we can share with files
+            const testShare = { files: [file] };
+            if (navigator.canShare(testShare)) {
+              shareData = {
+                title: `📚 ${shareTitle} - GodlyKids`,
+                text: `${shareText}\n\n🔗 ${shareUrl}`,
+                files: [file],
+              };
+              console.log('✅ Sharing with cover image');
+            }
+          } catch (imgErr) {
+            console.log('📷 Could not include image in share:', imgErr);
+          }
+        }
+        
+        await navigator.share(shareData);
+        console.log('📤 Book shared successfully');
       } catch (err) {
         // User cancelled or share failed - that's ok
         if ((err as Error).name !== 'AbortError') {
@@ -440,7 +467,7 @@ const BookDetailPage: React.FC = () => {
     } else {
       // Fallback: Copy link to clipboard
       try {
-        await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
+        await navigator.clipboard.writeText(`${shareText}\n\n🔗 ${shareUrl}`);
         alert('📋 Link copied to clipboard! Share it with your friends.');
       } catch (err) {
         // Final fallback: prompt user
