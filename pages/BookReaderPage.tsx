@@ -3878,12 +3878,13 @@ const BookReaderPage: React.FC = () => {
                 style={{
                     // Lock background in place - prevent overscroll/bounce
                     overscrollBehavior: 'none',
-                    touchAction: 'pan-x', // Only allow horizontal swipes for page turns
+                    // For web view pages, allow all touch actions so iframe can receive events
+                    touchAction: currentPage?.isWebViewPage ? 'auto' : 'pan-x',
                 }}
-                onClick={handleBackgroundTap}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
+                onClick={currentPage?.isWebViewPage ? undefined : handleBackgroundTap}
+                onTouchStart={currentPage?.isWebViewPage ? undefined : handleTouchStart}
+                onTouchMove={currentPage?.isWebViewPage ? undefined : handleTouchMove}
+                onTouchEnd={currentPage?.isWebViewPage ? undefined : handleTouchEnd}
             >
                 {/* Style for high-sheen 3D glossy white page curl animation */}
                 <style>{`
