@@ -2384,7 +2384,12 @@ const BookReaderPage: React.FC = () => {
                                 setTimeout(() => {
                                     if (autoPlayModeRef.current && currentPageIndexRef.current === nextPageIndex) {
                                         const nextPage = pages[nextPageIndex];
-                                        const nextPageTextBoxes = nextPage?.content?.textBoxes || nextPage?.textBoxes;
+                                        // Check ALL possible locations for textBoxes
+                                        const contentTextBoxes = nextPage?.content?.textBoxes;
+                                        const rootTextBoxes = nextPage?.textBoxes;
+                                        const nextPageTextBoxes = (contentTextBoxes && contentTextBoxes.length > 0) 
+                                            ? contentTextBoxes 
+                                            : rootTextBoxes;
                                         if (nextPage && nextPageTextBoxes?.length > 0) {
                                             const translatedTextBoxes = getTranslatedTextBoxes(nextPage);
                                             const firstBoxText = translatedTextBoxes[0]?.text || nextPageTextBoxes[0].text;
@@ -2522,11 +2527,19 @@ const BookReaderPage: React.FC = () => {
                                     
                                     if (autoPlayModeRef.current && currentPageIndexRef.current === nextPageIndex) {
                                         const nextPage = pages[nextPageIndex];
-                                        const nextPageTextBoxes = nextPage?.content?.textBoxes || nextPage?.textBoxes;
+                                        // Check ALL possible locations for textBoxes
+                                        const contentTextBoxes = nextPage?.content?.textBoxes;
+                                        const rootTextBoxes = nextPage?.textBoxes;
+                                        const nextPageTextBoxes = (contentTextBoxes && contentTextBoxes.length > 0) 
+                                            ? contentTextBoxes 
+                                            : rootTextBoxes;
                                         
-                                        console.log('📄 Next page:', {
+                                        console.log('📄 Next page textBoxes search:', {
                                             exists: !!nextPage,
-                                            textBoxCount: nextPageTextBoxes?.length || 0
+                                            pageId: nextPage?._id,
+                                            'content.textBoxes': contentTextBoxes?.length || 0,
+                                            'root.textBoxes': rootTextBoxes?.length || 0,
+                                            using: nextPageTextBoxes?.length || 0
                                         });
                                         
                                         if (nextPage && nextPageTextBoxes?.length > 0) {
@@ -2539,7 +2552,7 @@ const BookReaderPage: React.FC = () => {
                                             autoPlayModeRef.current = true;
                                             handlePlayText(firstBoxText, 0, { stopPropagation: () => {} } as React.MouseEvent, true);
                                         } else {
-                                            console.log('⚠️ Multi-segment: No text boxes, stopping auto-play');
+                                            console.log('⚠️ Multi-segment: No text boxes found in any location, stopping auto-play');
                                             setAutoPlayMode(false);
                                             autoPlayModeRef.current = false;
                                             isAutoPlayingRef.current = false;
@@ -3155,7 +3168,12 @@ const BookReaderPage: React.FC = () => {
                                         // Check again if auto-play is still enabled and we're on the correct page
                                         if (autoPlayModeRef.current && currentPageIndexRef.current === nextPageIndex) {
                                             const nextPage = pages[nextPageIndex];
-                                            const nextPageTextBoxes = nextPage?.content?.textBoxes || nextPage?.textBoxes;
+                                            // Check ALL possible locations for textBoxes
+                                            const contentTextBoxes = nextPage?.content?.textBoxes;
+                                            const rootTextBoxes = nextPage?.textBoxes;
+                                            const nextPageTextBoxes = (contentTextBoxes && contentTextBoxes.length > 0) 
+                                                ? contentTextBoxes 
+                                                : rootTextBoxes;
                                             if (nextPage && nextPageTextBoxes && nextPageTextBoxes.length > 0) {
                                                 // Use translated text if available
                                                 const translatedTextBoxes = getTranslatedTextBoxes(nextPage);
