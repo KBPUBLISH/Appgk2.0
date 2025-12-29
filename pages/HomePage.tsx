@@ -13,7 +13,7 @@ import ChallengeGameModal from '../components/features/ChallengeGameModal';
 import PrayerGameModal from '../components/features/PrayerGameModal';
 import ReviewPromptModal, { shouldShowReviewPrompt } from '../components/features/ReviewPromptModal';
 import EmailSignupModal from '../components/features/EmailSignupModal';
-import { Key, Brain, Heart, Video, Lock, Check, Play, CheckCircle, Clock, Coins } from 'lucide-react';
+import { Key, Brain, Heart, Video, Lock, Check, Play, CheckCircle, Clock, Coins, BookOpen } from 'lucide-react';
 import { ApiService } from '../services/apiService';
 import { 
   isCompleted, 
