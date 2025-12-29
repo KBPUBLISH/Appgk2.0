@@ -1865,6 +1865,7 @@ const BookReaderPage: React.FC = () => {
 
         // Enable auto-play mode only if TTS mode is 'auto'
         const shouldAutoPlay = ttsMode === 'auto';
+        console.log('▶️ handlePlayPage: ttsMode=', ttsMode, 'shouldAutoPlay=', shouldAutoPlay);
         setAutoPlayMode(shouldAutoPlay);
         autoPlayModeRef.current = shouldAutoPlay;
 
@@ -2332,6 +2333,14 @@ const BookReaderPage: React.FC = () => {
                         
                         // Auto-play to next page
                         const currentPageIdx = currentPageIndexRef.current;
+                        console.log('🔍 Auto-play check:', {
+                            autoPlayModeRef: autoPlayModeRef.current,
+                            isAutoPlayingRef: isAutoPlayingRef.current,
+                            currentPageIdx,
+                            totalPages: pages.length,
+                            canGoNext: currentPageIdx < pages.length - 1
+                        });
+                        
                         if (autoPlayModeRef.current && !isAutoPlayingRef.current && currentPageIdx < pages.length - 1) {
                             isAutoPlayingRef.current = true;
                             const nextPageIndex = currentPageIdx + 1;
@@ -2426,6 +2435,14 @@ const BookReaderPage: React.FC = () => {
     
     const handlePlayText = async (text: string, index: number, e: React.MouseEvent, isAutoPlay: boolean = false) => {
         e.stopPropagation();
+        
+        console.log('🎤 handlePlayText called:', { 
+            isAutoPlay, 
+            autoPlayModeRef: autoPlayModeRef.current,
+            playingRef: playingRef.current,
+            isPlayingMultiSegment: isPlayingMultiSegmentRef.current,
+            textLength: text?.length 
+        });
 
         // If already playing this text, STOP it completely (tap to stop)
         if (playing && activeTextBoxIndex === index) {
@@ -2522,6 +2539,9 @@ const BookReaderPage: React.FC = () => {
                 if (isAutoPlay) {
                     setAutoPlayMode(true);
                     autoPlayModeRef.current = true;
+                    console.log('🔄 Multi-segment: autoPlayModeRef set to TRUE');
+                } else {
+                    console.log('⚠️ Multi-segment: isAutoPlay is FALSE, autoPlayModeRef=', autoPlayModeRef.current);
                 }
                 
                 setLoadingAudio(false);
