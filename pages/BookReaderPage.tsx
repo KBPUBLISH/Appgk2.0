@@ -4067,6 +4067,14 @@ const BookReaderPage: React.FC = () => {
 
                     {/* The actual page content - always visible underneath */}
                     <div className="absolute inset-0 z-10">
+                        {/* Debug: Log web view detection */}
+                        {console.log('🌐 Page web view check:', {
+                            pageNumber: currentPage?.pageNumber,
+                            isWebViewPage: currentPage?.isWebViewPage,
+                            hasWebView: !!currentPage?.webView,
+                            webViewUrl: currentPage?.webView?.url,
+                            webViewGameId: currentPage?.webView?.gameId,
+                        })}
                         {/* Web View Page - renders iframe with external content */}
                         {currentPage?.isWebViewPage && currentPage?.webView ? (
                             <WebViewPageRenderer

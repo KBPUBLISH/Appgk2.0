@@ -34,6 +34,9 @@ const WebViewPageRenderer: React.FC<WebViewPageRendererProps> = ({
     const [errorMessage, setErrorMessage] = useState('');
     const iframeRef = useRef<HTMLIFrameElement>(null);
     
+    // Debug logging
+    console.log('🌐 WebViewPageRenderer mounted with:', { url, title, showButton });
+    
     // Touch handling for swipe gestures
     const touchStartX = useRef<number>(0);
     const touchStartY = useRef<number>(0);
