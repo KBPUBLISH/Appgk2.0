@@ -304,15 +304,28 @@ const BookReaderPage: React.FC = () => {
         console.log('🔄 Normalized text:', normalizedText.substring(0, 100) + '...');
         
         // Debug: Check if regex can find patterns
-        const testMatch = normalizedText.match(/@(\w+)\s*"([^"]+)"/);
-        console.log('🧪 Test regex match:', testMatch ? `Found: @${testMatch[1]} "${testMatch[2].substring(0, 20)}..."` : 'NO MATCH');
+        // Pattern 1: @Name "text"
+        const testMatch1 = normalizedText.match(/@(\w+)\s*"([^"]+)"/);
+        console.log('🧪 Pattern 1 (@Name "text"):', testMatch1 ? `Found: @${testMatch1[1]} "${testMatch1[2].substring(0, 20)}..."` : 'NO MATCH');
         
-        // Debug: Show character codes around first @
+        // Pattern 2: "@Name text"
+        const testMatch2 = normalizedText.match(/"@(\w+)\s+([^"]+)"/);
+        console.log('🧪 Pattern 2 ("@Name text"):', testMatch2 ? `Found: @${testMatch2[1]} "${testMatch2[2].substring(0, 20)}..."` : 'NO MATCH');
+        
+        // Debug: Show character codes around first "@
+        const quoteAtIndex = normalizedText.indexOf('"@');
+        if (quoteAtIndex >= 0) {
+            const snippet = normalizedText.substring(quoteAtIndex, quoteAtIndex + 40);
+            const charCodes = [...snippet].map(c => c.charCodeAt(0)).join(',');
+            console.log('🔬 Char codes at "@:', snippet, '→', charCodes);
+        }
+        
+        // Also show first @ context
         const atIndex = normalizedText.indexOf('@');
         if (atIndex >= 0) {
-            const snippet = normalizedText.substring(atIndex, atIndex + 30);
-            const charCodes = [...snippet].map(c => c.charCodeAt(0)).join(',');
-            console.log('🔬 Char codes after @:', snippet, '→', charCodes);
+            const beforeAt = normalizedText.substring(Math.max(0, atIndex - 5), atIndex);
+            const afterAt = normalizedText.substring(atIndex, atIndex + 30);
+            console.log('🔬 Context around @:', `"${beforeAt}" + "${afterAt}"`)
         }
         
         // Combined regex to match both formats:
