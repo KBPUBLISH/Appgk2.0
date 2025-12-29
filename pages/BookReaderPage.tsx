@@ -506,6 +506,11 @@ const BookReaderPage: React.FC = () => {
                     // Track book read for Report Card
                     activityTrackingService.trackBookRead(bookId, book.title);
                     
+                    // Record play event for real-time trending
+                    import('../services/playEventService').then(({ playEventService }) => {
+                        playEventService.recordBookPlay(bookId);
+                    }).catch(() => {});
+                    
                     // Increment book opened counter for review prompt
                     incrementActivityCounter('book');
                     

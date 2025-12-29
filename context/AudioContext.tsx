@@ -202,6 +202,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                             // There's a next track - keep playing
                             console.log('🎵 Track ended, auto-playing next track:', nextIndex + 1, '/', playlist.items.length);
                             setIsPlaying(true); // Keep playing state true for next track
+                            
+                            // Record play event for the next track (real-time trending)
+                            const track = playlist.items[nextIndex];
+                            const trackId = (track as any)?._id;
+                            import('../services/playEventService').then(({ playEventService }) => {
+                                playEventService.recordEpisodePlay(playlist._id, nextIndex, trackId);
+                            }).catch(() => {});
+                            
                             return nextIndex;
                         } else {
                             // No more tracks - stop playing
@@ -450,6 +458,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             } else {
                 ApiService.incrementPlaylistPlayCount(playlistId);
             }
+            
+            // Record play event for real-time trending
+            import('../services/playEventService').then(({ playEventService }) => {
+                playEventService.recordEpisodePlay(playlistId, startIndex, trackId);
+            }).catch(() => {});
         }
     }, []);
 
