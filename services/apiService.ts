@@ -478,7 +478,8 @@ export const ApiService = {
   getFeaturedContent: async (): Promise<Array<Book | Playlist>> => {
     const cacheKey = 'featured_content';
     const cached = getCached<Array<Book | Playlist>>(cacheKey);
-    if (cached) return cached;
+    // Only use cache if it has at least 2 items (prevents stale cache on mobile)
+    if (cached && cached.length >= 2) return cached;
 
     try {
       const [featuredBooks, featuredPlaylists, featuredEpisodes] = await Promise.all([
@@ -548,7 +549,8 @@ export const ApiService = {
   getTrendingEpisodes: async (limit: number = 10): Promise<FeaturedEpisode[]> => {
     const cacheKey = `trending_episodes_${limit}`;
     const cached = getCached<FeaturedEpisode[]>(cacheKey);
-    if (cached) return cached;
+    // Only use cache if it has at least 2 items (prevents stale single-item cache on mobile)
+    if (cached && cached.length >= 2) return cached;
 
     try {
       const baseUrl = getApiBaseUrl();
@@ -574,7 +576,8 @@ export const ApiService = {
   getTrendingBooks: async (limit: number = 10): Promise<Book[]> => {
     const cacheKey = `trending_books_${limit}`;
     const cached = getCached<Book[]>(cacheKey);
-    if (cached) return cached;
+    // Only use cache if it has at least 2 items (prevents stale single-item cache on mobile)
+    if (cached && cached.length >= 2) return cached;
 
     try {
       const baseUrl = getApiBaseUrl();

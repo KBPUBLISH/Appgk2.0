@@ -111,10 +111,21 @@ const HomePage: React.FC = () => {
   const [unlockSuccess, setUnlockSuccess] = useState<{ show: boolean; gameName: string }>({ show: false, gameName: '' });
 
   // Helper to get cached data from sessionStorage
+  // Validates cache to prevent showing incomplete/stale data on mobile
   const getCached = (key: string): any[] => {
     try {
       const cached = sessionStorage.getItem(`godlykids_home_${key}`);
-      return cached ? JSON.parse(cached) : [];
+      if (cached) {
+        const data = JSON.parse(cached);
+        // Don't trust cache with suspiciously few items for trending/featured sections
+        if ((key.includes('trending') || key.includes('featured')) && Array.isArray(data) && data.length < 2) {
+          console.log(`⚠️ Cache for ${key} looks incomplete (${data.length} items), ignoring`);
+          sessionStorage.removeItem(`godlykids_home_${key}`); // Clear bad cache
+          return [];
+        }
+        return data;
+      }
+      return [];
     } catch { return []; }
   };
   
@@ -450,15 +461,30 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // Handle app resume from background (iOS) - fetch lessons if cache is empty
+  // Handle app resume from background (iOS/mobile) - refetch data if cache looks stale
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        console.log('📱 App became visible again');
+        console.log('📱 App became visible again - checking caches');
+        
+        // Check lessons cache
         const cachedLessons = getCached('lessons');
         if (!cachedLessons || cachedLessons.length === 0) {
           console.log('📱 No cached lessons on resume, fetching...');
           fetchLessons();
+        }
+        
+        // Check trending caches - refetch if they look incomplete
+        const cachedTrendingEpisodes = getCached('trendingEpisodes');
+        if (!cachedTrendingEpisodes || cachedTrendingEpisodes.length < 2) {
+          console.log('📱 Trending episodes cache incomplete, refetching...');
+          fetchTrendingEpisodes();
+        }
+        
+        const cachedTrendingBooks = getCached('trendingBooks');
+        if (!cachedTrendingBooks || cachedTrendingBooks.length < 2) {
+          console.log('📱 Trending books cache incomplete, refetching...');
+          fetchTrendingBooks();
         }
       }
     };
