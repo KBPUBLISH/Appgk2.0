@@ -37,6 +37,23 @@ const setCache = <T>(key: string, data: T): void => {
   }
 };
 
+// Clear cache for a specific key pattern
+const clearCacheByPattern = (pattern: string): void => {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(API_CACHE_PREFIX) && key.includes(pattern)) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => {
+      console.log(`🗑️ Clearing cache: ${key}`);
+      localStorage.removeItem(key);
+    });
+  } catch {}
+};
+
 // ============================================
 
 // Get API base URL from environment or use default
@@ -1909,6 +1926,29 @@ export const ApiService = {
       console.error('❌ Failed to get quiz attempts:', error);
       return null;
     }
+  },
+
+  // Clear cache for a specific book (forces fresh data on next fetch)
+  clearBookCache: (bookId: string): void => {
+    console.log(`🗑️ Clearing cache for book ${bookId}`);
+    clearCacheByPattern(`book_pages_${bookId}`);
+    clearCacheByPattern(`book_${bookId}`);
+  },
+
+  // Clear all API cache
+  clearAllCache: (): void => {
+    console.log('🗑️ Clearing all API cache');
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(API_CACHE_PREFIX)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      console.log(`🗑️ Cleared ${keysToRemove.length} cache entries`);
+    } catch {}
   },
 };
 

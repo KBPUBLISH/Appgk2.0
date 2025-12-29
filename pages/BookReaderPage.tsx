@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, X, Play, Pause, Volume2, Mic, Check, Music, Home, Heart, Star, RotateCcw, Lock, Sparkles, HelpCircle, Share2, Copy, Smartphone, Grid3X3, Loader2, Globe, BookOpen, SkipForward, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Play, Pause, Volume2, Mic, Check, Music, Home, Heart, Star, RotateCcw, Lock, Sparkles, HelpCircle, Share2, Copy, Smartphone, Grid3X3, Loader2, Globe, BookOpen, SkipForward, FileText, RefreshCw } from 'lucide-react';
 import { ApiService } from '../services/apiService';
 import { voiceCloningService, ClonedVoice } from '../services/voiceCloningService';
 import { translationService, SUPPORTED_LANGUAGES } from '../services/translationService';
@@ -484,6 +484,13 @@ const BookReaderPage: React.FC = () => {
     const touchEndY = useRef<number>(0);
     const touchStartTime = useRef<number>(0);
     const swipeDetectedRef = useRef<boolean>(false);
+    
+    // Pull-to-refresh state
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [pullDistance, setPullDistance] = useState(0);
+    const pullStartY = useRef<number>(0);
+    const isPulling = useRef<boolean>(false);
+    const PULL_THRESHOLD = 80; // pixels to pull before refresh triggers
     
     // Audio preloading cache refs
     const audioPreloadCacheRef = useRef<Map<string, { audioUrl: string; alignment: any }>>(new Map());
@@ -1653,6 +1660,35 @@ const BookReaderPage: React.FC = () => {
         }
     };
 
+    // Pull-to-refresh handler
+    const handleRefresh = async () => {
+        if (!bookId || isRefreshing) return;
+        
+        console.log('🔄 Pull-to-refresh: Refreshing book data...');
+        setIsRefreshing(true);
+        
+        try {
+            // Clear cache for this book
+            ApiService.clearBookCache(bookId);
+            
+            // Also clear audio preload cache
+            audioPreloadCacheRef.current.clear();
+            preloadingInProgressRef.current.clear();
+            
+            // Re-fetch pages
+            const freshPages = await ApiService.getBookPages(bookId);
+            if (freshPages && freshPages.length > 0) {
+                setPages(freshPages);
+                console.log('✅ Book refreshed with', freshPages.length, 'pages');
+            }
+        } catch (error) {
+            console.error('❌ Refresh failed:', error);
+        } finally {
+            setIsRefreshing(false);
+            setPullDistance(0);
+        }
+    };
+    
     // Swipe gesture handlers - more sensitive to prevent accidental page turns
     const handleTouchStart = (e: React.TouchEvent) => {
         touchStartX.current = e.touches[0].clientX;
@@ -1661,14 +1697,37 @@ const BookReaderPage: React.FC = () => {
         touchEndY.current = e.touches[0].clientY;
         touchStartTime.current = Date.now();
         swipeDetectedRef.current = false; // Reset swipe detection
+        
+        // Pull-to-refresh: Track pull start
+        pullStartY.current = e.touches[0].clientY;
+        isPulling.current = false;
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
         touchEndX.current = e.touches[0].clientX;
         touchEndY.current = e.touches[0].clientY;
+        
+        // Pull-to-refresh: Only on first page and pulling down from top
+        if (currentPageIndex === 0 && !isRefreshing) {
+            const pullDelta = e.touches[0].clientY - pullStartY.current;
+            
+            // Only allow pull if at the top of the page (pulling down)
+            if (pullDelta > 10 && touchStartY.current < 150) {
+                isPulling.current = true;
+                setPullDistance(Math.min(pullDelta * 0.5, PULL_THRESHOLD * 1.5)); // Dampen the pull
+            }
+        }
     };
 
     const handleTouchEnd = () => {
+        // Pull-to-refresh: Check if we should refresh
+        if (isPulling.current && pullDistance >= PULL_THRESHOLD) {
+            handleRefresh();
+        } else {
+            setPullDistance(0);
+        }
+        isPulling.current = false;
+        
         const swipeThresholdX = 50; // Reduced for more responsive swiping
         const swipeThresholdY = 100; // Allow more vertical tolerance for natural swipes
         const minSwipeTime = 50; // Reduced min time for quick flicks
@@ -1682,10 +1741,12 @@ const BookReaderPage: React.FC = () => {
         // 1. Horizontal swipe is significant (> threshold)
         // 2. Vertical movement is minimal (primarily horizontal gesture)
         // 3. Swipe duration is within valid range (not too fast/accidental, not too slow)
+        // 4. Not currently pulling to refresh
         const isValidSwipe = Math.abs(diffX) > swipeThresholdX && 
                              diffY < swipeThresholdY && 
                              swipeTime > minSwipeTime && 
-                             swipeTime < maxSwipeTime;
+                             swipeTime < maxSwipeTime &&
+                             pullDistance < 20; // Don't swipe if pulling to refresh
 
         if (isValidSwipe) {
             swipeDetectedRef.current = true; // Mark that a swipe was detected
@@ -3273,6 +3334,35 @@ const BookReaderPage: React.FC = () => {
                 e.stopPropagation();
             }}
         >
+            {/* Pull-to-Refresh Indicator */}
+            {(pullDistance > 0 || isRefreshing) && currentPageIndex === 0 && (
+                <div 
+                    className="absolute top-0 left-0 right-0 z-[300] flex items-center justify-center transition-all duration-200"
+                    style={{ 
+                        height: isRefreshing ? 60 : pullDistance,
+                        backgroundColor: 'rgba(0,0,0,0.5)',
+                        backdropFilter: 'blur(4px)'
+                    }}
+                >
+                    <div className={`flex items-center gap-2 text-white/90 ${isRefreshing ? 'animate-pulse' : ''}`}>
+                        <RefreshCw 
+                            className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''} ${pullDistance >= PULL_THRESHOLD ? 'text-green-400' : 'text-white/70'}`}
+                            style={{ 
+                                transform: isRefreshing ? 'none' : `rotate(${pullDistance * 3}deg)`,
+                                transition: 'transform 0.1s'
+                            }}
+                        />
+                        <span className="text-sm font-medium">
+                            {isRefreshing 
+                                ? 'Refreshing...' 
+                                : pullDistance >= PULL_THRESHOLD 
+                                    ? 'Release to refresh' 
+                                    : 'Pull down to refresh'}
+                        </span>
+                    </div>
+                </div>
+            )}
+            
             {/* Dismissible Loading Popup for TTS Generation */}
             {showLoadingPopup && loadingAudio && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
