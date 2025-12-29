@@ -15,6 +15,7 @@ import { analyticsService } from '../services/analyticsService';
 import { bookCompletionService } from '../services/bookCompletionService';
 import { incrementActivityCounter } from '../components/features/ReviewPromptModal';
 import { BookPageRenderer, ScrollState } from '../components/features/BookPageRenderer';
+import WebViewPageRenderer from '../components/features/WebViewPageRenderer';
 import { processTextWithEmotionalCues, removeEmotionalCues } from '../utils/textProcessing';
 import { activityTrackingService } from '../services/activityTrackingService';
 import { authService } from '../services/authService';
@@ -51,6 +52,18 @@ interface Page {
     backgroundType?: 'image' | 'video';
     isColoringPage?: boolean;
     coloringEndModalOnly?: boolean; // If true, coloring page only shows in end modal
+    // Web View page - embeds external URL or game
+    isWebViewPage?: boolean;
+    webView?: {
+        url?: string;
+        gameId?: {
+            _id: string;
+            url?: string;
+            name?: string;
+        } | string;
+        title?: string;
+        showNavigationButton?: boolean;
+    };
     scrollUrl?: string;
     scrollHeight?: number;
     scrollMidHeight?: number; // Mid scroll height % (default 30)
@@ -4054,20 +4067,51 @@ const BookReaderPage: React.FC = () => {
 
                     {/* The actual page content - always visible underneath */}
                     <div className="absolute inset-0 z-10">
-                        <BookPageRenderer
-                            page={{
-                                ...currentPage,
-                                // Use translated textBoxes if available
-                                textBoxes: getTranslatedTextBoxes(currentPage),
-                            }}
-                            activeTextBoxIndex={activeTextBoxIndex}
-                            scrollState={scrollState}
-                            onScrollStateChange={handleScrollStateChange}
-                            onPlayText={handlePlayText}
-                            highlightedWordIndex={currentWordIndex}
-                            wordAlignment={wordAlignment}
-                            isTTSPlaying={playing}
-                        />
+                        {/* Web View Page - renders iframe with external content */}
+                        {currentPage?.isWebViewPage && currentPage?.webView ? (
+                            <WebViewPageRenderer
+                                url={
+                                    currentPage.webView.url || 
+                                    (typeof currentPage.webView.gameId === 'object' 
+                                        ? currentPage.webView.gameId?.url 
+                                        : undefined) || 
+                                    ''
+                                }
+                                title={currentPage.webView.title}
+                                onContinue={() => {
+                                    if (currentPageIndex < pages.length - 1) {
+                                        handleNext({ stopPropagation: () => {} } as React.MouseEvent);
+                                    }
+                                }}
+                                showButton={currentPage.webView.showNavigationButton !== false}
+                                onSwipeLeft={() => {
+                                    if (currentPageIndex < pages.length - 1) {
+                                        handleNext({ stopPropagation: () => {} } as React.MouseEvent);
+                                    }
+                                }}
+                                onSwipeRight={() => {
+                                    if (currentPageIndex > 0) {
+                                        handlePrev({ stopPropagation: () => {} } as React.MouseEvent);
+                                    }
+                                }}
+                            />
+                        ) : (
+                            /* Regular Book Page - renders background, scroll, text boxes */
+                            <BookPageRenderer
+                                page={{
+                                    ...currentPage,
+                                    // Use translated textBoxes if available
+                                    textBoxes: getTranslatedTextBoxes(currentPage),
+                                }}
+                                activeTextBoxIndex={activeTextBoxIndex}
+                                scrollState={scrollState}
+                                onScrollStateChange={handleScrollStateChange}
+                                onPlayText={handlePlayText}
+                                highlightedWordIndex={currentWordIndex}
+                                wordAlignment={wordAlignment}
+                                isTTSPlaying={playing}
+                            />
+                        )}
                     </div>
 
                     {/* High-sheen glossy white page that curls over */}
