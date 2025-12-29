@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Book } from '../../types';
-import { BookOpen, Headphones, Eye, Heart, Lock, Crown } from 'lucide-react';
+import { BookOpen, Headphones, Heart, Lock, Crown } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -96,21 +96,13 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
           {book.level}
         </div>
 
-        {/* Stats Badge - Views/Likes */}
-        {((book as any).viewCount > 0 || (book as any).likeCount > 0) && (
-          <div className="absolute top-2 left-2 flex gap-1">
-            {(book as any).viewCount > 0 && (
-              <div className="bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium px-1.5 py-0.5 rounded flex items-center gap-1">
-                <Eye size={10} />
-                {(book as any).viewCount > 999 ? `${((book as any).viewCount / 1000).toFixed(1)}k` : (book as any).viewCount}
-              </div>
-            )}
-            {(book as any).likeCount > 0 && (
-              <div className="bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium px-1.5 py-0.5 rounded flex items-center gap-1">
-                <Heart size={10} className="text-red-400" />
-                {(book as any).likeCount}
-              </div>
-            )}
+        {/* Stats Badge - Likes only */}
+        {(book as any).likeCount > 0 && (
+          <div className="absolute top-2 left-2">
+            <div className="bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium px-1.5 py-0.5 rounded flex items-center gap-1">
+              <Heart size={10} className="text-red-400" />
+              {(book as any).likeCount}
+            </div>
           </div>
         )}
 
