@@ -156,10 +156,56 @@ const BookReaderPage: React.FC = () => {
     // Track if user has overridden the book's default voice
     const [useBookDefaultVoice, setUseBookDefaultVoice] = useState(true);
     
-    // Get the effective voice ID to use for TTS
+    // Multi-character voice system
+    const [defaultNarratorVoiceId, setDefaultNarratorVoiceId] = useState<string | null>(null);
+    const [characterVoices, setCharacterVoices] = useState<Array<{ characterName: string; voiceId: string; color?: string }>>([]);
+    
+    // Get the effective voice ID to use for TTS (for narrator - non-character text)
+    // Priority: 1. Book's narrator voice, 2. User's selected voice
+    const effectiveNarratorVoiceId = defaultNarratorVoiceId || 
+        ((bookDefaultVoiceId && useBookDefaultVoice) ? bookDefaultVoiceId : selectedVoiceId);
+    
+    // Legacy: Get the effective voice ID to use for TTS
     // If book has default and user hasn't overridden, use book's default
     // Otherwise use user's selected voice
     const effectiveVoiceId = (bookDefaultVoiceId && useBookDefaultVoice) ? bookDefaultVoiceId : selectedVoiceId;
+    
+    /**
+     * Get the voice ID to use for a given text, handling @Character tags
+     * Voice Priority:
+     * 1. @Character tag -> Use character's assigned voice (FIXED, user cannot override)
+     * 2. No tag -> Use narrator voice (defaultNarratorVoiceId or user's selected voice)
+     */
+    const getVoiceForText = (text: string): { voiceId: string; cleanText: string; characterName?: string } => {
+        // Check for @Character tag at the start of text
+        // Format: @CharacterName "dialogue text" or @CharacterName any text
+        const match = text.match(/^@(\w+)\s+(.*)$/s);
+        
+        if (match) {
+            const [, charName, remainingText] = match;
+            // Find character in characterVoices array (case-insensitive)
+            const character = characterVoices.find(c => 
+                c.characterName.toLowerCase() === charName.toLowerCase()
+            );
+            
+            if (character && character.voiceId) {
+                console.log(`🎭 Character voice: @${charName} -> ${character.voiceId}`);
+                return { 
+                    voiceId: character.voiceId, 
+                    cleanText: remainingText.trim(),
+                    characterName: character.characterName
+                };
+            }
+            // Character not found in mappings, use narrator voice and keep the tag visible
+            console.warn(`⚠️ Character @${charName} not found in voice mappings, using narrator voice`);
+        }
+        
+        // No character tag - use narrator voice
+        return { 
+            voiceId: effectiveNarratorVoiceId, 
+            cleanText: text 
+        };
+    };
     const [wordAlignment, setWordAlignment] = useState<{ words: Array<{ word: string; start: number; end: number }> } | null>(null);
     const [currentWordIndex, setCurrentWordIndex] = useState<number>(-1);
     const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
@@ -542,6 +588,18 @@ const BookReaderPage: React.FC = () => {
                     if (rewardVoice) {
                         console.log('🎁 Book has reward voice:', rewardVoice);
                         setBookRewardVoiceId(rewardVoice);
+                    }
+                    
+                    // Load multi-character voice settings
+                    const narratorVoice = rawData?.defaultNarratorVoiceId || (book as any)?.defaultNarratorVoiceId;
+                    const charVoices = rawData?.characterVoices || (book as any)?.characterVoices;
+                    if (narratorVoice) {
+                        console.log('🎭 Book has default narrator voice:', narratorVoice);
+                        setDefaultNarratorVoiceId(narratorVoice);
+                    }
+                    if (charVoices && Array.isArray(charVoices) && charVoices.length > 0) {
+                        console.log('🎭 Book has character voices:', charVoices);
+                        setCharacterVoices(charVoices);
                     }
                     
                     // Increment view count in database (when book is OPENED)
@@ -1557,8 +1615,14 @@ const BookReaderPage: React.FC = () => {
                 const textBox = pageTextBoxes[textBoxIndex];
                 if (!textBox.text) continue;
                 
-                // Include language in cache key for multilingual support
-                const audioCacheKey = `${pageIndex}-${textBoxIndex}-${effectiveVoiceId}${currentLang !== 'en' ? `-${currentLang}` : ''}`;
+                // Get translated text if available
+                const rawTextToSpeak = getTranslatedText(page._id, textBoxIndex, textBox.text);
+                
+                // Parse for @Character tags and get the appropriate voice
+                const { voiceId: voiceForText, cleanText: textToPreload, characterName } = getVoiceForText(rawTextToSpeak);
+                
+                // Include language AND voice in cache key for multilingual + character voice support
+                const audioCacheKey = `${pageIndex}-${textBoxIndex}-${voiceForText}${currentLang !== 'en' ? `-${currentLang}` : ''}`;
                 
                 // Skip if already cached or currently preloading
                 if (audioPreloadCacheRef.current.has(audioCacheKey) || preloadingInProgressRef.current.has(audioCacheKey)) {
@@ -1571,28 +1635,25 @@ const BookReaderPage: React.FC = () => {
                 // Preload in background (don't await to avoid blocking)
                 (async () => {
                     try {
-                        // Use translated text if available
-                        const textToSpeak = getTranslatedText(page._id, textBoxIndex, textBox.text);
-                        
                         // IMPORTANT: For non-English, verify we have the actual translation, not fallback
-                        // If textToSpeak equals original text but language isn't English, skip preload
-                        if (currentLang !== 'en' && textToSpeak === textBox.text) {
+                        // If textToPreload equals original text but language isn't English, skip preload
+                        if (currentLang !== 'en' && textToPreload === textBox.text) {
                             console.log(`⚠️ Skipping audio preload - translation not available for page ${pageIndex + 1}`);
                             preloadingInProgressRef.current.delete(audioCacheKey);
                             return;
                         }
                         
-                        const processed = processTextWithEmotionalCues(textToSpeak);
+                        const processed = processTextWithEmotionalCues(textToPreload);
                         // For non-English, strip emotional cues (multilingual model doesn't support them)
                         const ttsText = currentLang !== 'en' 
-                            ? removeEmotionalCues(textToSpeak) 
+                            ? removeEmotionalCues(textToPreload) 
                             : processed.processedText;
                         
-                        console.log(`🎤 Preloading TTS for page ${pageIndex + 1} in ${currentLang}: "${ttsText.substring(0, 50)}..."`);
+                        console.log(`🎤 Preloading TTS for page ${pageIndex + 1} in ${currentLang}${characterName ? ` [🎭 ${characterName}]` : ''}: "${ttsText.substring(0, 50)}..."`);
                         
                         const result = await ApiService.generateTTS(
                             ttsText,
-                            effectiveVoiceId,
+                            voiceForText, // Use character or narrator voice
                             bookId || undefined,
                             currentLang !== 'en' ? currentLang : undefined
                         );
@@ -1602,7 +1663,7 @@ const BookReaderPage: React.FC = () => {
                                 audioUrl: result.audioUrl,
                                 alignment: result.alignment
                             });
-                            console.log(`🎵 Preloaded audio for page ${pageIndex + 1}, text box ${textBoxIndex + 1} (${currentLang})`);
+                            console.log(`🎵 Preloaded audio for page ${pageIndex + 1}, text box ${textBoxIndex + 1} (${currentLang})${characterName ? ` [${characterName}]` : ''}`);
                         }
                     } catch (err) {
                         console.warn(`Failed to preload audio for page ${pageIndex + 1}:`, err);
@@ -1809,18 +1870,22 @@ const BookReaderPage: React.FC = () => {
             const actualPageIndex = currentPageIndexRef.current;
             // Use ref for language to get latest value in async context
             const currentLang = selectedLanguageRef.current;
-            // Include language in cache key for multilingual support
-            const cacheKey = `${actualPageIndex}-${index}-${effectiveVoiceId}${currentLang !== 'en' ? `-${currentLang}` : ''}`;
-            let result = audioPreloadCacheRef.current.get(cacheKey);
             
             // Get translated text if available
             const currentPage = pages[actualPageIndex];
-            const textToSpeak = currentPage?._id 
+            const rawTextToSpeak = currentPage?._id 
                 ? getTranslatedText(currentPage._id, index, text) 
                 : text;
             
+            // Parse for @Character tags and get the appropriate voice
+            const { voiceId: voiceForText, cleanText: textToSpeak, characterName } = getVoiceForText(rawTextToSpeak);
+            
+            // Include language AND voice in cache key for multilingual + character voice support
+            const cacheKey = `${actualPageIndex}-${index}-${voiceForText}${currentLang !== 'en' ? `-${currentLang}` : ''}`;
+            let result = audioPreloadCacheRef.current.get(cacheKey);
+            
             if (result) {
-                console.log(`🎵 Using preloaded audio for page ${actualPageIndex + 1}, text box ${index + 1} (lang: ${currentLang})`);
+                console.log(`🎵 Using preloaded audio for page ${actualPageIndex + 1}, text box ${index + 1} (lang: ${currentLang})${characterName ? ` [${characterName}]` : ''}`);
                 setShowLoadingPopup(false); // Hide popup immediately if cached
             } else {
                 // Not in cache, generate now with translated text
@@ -1837,12 +1902,13 @@ const BookReaderPage: React.FC = () => {
                     ? removeEmotionalCues(textToSpeak) 
                     : processed.processedText;
                     
-                console.log(`🎤 Generating TTS for page ${actualPageIndex + 1}, text box ${index + 1} (lang: ${currentLang})${isUsingTranslation ? ' [TRANSLATED]' : ''}`);
+                console.log(`🎤 Generating TTS for page ${actualPageIndex + 1}, text box ${index + 1} (lang: ${currentLang})${characterName ? ` [🎭 ${characterName}]` : ''}${isUsingTranslation ? ' [TRANSLATED]' : ''}`);
                 console.log(`📝 Text to speak: "${ttsText.substring(0, 80)}..."`);
+                console.log(`🔊 Using voice: ${voiceForText}${characterName ? ` (character: ${characterName})` : ' (narrator)'}`);
                 
                 result = await ApiService.generateTTS(
                     ttsText,
-                    effectiveVoiceId,
+                    voiceForText, // Use character or narrator voice
                     bookId || undefined,
                     currentLang !== 'en' ? currentLang : undefined
                 ) || undefined;
