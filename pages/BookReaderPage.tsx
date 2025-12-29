@@ -809,6 +809,26 @@ const BookReaderPage: React.FC = () => {
     useEffect(() => {
         playingRef.current = playing;
     }, [playing]);
+    
+    // Auto-resume TTS if it gets unexpectedly paused (e.g., by video loop on iOS)
+    // This polls every 500ms to check if TTS should be playing but got paused
+    useEffect(() => {
+        const checkAndResumeTTS = () => {
+            if (playingRef.current && currentAudioRef.current && currentAudioRef.current.paused) {
+                // TTS should be playing but is paused - resume it
+                console.log('🔄 Auto-resuming TTS that was unexpectedly paused');
+                currentAudioRef.current.play().catch((err) => {
+                    console.warn('Failed to auto-resume TTS:', err);
+                });
+            }
+        };
+        
+        // Only start polling if we're playing
+        if (playing) {
+            const interval = setInterval(checkAndResumeTTS, 500);
+            return () => clearInterval(interval);
+        }
+    }, [playing]);
 
     // Effect: Stop TTS audio when component unmounts OR when navigating away
     useEffect(() => {
@@ -3221,7 +3241,6 @@ const BookReaderPage: React.FC = () => {
                                     currentAudioRef.current.play().catch(() => {});
                                 }
                             }}
-                            sharedAudioContext={audioContextRef.current}
                         />
                     </div>
 
