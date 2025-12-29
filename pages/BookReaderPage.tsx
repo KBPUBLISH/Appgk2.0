@@ -83,6 +83,26 @@ interface Page {
     soundEffectUrl?: string;
 }
 
+/**
+ * Represents a segment of text to be spoken with a specific voice.
+ * Used for multi-segment TTS where narrator and characters alternate.
+ * 
+ * Example: "Moses said @Moses "Let my people go" then Pharaoh replied @Pharaoh "Never!""
+ * Becomes 4 segments:
+ *   1. { text: "Moses said", isNarrator: true }
+ *   2. { text: "Let my people go", characterName: "Moses" }
+ *   3. { text: "then Pharaoh replied", isNarrator: true }
+ *   4. { text: "Never!", characterName: "Pharaoh" }
+ */
+interface TextSegment {
+    text: string;           // The actual text to speak
+    voiceId: string;        // Voice ID to use for this segment
+    characterName?: string; // Character name (if character voice)
+    isNarrator: boolean;    // True if narrator voice
+    startIndex: number;     // Start position in original cleaned text (for highlighting)
+    endIndex: number;       // End position in original cleaned text (for highlighting)
+}
+
 
 // Wood Button Component
 const WoodButton: React.FC<{ onClick: (e: React.MouseEvent) => void; icon: React.ReactNode; className?: string }> = ({ onClick, icon, className = '' }) => (
@@ -253,6 +273,160 @@ const BookReaderPage: React.FC = () => {
             cleanText 
         };
     };
+    
+    /**
+     * Parse text into multiple segments for multi-voice TTS playback.
+     * Handles text with multiple @Character tags that need different voices.
+     * 
+     * Example input:
+     *   "Moses said @Moses "Let my people go" then Pharaoh replied @Pharaoh "Never!""
+     * 
+     * Returns array of segments:
+     *   [
+     *     { text: "Moses said", voiceId: narratorVoice, isNarrator: true },
+     *     { text: "Let my people go", voiceId: mosesVoice, characterName: "Moses" },
+     *     { text: "then Pharaoh replied", voiceId: narratorVoice, isNarrator: true },
+     *     { text: "Never!", voiceId: pharaohVoice, characterName: "Pharaoh" }
+     *   ]
+     * 
+     * Supports both formats:
+     * - @Moses "dialogue" (tag outside quotes)
+     * - "@Moses dialogue" (tag inside quotes)
+     */
+    const parseTextIntoSegments = (text: string): TextSegment[] => {
+        const segments: TextSegment[] = [];
+        
+        // Combined regex to match both formats:
+        // 1. @Character "dialogue" - tag outside quotes
+        // 2. "@Character dialogue" - tag inside quotes
+        const characterPattern = /(?:@(\w+)\s*"([^"]+)"|"@(\w+)\s+([^"]+)")/g;
+        
+        let lastIndex = 0;
+        let match: RegExpExecArray | null;
+        let cleanTextIndex = 0; // Track position in cleaned text for highlighting
+        
+        // First pass: build cleaned text to calculate indices
+        const cleanedText = text
+            .replace(/@(\w+)\s*"([^"]+)"/g, '"$2"')  // @Name "text" -> "text"
+            .replace(/"@(\w+)\s+([^"]+)"/g, '"$2"') // "@Name text" -> "text"
+            .replace(/\s+/g, ' ')
+            .trim();
+        
+        // Reset regex
+        characterPattern.lastIndex = 0;
+        
+        while ((match = characterPattern.exec(text)) !== null) {
+            // Get narrator text before this character dialogue
+            const narratorText = text.slice(lastIndex, match.index).trim();
+            
+            if (narratorText) {
+                // Calculate position in cleaned text
+                const cleanNarratorText = narratorText.replace(/\s+/g, ' ').trim();
+                const startIdx = cleanTextIndex;
+                const endIdx = cleanTextIndex + cleanNarratorText.length;
+                cleanTextIndex = endIdx + 1; // +1 for space
+                
+                segments.push({
+                    text: cleanNarratorText,
+                    voiceId: effectiveNarratorVoiceId,
+                    isNarrator: true,
+                    startIndex: startIdx,
+                    endIndex: endIdx
+                });
+            }
+            
+            // Determine which pattern matched
+            // match[1] and match[2] are for @Name "text" pattern
+            // match[3] and match[4] are for "@Name text" pattern
+            const charName = match[1] || match[3];
+            const dialogueText = match[2] || match[4];
+            
+            if (charName && dialogueText) {
+                // Find the character voice
+                const character = characterVoices.find(c => 
+                    c.characterName.toLowerCase() === charName.toLowerCase()
+                );
+                
+                // Calculate position in cleaned text (dialogue is in quotes)
+                const startIdx = cleanTextIndex + 1; // +1 for opening quote
+                const endIdx = startIdx + dialogueText.length;
+                cleanTextIndex = endIdx + 2; // +2 for closing quote and space
+                
+                segments.push({
+                    text: dialogueText,
+                    voiceId: character?.voiceId || effectiveNarratorVoiceId,
+                    characterName: character?.characterName || charName,
+                    isNarrator: false,
+                    startIndex: startIdx,
+                    endIndex: endIdx
+                });
+                
+                if (!character) {
+                    console.warn(`⚠️ Character @${charName} not found in characterVoices, using narrator voice`);
+                }
+            }
+            
+            lastIndex = match.index + match[0].length;
+        }
+        
+        // Get any remaining narrator text after the last character dialogue
+        const remainingText = text.slice(lastIndex).trim();
+        if (remainingText) {
+            const cleanRemainingText = remainingText
+                .replace(/@\w+\s*/g, '') // Remove stray @tags
+                .replace(/\s+/g, ' ')
+                .trim();
+            
+            if (cleanRemainingText) {
+                const startIdx = cleanTextIndex;
+                const endIdx = cleanTextIndex + cleanRemainingText.length;
+                
+                segments.push({
+                    text: cleanRemainingText,
+                    voiceId: effectiveNarratorVoiceId,
+                    isNarrator: true,
+                    startIndex: startIdx,
+                    endIndex: endIdx
+                });
+            }
+        }
+        
+        // If no segments were created (no character tags), create single narrator segment
+        if (segments.length === 0) {
+            const cleanText = text
+                .replace(/@\w+\s*/g, '') // Remove any stray @tags
+                .replace(/\s+/g, ' ')
+                .trim();
+            
+            segments.push({
+                text: cleanText,
+                voiceId: effectiveNarratorVoiceId,
+                isNarrator: true,
+                startIndex: 0,
+                endIndex: cleanText.length
+            });
+        }
+        
+        console.log(`📝 Parsed ${segments.length} segment(s):`, segments.map(s => 
+            `"${s.text.substring(0, 30)}${s.text.length > 30 ? '...' : ''}" [${s.isNarrator ? 'Narrator' : s.characterName}]`
+        ));
+        
+        return segments;
+    };
+    
+    /**
+     * Get cleaned display text with all @Character tags removed.
+     * Used for displaying text in the UI without the voice markup.
+     */
+    const getCleanDisplayText = (text: string): string => {
+        return text
+            .replace(/@(\w+)\s*"([^"]+)"/g, '"$2"')  // @Name "text" -> "text"
+            .replace(/"@(\w+)\s+([^"]+)"/g, '"$2"') // "@Name text" -> "text"
+            .replace(/@\w+\s*/g, '') // Remove stray @tags
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
+    
     const [wordAlignment, setWordAlignment] = useState<{ words: Array<{ word: string; start: number; end: number }> } | null>(null);
     const [currentWordIndex, setCurrentWordIndex] = useState<number>(-1);
     const [showVoiceDropdown, setShowVoiceDropdown] = useState(false);
@@ -288,6 +462,16 @@ const BookReaderPage: React.FC = () => {
     const [ttsMode, setTtsMode] = useState<'auto' | 'page'>('auto');
     const ttsModeRef = useRef<'auto' | 'page'>('auto');
     const [showTtsModeMenu, setShowTtsModeMenu] = useState(false);
+    
+    // Multi-segment TTS playback state
+    // Allows alternating between narrator and character voices in a single text box
+    const [currentSegments, setCurrentSegments] = useState<TextSegment[]>([]);
+    const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0);
+    const currentSegmentIndexRef = useRef(0); // Ref for closure access
+    const segmentsQueueRef = useRef<Array<{ segment: TextSegment; audioUrl: string; alignment: any }>>([]);
+    const isPlayingMultiSegmentRef = useRef(false); // Track if we're in multi-segment playback mode
+    const multiSegmentAudioRef = useRef<HTMLAudioElement | null>(null); // Current playing audio in multi-segment mode
+    
     const [isPageTurning, setIsPageTurning] = useState(false);
     const [flipState, setFlipState] = useState<{ direction: 'next' | 'prev', isFlipping: boolean } | null>(null);
     const touchStartX = useRef<number>(0);
@@ -1915,11 +2099,198 @@ const BookReaderPage: React.FC = () => {
         }
     }, [pages]);
 
+    /**
+     * Play a single segment of multi-segment TTS.
+     * Called recursively to play all segments in sequence.
+     */
+    const playSegment = async (
+        segment: TextSegment,
+        segmentIdx: number,
+        allSegments: TextSegment[],
+        textBoxIndex: number,
+        isAutoPlay: boolean,
+        currentLang: string
+    ) => {
+        try {
+            // Generate TTS for this segment
+            const processed = processTextWithEmotionalCues(segment.text);
+            const ttsText = currentLang !== 'en' 
+                ? removeEmotionalCues(segment.text) 
+                : processed.processedText;
+            
+            console.log(`🎭 Multi-segment ${segmentIdx + 1}/${allSegments.length}: "${ttsText.substring(0, 40)}..." [${segment.isNarrator ? 'Narrator' : segment.characterName}]`);
+            
+            const result = await ApiService.generateTTS(
+                ttsText,
+                segment.voiceId,
+                bookId || undefined,
+                currentLang !== 'en' ? currentLang : undefined
+            );
+            
+            if (!result?.audioUrl) {
+                console.error(`Failed to generate audio for segment ${segmentIdx + 1}`);
+                return;
+            }
+            
+            const audio = new Audio(result.audioUrl);
+            multiSegmentAudioRef.current = audio;
+            
+            // Set up word alignment for this segment
+            audio.addEventListener('loadedmetadata', () => {
+                const audioDuration = audio.duration;
+                const words = segment.text.split(/\s+/).filter(w => w.length > 0);
+                
+                if (words.length > 0) {
+                    const wordDuration = audioDuration / words.length;
+                    const alignment = {
+                        words: words.map((word, idx) => ({
+                            word,
+                            start: idx * wordDuration,
+                            end: (idx + 1) * wordDuration
+                        }))
+                    };
+                    setWordAlignment(alignment);
+                    wordAlignmentRef.current = alignment;
+                }
+            });
+            
+            // Track time for highlighting
+            let lastWordIdx = -1;
+            audio.ontimeupdate = () => {
+                const alignment = wordAlignmentRef.current;
+                if (alignment?.words) {
+                    for (let i = 0; i < alignment.words.length; i++) {
+                        const w = alignment.words[i];
+                        if (audio.currentTime >= w.start && audio.currentTime < w.end) {
+                            if (i !== lastWordIdx) {
+                                lastWordIdx = i;
+                                setCurrentWordIndex(i);
+                            }
+                            break;
+                        }
+                    }
+                }
+            };
+            
+            // When this segment ends, play the next one or finish
+            audio.onended = () => {
+                setCurrentWordIndex(-1);
+                setWordAlignment(null);
+                wordAlignmentRef.current = null;
+                
+                const nextSegmentIdx = segmentIdx + 1;
+                
+                if (nextSegmentIdx < allSegments.length) {
+                    // Play next segment
+                    console.log(`▶️ Playing next segment ${nextSegmentIdx + 1}/${allSegments.length}`);
+                    currentSegmentIndexRef.current = nextSegmentIdx;
+                    setCurrentSegmentIndex(nextSegmentIdx);
+                    playSegment(allSegments[nextSegmentIdx], nextSegmentIdx, allSegments, textBoxIndex, isAutoPlay, currentLang);
+                } else {
+                    // All segments complete - trigger auto-play to next page if enabled
+                    console.log(`✅ All ${allSegments.length} segments complete`);
+                    isPlayingMultiSegmentRef.current = false;
+                    setCurrentSegments([]);
+                    setCurrentSegmentIndex(0);
+                    currentSegmentIndexRef.current = 0;
+                    multiSegmentAudioRef.current = null;
+                    
+                    // Clear playing state
+                    setTimeout(() => {
+                        setPlaying(false);
+                        setActiveTextBoxIndex(null);
+                        
+                        // Auto-play: Move to next page if enabled
+                        const currentPageIdx = currentPageIndexRef.current;
+                        if (autoPlayModeRef.current && !isAutoPlayingRef.current && currentPageIdx < pages.length - 1) {
+                            isAutoPlayingRef.current = true;
+                            const nextPageIndex = currentPageIdx + 1;
+                            console.log('🔄 Multi-segment auto-play: Moving to page', nextPageIndex + 1);
+                            
+                            setIsPageTurning(true);
+                            setFlipState({ direction: 'next', isFlipping: true });
+                            playPageTurnSound();
+                            
+                            setTimeout(() => {
+                                setCurrentPageIndex(nextPageIndex);
+                                currentPageIndexRef.current = nextPageIndex;
+                                setScrollState(scrollStateRef.current);
+                            }, 400);
+                            
+                            setTimeout(() => {
+                                setIsPageTurning(false);
+                                setFlipState(null);
+                                if (bookId) {
+                                    readingProgressService.saveProgress(bookId, nextPageIndex);
+                                }
+                                
+                                setTimeout(() => {
+                                    if (autoPlayModeRef.current && currentPageIndexRef.current === nextPageIndex) {
+                                        const nextPage = pages[nextPageIndex];
+                                        const nextPageTextBoxes = nextPage?.content?.textBoxes || nextPage?.textBoxes;
+                                        if (nextPage && nextPageTextBoxes && nextPageTextBoxes.length > 0) {
+                                            const translatedTextBoxes = getTranslatedTextBoxes(nextPage);
+                                            const firstBoxText = translatedTextBoxes[0]?.text || nextPageTextBoxes[0].text;
+                                            isAutoPlayingRef.current = false;
+                                            const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                                            handlePlayText(firstBoxText, 0, syntheticEvent, true);
+                                        } else {
+                                            setAutoPlayMode(false);
+                                            autoPlayModeRef.current = false;
+                                            isAutoPlayingRef.current = false;
+                                        }
+                                    } else {
+                                        isAutoPlayingRef.current = false;
+                                    }
+                                }, 300);
+                            }, 800);
+                        } else if (autoPlayModeRef.current && currentPageIdx >= pages.length - 1) {
+                            // End of book
+                            setAutoPlayMode(false);
+                            autoPlayModeRef.current = false;
+                            if (bookId) {
+                                bookCompletionService.markBookCompleted(bookId);
+                                readCountService.incrementReadCount(bookId);
+                                analyticsService.bookReadComplete(bookId, bookTitle);
+                                handleUnlockRewardVoice();
+                            }
+                        }
+                    }, 300);
+                }
+            };
+            
+            audio.onplay = () => {
+                setPlaying(true);
+                setShowLoadingPopup(false);
+            };
+            
+            // Play this segment
+            if (audio.readyState >= 3) {
+                audio.play().catch(err => console.warn('Segment play failed:', err));
+            } else {
+                audio.addEventListener('canplaythrough', () => {
+                    audio.play().catch(err => console.warn('Segment play failed:', err));
+                }, { once: true });
+                audio.load();
+            }
+        } catch (error) {
+            console.error(`Error playing segment ${segmentIdx + 1}:`, error);
+            isPlayingMultiSegmentRef.current = false;
+        }
+    };
+    
     const handlePlayText = async (text: string, index: number, e: React.MouseEvent, isAutoPlay: boolean = false) => {
         e.stopPropagation();
 
         // If already playing this text, pause it
         if (playing && activeTextBoxIndex === index) {
+            // Stop multi-segment playback if active
+            if (isPlayingMultiSegmentRef.current && multiSegmentAudioRef.current) {
+                multiSegmentAudioRef.current.pause();
+                isPlayingMultiSegmentRef.current = false;
+                setCurrentSegments([]);
+                setCurrentSegmentIndex(0);
+            }
             currentAudio?.pause();
             setPlaying(false);
             setAutoPlayMode(false);
@@ -1930,10 +2301,17 @@ const BookReaderPage: React.FC = () => {
         // If playing another text, stop it
         if (playing && activeTextBoxIndex !== index) {
             stopAudio();
+            // Also stop multi-segment if active
+            if (isPlayingMultiSegmentRef.current && multiSegmentAudioRef.current) {
+                multiSegmentAudioRef.current.pause();
+                isPlayingMultiSegmentRef.current = false;
+                setCurrentSegments([]);
+                setCurrentSegmentIndex(0);
+            }
         }
 
         // If we have audio for this text already loaded and paused, resume it
-        if (activeTextBoxIndex === index && currentAudio) {
+        if (activeTextBoxIndex === index && currentAudio && !isPlayingMultiSegmentRef.current) {
             currentAudio.play();
             setPlaying(true);
             if (isAutoPlay) {
@@ -1964,8 +2342,35 @@ const BookReaderPage: React.FC = () => {
                 ? getTranslatedText(currentPage._id, index, text) 
                 : text;
             
-            // Parse for @Character tags and get the appropriate voice
-            const { voiceId: voiceForText, cleanText: textToSpeak, characterName } = getVoiceForText(rawTextToSpeak);
+            // ============ MULTI-SEGMENT TTS ============
+            // Parse text into segments for alternating narrator/character voices
+            const segments = parseTextIntoSegments(rawTextToSpeak);
+            
+            // If multiple segments, use multi-segment playback
+            if (segments.length > 1) {
+                console.log(`🎭 Multi-segment TTS: ${segments.length} segments detected`);
+                isPlayingMultiSegmentRef.current = true;
+                setCurrentSegments(segments);
+                setCurrentSegmentIndex(0);
+                currentSegmentIndexRef.current = 0;
+                
+                if (isAutoPlay) {
+                    setAutoPlayMode(true);
+                    autoPlayModeRef.current = true;
+                }
+                
+                setLoadingAudio(false);
+                // Start playing first segment
+                playSegment(segments[0], 0, segments, index, isAutoPlay, currentLang);
+                return;
+            }
+            // ============ END MULTI-SEGMENT ============
+            
+            // Single segment - use existing logic
+            const segment = segments[0];
+            const voiceForText = segment.voiceId;
+            const textToSpeak = segment.text;
+            const characterName = segment.characterName;
             
             // Include language AND voice in cache key for multilingual + character voice support
             const cacheKey = `${actualPageIndex}-${index}-${voiceForText}${currentLang !== 'en' ? `-${currentLang}` : ''}`;
