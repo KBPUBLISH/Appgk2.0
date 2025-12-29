@@ -554,7 +554,7 @@ const BookReaderPage: React.FC = () => {
                     
                     // Record play event for real-time trending (with total pages for engagement tracking)
                     import('../services/playEventService').then(({ playEventService }) => {
-                        playEventService.recordBookPlay(bookId, undefined, data.length);
+                        playEventService.recordBookPlay(bookId);
                     }).catch(() => {});
                     
                     // Increment book opened counter for review prompt
