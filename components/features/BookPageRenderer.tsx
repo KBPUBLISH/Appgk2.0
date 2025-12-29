@@ -372,6 +372,29 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
         // Pick a random position from the array
         const randomPosition = positions[Math.floor(Math.random() * positions.length)];
         setBubblePosition(randomPosition);
+        
+        // Ensure video plays when page changes (autoPlay isn't always reliable on src change)
+        // Use a small delay to let React update the video src first
+        const playVideoTimeout = setTimeout(() => {
+            // Single video background
+            if (videoRef.current && page.backgroundType === 'video') {
+                console.log('🎬 Page changed - ensuring video plays');
+                videoRef.current.currentTime = 0; // Start from beginning
+                videoRef.current.play().catch(err => {
+                    console.warn('Could not play video on page change:', err);
+                });
+            }
+            // Video sequence - play buffer A
+            if (page.useVideoSequence && videoRefA.current) {
+                console.log('🎬 Page changed - ensuring video sequence plays');
+                videoRefA.current.currentTime = 0;
+                videoRefA.current.play().catch(err => {
+                    console.warn('Could not play video sequence on page change:', err);
+                });
+            }
+        }, 100);
+        
+        return () => clearTimeout(playVideoTimeout);
     }, [page.id]);
     
     // Handle video sequence - seamlessly switch to preloaded buffer
