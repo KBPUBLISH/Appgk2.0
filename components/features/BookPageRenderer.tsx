@@ -708,19 +708,19 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                     const isActive = activeTextBoxIndex === idx;
                     const shouldHideTextBoxes = page.scrollUrl && scrollState === 'hidden';
                     
-                    // Calculate text position that scales with scroll height
+                    // Calculate text position - MATCH portal exactly
+                    // Portal formula: max(box.y%, calc(100% - scrollHeight% - scrollOffsetY% + 12px))
                     let textTopStyle: string;
                     let textMaxHeightStyle: string;
                     
                     if (page.scrollUrl) {
-                        // Text was positioned relative to 60% scroll (design view)
-                        // Calculate the offset from the TOP of the scroll (not the screen)
-                        const offsetFromDesignScrollTop = box.y - designScrollTop;
-                        
-                        // Apply same offset from current scroll top
-                        // This makes text "stick" to the top of the scroll as it shrinks/expands
-                        textTopStyle = `calc(${currentScrollTop}% + ${Math.max(0, offsetFromDesignScrollTop)}% + ${scrollOffset}% + 8px)`;
-                        textMaxHeightStyle = `calc(${currentScrollHeightNum}% - ${Math.max(0, offsetFromDesignScrollTop)}% - 60px)`;
+                        // Use the SAME formula as the portal:
+                        // scrollTopPosition = calc(100% - scrollHeight% - scrollOffsetY% + 12px)
+                        // textTop = max(box.y%, scrollTopPosition)
+                        // This ensures text is never above the scroll, but respects box.y if it's lower
+                        const scrollTopCalc = `calc(100% - ${currentScrollHeightNum}% - ${scrollOffset}% + 12px)`;
+                        textTopStyle = `max(${box.y}%, ${scrollTopCalc})`;
+                        textMaxHeightStyle = `calc(${currentScrollHeightNum}% - 60px)`;
                     } else {
                         // No scroll - use absolute position
                         textTopStyle = `${box.y}%`;
