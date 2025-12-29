@@ -28,7 +28,9 @@ interface FeaturedItem extends Partial<Book> {
   title: string;
   coverUrl?: string;
   coverImage?: string;
-  _itemType?: 'book' | 'playlist';
+  _itemType?: 'book' | 'playlist' | 'episode';
+  _playlistId?: string;
+  _itemIndex?: number;
 }
 
 interface FeaturedCarouselProps {
@@ -183,6 +185,7 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
   };
 
   const isPlaylist = (item: FeaturedItem) => item._itemType === 'playlist';
+  const isEpisode = (item: FeaturedItem) => item._itemType === 'episode';
 
   const scrollToIndex = useCallback((index: number) => {
     if (scrollRef.current) {
@@ -229,6 +232,7 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
         {books.map((item, index) => {
           const itemId = item.id || item._id || '';
           const itemIsPlaylist = isPlaylist(item);
+          const itemIsEpisode = isEpisode(item);
           const isActive = index === activeIndex;
           const coverUrl = getImageSrc(item);
 
@@ -236,7 +240,14 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
             <div
               key={itemId}
               className="flex-shrink-0 w-full h-full snap-center relative flex flex-col items-center justify-center pb-8"
-              onClick={() => onBookClick(itemId, itemIsPlaylist)}
+              onClick={() => {
+                if (itemIsEpisode && item._playlistId !== undefined && item._itemIndex !== undefined) {
+                  // For episodes, navigate to the specific track in the playlist
+                  onBookClick(`${item._playlistId}/${item._itemIndex}`, true);
+                } else {
+                  onBookClick(itemId, itemIsPlaylist || itemIsEpisode);
+                }
+              }}
             >
               {/* Wood Background */}
               <div className="absolute inset-0" style={{
@@ -256,7 +267,7 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
               {/* Tap text */}
               <div className="relative z-20 mb-2 px-4">
                 <p className="text-white font-display font-bold text-sm sm:text-base md:text-lg drop-shadow-lg text-center whitespace-nowrap">
-                  {itemIsPlaylist ? '🎧 Tap to listen' : '📖 Tap to read'}
+                  {(itemIsPlaylist || itemIsEpisode) ? '🎧 Tap to listen' : '📖 Tap to read'}
                 </p>
               </div>
 
@@ -264,8 +275,8 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
               <div className="relative z-10 transform transition-transform active:scale-95 duration-200 px-4">
                 <div className="w-[19rem] md:w-[24rem] aspect-square rounded-lg shadow-2xl relative overflow-visible">
                   
-                  {/* Use SimplePagePreview for books, static image for playlists */}
-                  {itemIsPlaylist ? (
+                  {/* Use SimplePagePreview for books, static image for playlists and episodes */}
+                  {(itemIsPlaylist || itemIsEpisode) ? (
                     <img
                       src={coverUrl || '/assets/images/placeholder-book.png'}
                       alt={item.title}
@@ -291,7 +302,7 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = ({ books, onBookClick 
 
                   {/* Action Button */}
                   <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-md text-black text-xs md:text-sm font-bold px-4 py-1.5 rounded-full flex items-center gap-2 shadow-lg hover:bg-white transition-colors z-30">
-                    {itemIsPlaylist ? (
+                    {(itemIsPlaylist || itemIsEpisode) ? (
                       <>
                         <Music size={14} fill="currentColor" className="md:w-4 md:h-4" />
                         <span>Listen</span>

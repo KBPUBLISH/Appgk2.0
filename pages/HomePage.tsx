@@ -168,8 +168,9 @@ const HomePage: React.FC = () => {
   const [featuredLoading, setFeaturedLoading] = useState(() => getCached('featured').length === 0);
   
   // Featured episodes state - individual playlist items marked as featured
-  const [featuredEpisodes, setFeaturedEpisodes] = useState<any[]>(() => getCached('featuredEpisodes'));
-  const [featuredEpisodesLoading, setFeaturedEpisodesLoading] = useState(() => getCached('featuredEpisodes').length === 0);
+  // Trending episodes state (top 10 by play count)
+  const [trendingEpisodes, setTrendingEpisodes] = useState<any[]>(() => getCached('trendingEpisodes'));
+  const [trendingEpisodesLoading, setTrendingEpisodesLoading] = useState(() => getCached('trendingEpisodes').length === 0);
   
   // Recently Read/Played state
   const [recentlyReadBooks, setRecentlyReadBooks] = useState<any[]>([]);
@@ -356,7 +357,7 @@ const HomePage: React.FC = () => {
     fetchExploreCategories();
     fetchPlaylists();
     fetchFeaturedContent();
-    fetchFeaturedEpisodes();
+    fetchTrendingEpisodes();
     fetchTopRatedContent();
     fetchDynamicGames();
     fetchBookSeries();
@@ -567,18 +568,18 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // Fetch featured episodes (individual playlist items)
-  const fetchFeaturedEpisodes = async () => {
+  // Fetch trending episodes (top 10 by play count)
+  const fetchTrendingEpisodes = async () => {
     try {
-      setFeaturedEpisodesLoading(true);
-      const data = await ApiService.getFeaturedEpisodes();
-      console.log('🎵 Featured episodes loaded:', data.length, 'items');
-      setFeaturedEpisodes(data);
-      cacheData('featuredEpisodes', data);
+      setTrendingEpisodesLoading(true);
+      const data = await ApiService.getTrendingEpisodes(10);
+      console.log('📈 Trending episodes loaded:', data.length, 'items');
+      setTrendingEpisodes(data);
+      cacheData('trendingEpisodes', data);
     } catch (error) {
-      console.error('❌ Error fetching featured episodes:', error);
+      console.error('❌ Error fetching trending episodes:', error);
     } finally {
-      setFeaturedEpisodesLoading(false);
+      setTrendingEpisodesLoading(false);
     }
   };
 
@@ -1168,39 +1169,43 @@ const HomePage: React.FC = () => {
           </>
         )}
 
-        {/* Featured Episodes Section */}
-        {!featuredEpisodesLoading && featuredEpisodes.length > 0 && (
+        {/* Trending Episodes Section - Top 10 by play count */}
+        {!trendingEpisodesLoading && trendingEpisodes.length > 0 && (
           <section className="mt-6">
             <SectionTitle 
-              title="Featured Episodes" 
-              icon="🎵"
-              color="#9C27B0"
+              title="Trending Episodes" 
+              icon="📈"
+              color="#FF6B35"
             />
             <div className="w-screen overflow-x-auto no-scrollbar pb-2 -mx-4 snap-x snap-mandatory">
               <div className="flex space-x-3 px-4">
-                {featuredEpisodes.map((episode: any) => (
+                {trendingEpisodes.map((episode: any, index: number) => (
                   <div
                     key={episode._id}
                     onClick={() => navigate(`/audio/playlist/${episode.playlist._id}/${episode.itemIndex}`)}
                     className="relative flex-shrink-0 w-36 snap-center cursor-pointer group"
                   >
                     {/* Cover Image */}
-                    <div className="relative aspect-square rounded-2xl overflow-hidden shadow-lg border-2 border-white/20 group-hover:border-purple-400/50 transition-all">
+                    <div className="relative aspect-square rounded-2xl overflow-hidden shadow-lg border-2 border-white/20 group-hover:border-orange-400/50 transition-all">
                       <img
                         src={episode.coverImage || episode.playlist.coverImage}
                         alt={episode.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150x150/9C27B0/FFFFFF?text=🎵';
+                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150x150/FF6B35/FFFFFF?text=🎵';
                         }}
                       />
                       {/* Play overlay */}
                       <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <Play className="w-10 h-10 text-white fill-white" />
                       </div>
+                      {/* Ranking badge - Top left */}
+                      <div className="absolute top-2 left-2 w-7 h-7 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white text-sm font-black shadow-lg">
+                        {index + 1}
+                      </div>
                       {/* Type badge */}
-                      <div className="absolute top-2 left-2 px-2 py-0.5 bg-purple-600/90 rounded-full text-[10px] font-bold text-white">
-                        {episode.playlist.type === 'Audiobook' ? '📖 Episode' : '🎵 Song'}
+                      <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/60 backdrop-blur-sm rounded-full text-[10px] font-bold text-white">
+                        {episode.playlist.type === 'Audiobook' ? '📖' : '🎵'} {episode.playCount || 0} plays
                       </div>
                       {/* Premium badge */}
                       {episode.isMembersOnly && (

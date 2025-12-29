@@ -481,15 +481,29 @@ export const ApiService = {
     if (cached) return cached;
 
     try {
-      const [featuredBooks, featuredPlaylists] = await Promise.all([
+      const [featuredBooks, featuredPlaylists, featuredEpisodes] = await Promise.all([
         ApiService.getFeaturedBooks(),
         ApiService.getFeaturedPlaylists(),
+        ApiService.getFeaturedEpisodes(),
       ]);
 
-      // Combine and sort by featuredOrder
-      const combined = [
+      // Combine books, playlists, and featured episodes
+      const combined: any[] = [
         ...featuredBooks.map(b => ({ ...b, _itemType: 'book' as const })),
         ...featuredPlaylists.map(p => ({ ...p, _itemType: 'playlist' as const })),
+        // Add featured episodes as playlist items (they navigate to the specific track)
+        ...featuredEpisodes.map(e => ({
+          ...e,
+          _id: `episode_${e.playlist._id}_${e.itemIndex}`,
+          id: `episode_${e.playlist._id}_${e.itemIndex}`,
+          title: e.title,
+          coverUrl: e.coverImage || e.playlist.coverImage,
+          coverImage: e.coverImage || e.playlist.coverImage,
+          _itemType: 'episode' as const,
+          _playlistId: e.playlist._id,
+          _itemIndex: e.itemIndex,
+          featuredOrder: e.featuredOrder || 100,
+        })),
       ];
 
       // Sort by featuredOrder (lower = first)
@@ -526,6 +540,32 @@ export const ApiService = {
       return [];
     } catch (error) {
       console.warn("Failed to fetch featured episodes:", error);
+      return [];
+    }
+  },
+
+  // Get trending episodes (top 10 by play count over a time period)
+  getTrendingEpisodes: async (limit: number = 10): Promise<FeaturedEpisode[]> => {
+    const cacheKey = `trending_episodes_${limit}`;
+    const cached = getCached<FeaturedEpisode[]>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetchWithTimeout(`${baseUrl}playlists/trending-episodes?limit=${limit}`, {
+        method: 'GET',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const result = Array.isArray(data) ? data : [];
+        setCache(cacheKey, result, 5 * 60 * 1000); // Cache for 5 minutes
+        console.log(`📈 Trending episodes loaded: ${result.length} items`);
+        return result;
+      }
+      return [];
+    } catch (error) {
+      console.warn("Failed to fetch trending episodes:", error);
       return [];
     }
   },
