@@ -2143,6 +2143,20 @@ const BookReaderPage: React.FC = () => {
     }, []);
     
     /**
+     * Calculate word offset for a segment by counting words in previous segments.
+     * This maps segment word indices to display word indices for highlighting.
+     */
+    const calculateWordOffset = (allSegments: TextSegment[], segmentIdx: number): number => {
+        let offset = 0;
+        for (let i = 0; i < segmentIdx; i++) {
+            const segmentText = allSegments[i].text;
+            const words = segmentText.split(/\s+/).filter(w => w.length > 0);
+            offset += words.length;
+        }
+        return offset;
+    };
+    
+    /**
      * Play a single segment of multi-segment TTS.
      * Uses playbackId to prevent race conditions and overlapping audio.
      */
@@ -2166,6 +2180,9 @@ const BookReaderPage: React.FC = () => {
             return;
         }
         
+        // Calculate word offset BEFORE this segment for highlighting
+        const wordOffset = calculateWordOffset(allSegments, segmentIdx);
+        
         try {
             // Stop any previous audio BEFORE generating new one
             if (multiSegmentAudioRef.current) {
@@ -2182,7 +2199,7 @@ const BookReaderPage: React.FC = () => {
                 ? removeEmotionalCues(segment.text) 
                 : processed.processedText;
             
-            console.log(`🎭 [${playbackId}] Segment ${segmentIdx + 1}/${allSegments.length}: "${ttsText.substring(0, 30)}..." [${segment.isNarrator ? 'Narrator' : segment.characterName}] voice: ${segment.voiceId}`);
+            console.log(`🎭 [${playbackId}] Segment ${segmentIdx + 1}/${allSegments.length}: "${ttsText.substring(0, 30)}..." [${segment.isNarrator ? 'Narrator' : segment.characterName}] voice: ${segment.voiceId} wordOffset: ${wordOffset}`);
             
             const result = await ApiService.generateTTS(
                 ttsText,
@@ -2210,11 +2227,50 @@ const BookReaderPage: React.FC = () => {
             const audio = new Audio(result.audioUrl);
             multiSegmentAudioRef.current = audio;
             
-            // Disable word-by-word highlighting for multi-segment (too complex with different word boundaries)
-            // Just keep the text box highlighted
-            setCurrentWordIndex(-1);
-            setWordAlignment(null);
-            wordAlignmentRef.current = null;
+            // Get segment words for alignment
+            const segmentWords = segment.text.split(/\s+/).filter(w => w.length > 0);
+            
+            // Set up word alignment with OFFSET for proper highlighting
+            audio.addEventListener('loadedmetadata', () => {
+                if (playbackId !== multiSegmentPlaybackIdRef.current) return;
+                
+                const audioDuration = audio.duration;
+                if (segmentWords.length > 0 && audioDuration > 0) {
+                    const wordDuration = audioDuration / segmentWords.length;
+                    const alignment = {
+                        words: segmentWords.map((word, idx) => ({
+                            word,
+                            start: idx * wordDuration,
+                            end: (idx + 1) * wordDuration
+                        }))
+                    };
+                    setWordAlignment(alignment);
+                    wordAlignmentRef.current = alignment;
+                    console.log(`📝 Segment ${segmentIdx + 1} alignment: ${segmentWords.length} words, offset ${wordOffset}`);
+                }
+            });
+            
+            // Track time for word highlighting with OFFSET
+            let lastHighlightedIdx = -1;
+            audio.ontimeupdate = () => {
+                if (playbackId !== multiSegmentPlaybackIdRef.current) return;
+                
+                const alignment = wordAlignmentRef.current;
+                if (alignment?.words) {
+                    for (let i = 0; i < alignment.words.length; i++) {
+                        const w = alignment.words[i];
+                        if (audio.currentTime >= w.start && audio.currentTime < w.end) {
+                            // Apply offset to get GLOBAL word index for display
+                            const globalIdx = wordOffset + i;
+                            if (globalIdx !== lastHighlightedIdx) {
+                                lastHighlightedIdx = globalIdx;
+                                setCurrentWordIndex(globalIdx);
+                            }
+                            break;
+                        }
+                    }
+                }
+            };
             
             // When this segment ends, play the next one
             audio.onended = () => {
