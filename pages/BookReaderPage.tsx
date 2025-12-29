@@ -448,8 +448,41 @@ const BookReaderPage: React.FC = () => {
     const [quizAttemptCount, setQuizAttemptCount] = useState(0);
     const maxQuizAttempts = 2;
 
-    // Page turn sound effect using Web Audio API for a synthetic paper sound
+    // Shared AudioContext for all audio (TTS, sound effects, video audio)
+    // Creating it early and sharing prevents iOS from suspending audio when video loops
     const audioContextRef = useRef<AudioContext | null>(null);
+    
+    // Initialize AudioContext early (but it will be in suspended state until user interaction)
+    useEffect(() => {
+        if (!audioContextRef.current) {
+            try {
+                audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+                console.log('🔊 Shared AudioContext created (state:', audioContextRef.current.state, ')');
+            } catch (e) {
+                console.warn('Failed to create AudioContext:', e);
+            }
+        }
+    }, []);
+    
+    // Resume AudioContext on first user interaction (required by browsers)
+    useEffect(() => {
+        const resumeContext = () => {
+            if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+                audioContextRef.current.resume().then(() => {
+                    console.log('🔊 AudioContext resumed after user interaction');
+                }).catch(() => {});
+            }
+        };
+        
+        // Listen for any user interaction
+        document.addEventListener('touchstart', resumeContext, { once: true });
+        document.addEventListener('click', resumeContext, { once: true });
+        
+        return () => {
+            document.removeEventListener('touchstart', resumeContext);
+            document.removeEventListener('click', resumeContext);
+        };
+    }, []);
 
     // Function to play page turn sound using Web Audio API (synthetic paper rustle)
     const playPageTurnSound = () => {

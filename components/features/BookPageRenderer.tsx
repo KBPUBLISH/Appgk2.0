@@ -227,6 +227,15 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
         };
     }, []);
     
+    // Try to connect video when sharedAudioContext becomes available
+    // This handles the case where video loaded before context was ready
+    useEffect(() => {
+        if (sharedAudioContext && videoRef.current && !connectedVideoRef.current) {
+            console.log('🎬 sharedAudioContext now available - connecting existing video');
+            connectVideoToSharedContext(videoRef.current);
+        }
+    }, [sharedAudioContext, connectVideoToSharedContext]);
+    
     // Swipe detection for scroll height changes
     const touchStartY = useRef<number>(0);
     const touchEndY = useRef<number>(0);
