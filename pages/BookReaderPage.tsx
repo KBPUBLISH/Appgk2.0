@@ -2421,7 +2421,7 @@ const BookReaderPage: React.FC = () => {
                         playingRef.current = false;
                         setActiveTextBoxIndex(null);
                         
-                        // Auto-play to next page
+                        // Auto-play to next page (2 second delay for user to process content)
                         const currentPageIdx = currentPageIndexRef.current;
                         console.log('🔍 Auto-play check:', {
                             autoPlayModeRef: autoPlayModeRef.current,
@@ -2480,7 +2480,7 @@ const BookReaderPage: React.FC = () => {
                                 handleUnlockRewardVoice();
                             }
                         }
-                    }, 200);
+                    }, 2000); // 2 second delay before auto page turn
                 }
             };
             
@@ -3028,85 +3028,88 @@ const BookReaderPage: React.FC = () => {
                             } else if (isAutoPlayingRef.current) {
                                 console.log('⏸️ Auto-play: Already processing, skipping');
                             }
-                        }, 500);
+                        }, 2000); // 2 second delay before auto page turn
                     } else {
-                        setPlaying(false);
-                        setActiveTextBoxIndex(null);
-                        setCurrentWordIndex(-1);
-                        setWordAlignment(null);
-                        wordAlignmentRef.current = null;
+                        // No word alignment - still add 2 second delay before auto page turn
+                        setTimeout(() => {
+                            setPlaying(false);
+                            setActiveTextBoxIndex(null);
+                            setCurrentWordIndex(-1);
+                            setWordAlignment(null);
+                            wordAlignmentRef.current = null;
 
-                        // Auto-play: Move to next page if enabled
-                        // Use refs to get latest values (closure-safe)
-                        const currentPageIdx = currentPageIndexRef.current;
-                        if (autoPlayModeRef.current && !isAutoPlayingRef.current && currentPageIdx < pages.length - 1) {
-                            isAutoPlayingRef.current = true; // Prevent multiple calls
-                            const nextPageIndex = currentPageIdx + 1;
-                            console.log('🔄 Auto-play: Moving to page', nextPageIndex + 1, `(from page ${currentPageIdx + 1})`);
-                            
-                            // Trigger page turn animation (same as manual swipe)
-                            setIsPageTurning(true);
-                            setFlipState({ direction: 'next', isFlipping: true });
-                            playPageTurnSound(); // Play page turn sound effect
-                            
-                            // Change page content at the halfway point (when page is perpendicular - 90deg)
-                            setTimeout(() => {
-                                setCurrentPageIndex(nextPageIndex);
-                                currentPageIndexRef.current = nextPageIndex; // Update ref
-                                // Preserve scroll state during page turns (both manual and auto-play)
-                                setScrollState(scrollStateRef.current);
-                            }, 400); // Halfway through 0.8s animation
-                            
-                            // End animation after full duration
-                            setTimeout(() => {
-                                setIsPageTurning(false);
-                                setFlipState(null);
-                                // Save progress
-                                if (bookId) {
-                                    readingProgressService.saveProgress(bookId, nextPageIndex);
-                                }
-
+                            // Auto-play: Move to next page if enabled
+                            // Use refs to get latest values (closure-safe)
+                            const currentPageIdx = currentPageIndexRef.current;
+                            if (autoPlayModeRef.current && !isAutoPlayingRef.current && currentPageIdx < pages.length - 1) {
+                                isAutoPlayingRef.current = true; // Prevent multiple calls
+                                const nextPageIndex = currentPageIdx + 1;
+                                console.log('🔄 Auto-play: Moving to page', nextPageIndex + 1, `(from page ${currentPageIdx + 1})`);
+                                
+                                // Trigger page turn animation (same as manual swipe)
+                                setIsPageTurning(true);
+                                setFlipState({ direction: 'next', isFlipping: true });
+                                playPageTurnSound(); // Play page turn sound effect
+                                
+                                // Change page content at the halfway point (when page is perpendicular - 90deg)
                                 setTimeout(() => {
-                                    // Check again if auto-play is still enabled and we're on the correct page
-                                    if (autoPlayModeRef.current && currentPageIndexRef.current === nextPageIndex) {
-                                        const nextPage = pages[nextPageIndex];
-                                        const nextPageTextBoxes = nextPage?.content?.textBoxes || nextPage?.textBoxes;
-                                        if (nextPage && nextPageTextBoxes && nextPageTextBoxes.length > 0) {
-                                            // Use translated text if available
-                                            const translatedTextBoxes = getTranslatedTextBoxes(nextPage);
-                                            const firstBoxText = translatedTextBoxes[0]?.text || nextPageTextBoxes[0].text;
-                                            console.log('▶️ Auto-play: Starting next page audio');
-                                            isAutoPlayingRef.current = false; // Reset flag before calling
-                                            const syntheticEvent = { stopPropagation: () => { } } as React.MouseEvent;
-                                            handlePlayText(firstBoxText, 0, syntheticEvent, true);
+                                    setCurrentPageIndex(nextPageIndex);
+                                    currentPageIndexRef.current = nextPageIndex; // Update ref
+                                    // Preserve scroll state during page turns (both manual and auto-play)
+                                    setScrollState(scrollStateRef.current);
+                                }, 400); // Halfway through 0.8s animation
+                                
+                                // End animation after full duration
+                                setTimeout(() => {
+                                    setIsPageTurning(false);
+                                    setFlipState(null);
+                                    // Save progress
+                                    if (bookId) {
+                                        readingProgressService.saveProgress(bookId, nextPageIndex);
+                                    }
+
+                                    setTimeout(() => {
+                                        // Check again if auto-play is still enabled and we're on the correct page
+                                        if (autoPlayModeRef.current && currentPageIndexRef.current === nextPageIndex) {
+                                            const nextPage = pages[nextPageIndex];
+                                            const nextPageTextBoxes = nextPage?.content?.textBoxes || nextPage?.textBoxes;
+                                            if (nextPage && nextPageTextBoxes && nextPageTextBoxes.length > 0) {
+                                                // Use translated text if available
+                                                const translatedTextBoxes = getTranslatedTextBoxes(nextPage);
+                                                const firstBoxText = translatedTextBoxes[0]?.text || nextPageTextBoxes[0].text;
+                                                console.log('▶️ Auto-play: Starting next page audio');
+                                                isAutoPlayingRef.current = false; // Reset flag before calling
+                                                const syntheticEvent = { stopPropagation: () => { } } as React.MouseEvent;
+                                                handlePlayText(firstBoxText, 0, syntheticEvent, true);
+                                            } else {
+                                                console.log('⏹️ Auto-play: No text boxes on next page, stopping');
+                                                setAutoPlayMode(false);
+                                                autoPlayModeRef.current = false;
+                                                isAutoPlayingRef.current = false;
+                                            }
                                         } else {
-                                            console.log('⏹️ Auto-play: No text boxes on next page, stopping');
-                                            setAutoPlayMode(false);
-                                            autoPlayModeRef.current = false;
+                                            console.log('⏹️ Auto-play: Cancelled or page changed');
                                             isAutoPlayingRef.current = false;
                                         }
-                                    } else {
-                                        console.log('⏹️ Auto-play: Cancelled or page changed');
-                                        isAutoPlayingRef.current = false;
-                                    }
-                                }, 300);
-                            }, 800); // Full animation duration
-                        } else if (autoPlayModeRef.current && currentPageIndexRef.current >= pages.length - 1) {
-                            // Reached end of book, stop auto-play
-                            console.log('🏁 Auto-play: Reached end of book, stopping');
-                            setAutoPlayMode(false);
-                            autoPlayModeRef.current = false;
-                            isAutoPlayingRef.current = false;
-                            // Mark book as completed (unlocks games permanently)
-                            if (bookId) {
-                                bookCompletionService.markBookCompleted(bookId);
-                                readCountService.incrementReadCount(bookId);
-                                // Track book completion analytics
-                                analyticsService.bookReadComplete(bookId, bookTitle);
+                                    }, 300);
+                                }, 800); // Full animation duration
+                            } else if (autoPlayModeRef.current && currentPageIndexRef.current >= pages.length - 1) {
+                                // Reached end of book, stop auto-play
+                                console.log('🏁 Auto-play: Reached end of book, stopping');
+                                setAutoPlayMode(false);
+                                autoPlayModeRef.current = false;
+                                isAutoPlayingRef.current = false;
+                                // Mark book as completed (unlocks games permanently)
+                                if (bookId) {
+                                    bookCompletionService.markBookCompleted(bookId);
+                                    readCountService.incrementReadCount(bookId);
+                                    // Track book completion analytics
+                                    analyticsService.bookReadComplete(bookId, bookTitle);
+                                }
+                            } else if (isAutoPlayingRef.current) {
+                                console.log('⏸️ Auto-play: Already processing, skipping');
                             }
-                        } else if (isAutoPlayingRef.current) {
-                            console.log('⏸️ Auto-play: Already processing, skipping');
-                        }
+                        }, 2000); // 2 second delay before auto page turn
                     }
                 };
 
