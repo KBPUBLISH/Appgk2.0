@@ -296,10 +296,11 @@ const BookReaderPage: React.FC = () => {
     const parseTextIntoSegments = (text: string): TextSegment[] => {
         const segments: TextSegment[] = [];
         
-        // Normalize quotes first - convert curly quotes to straight quotes
+        // Normalize quotes first - convert ALL types of quotes to straight quotes
+        // Include fullwidth, CJK, and other Unicode quote variants
         const normalizedText = text
-            .replace(/[""„«»]/g, '"')  // Convert all types of double quotes to straight
-            .replace(/[''‚‹›]/g, "'"); // Convert all types of single quotes to straight
+            .replace(/[""„«»「」『』〝〞＂❝❞⹂〟‟″‶]/g, '"')  // ALL double quote variants
+            .replace(/[''‚‹›「」＇❛❜‛′‵]/g, "'"); // ALL single quote variants
         
         console.log('🔄 Normalized text:', normalizedText.substring(0, 100) + '...');
         
@@ -320,11 +321,13 @@ const BookReaderPage: React.FC = () => {
             console.log('🔬 Char codes at "@:', snippet, '→', charCodes);
         }
         
-        // Also show first @ context
+        // Also show first @ context with CHAR CODES to identify mystery quote
         const atIndex = normalizedText.indexOf('@');
         if (atIndex >= 0) {
             const beforeAt = normalizedText.substring(Math.max(0, atIndex - 5), atIndex);
             const afterAt = normalizedText.substring(atIndex, atIndex + 30);
+            const beforeCharCodes = [...beforeAt].map(c => `${c}=${c.charCodeAt(0)}`).join(', ');
+            console.log('🔬 BEFORE @ char codes:', beforeCharCodes);
             console.log('🔬 Context around @:', `"${beforeAt}" + "${afterAt}"`)
         }
         

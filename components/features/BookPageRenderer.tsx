@@ -314,18 +314,43 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     }, [page.soundEffectUrl]);
 
     // Set video volume when video loads - handle both buffers for video sequence
+    // NOTE: Do NOT set muted here - let React control it via the muted prop based on isTTSPlaying
     useEffect(() => {
         const activeRef = activeBuffer === 'A' ? videoRefA : videoRefB;
         if (activeRef.current) {
-            activeRef.current.volume = 1.0; // Full volume for video's native audio
-            activeRef.current.muted = false;
+            activeRef.current.volume = 1.0; // Full volume for video's native audio (when not muted)
         }
         // Also set up the single video ref for non-sequence videos
         if (videoRef.current) {
             videoRef.current.volume = 1.0;
-            videoRef.current.muted = false;
         }
     }, [currentVideoIndex, activeBuffer, page.backgroundUrl]);
+    
+    // Ensure video keeps playing when muted state changes (TTS starts/stops)
+    // On some browsers, changing muted can pause the video
+    useEffect(() => {
+        // For single video background
+        if (videoRef.current) {
+            const video = videoRef.current;
+            if (video.paused && video.readyState >= 2) {
+                console.log('🎬 Video was paused, resuming playback');
+                video.play().catch(err => {
+                    console.warn('Could not resume video:', err);
+                });
+            }
+        }
+        // For video sequences
+        const activeRef = activeBuffer === 'A' ? videoRefA : videoRefB;
+        if (activeRef.current) {
+            const video = activeRef.current;
+            if (video.paused && video.readyState >= 2) {
+                console.log('🎬 Video sequence was paused, resuming playback');
+                video.play().catch(err => {
+                    console.warn('Could not resume video sequence:', err);
+                });
+            }
+        }
+    }, [isTTSPlaying, activeBuffer]);
 
     // Reset bubble and video sequence when page changes
     useEffect(() => {
@@ -430,6 +455,8 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                             src={bufferAVideoUrl || ''}
                             className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full transition-opacity duration-300"
                             autoPlay={activeBuffer === 'A'}
+                            loop={sortedVideoSequence.length === 1} // Loop only if single video in sequence
+                            muted={isTTSPlaying} // Mute when TTS is playing
                             playsInline
                             preload="auto"
                             onEnded={activeBuffer === 'A' ? handleVideoEnded : undefined}
@@ -437,7 +464,12 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                                 setBufferAReady(true);
                                 if (videoRefA.current && activeBuffer === 'A') {
                                     videoRefA.current.volume = 1.0;
-                                    videoRefA.current.muted = false;
+                                    // Ensure video is playing
+                                    if (videoRefA.current.paused) {
+                                        videoRefA.current.play().catch(err => {
+                                            console.warn('Could not autoplay video A:', err);
+                                        });
+                                    }
                                 }
                             }}
                             onCanPlayThrough={() => setBufferAReady(true)}
@@ -458,6 +490,8 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                             src={bufferBVideoUrl || ''}
                             className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full transition-opacity duration-300"
                             autoPlay={activeBuffer === 'B'}
+                            loop={sortedVideoSequence.length === 1} // Loop only if single video in sequence
+                            muted={isTTSPlaying} // Mute when TTS is playing
                             playsInline
                             preload="auto"
                             onEnded={activeBuffer === 'B' ? handleVideoEnded : undefined}
@@ -465,7 +499,12 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                                 setBufferBReady(true);
                                 if (videoRefB.current && activeBuffer === 'B') {
                                     videoRefB.current.volume = 1.0;
-                                    videoRefB.current.muted = false;
+                                    // Ensure video is playing
+                                    if (videoRefB.current.paused) {
+                                        videoRefB.current.play().catch(err => {
+                                            console.warn('Could not autoplay video B:', err);
+                                        });
+                                    }
                                 }
                             }}
                             onCanPlayThrough={() => setBufferBReady(true)}
@@ -612,8 +651,15 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                         preload="auto"
                         onLoadedData={() => {
                             // Set video volume (only matters when not muted)
+                            // Do NOT set muted here - let React control it via prop
                             if (videoRef.current) {
                                 videoRef.current.volume = 1.0;
+                                // Ensure video is playing
+                                if (videoRef.current.paused) {
+                                    videoRef.current.play().catch(err => {
+                                        console.warn('Could not autoplay video on load:', err);
+                                    });
+                                }
                             }
                         }}
                         style={{
