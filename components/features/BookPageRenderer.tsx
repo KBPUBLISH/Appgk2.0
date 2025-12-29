@@ -63,6 +63,7 @@ interface BookPageRendererProps {
     highlightedWordIndex?: number;
     wordAlignment?: { words: Array<{ word: string; start: number; end: number }> } | null;
     onVideoTransition?: () => void; // Called when video sequences transition to keep audio active
+    sharedAudioContext?: AudioContext | null; // Shared AudioContext for routing video audio (prevents iOS suspension)
 }
 
 export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
@@ -73,7 +74,8 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     onPlayText,
     highlightedWordIndex,
     wordAlignment,
-    onVideoTransition
+    onVideoTransition,
+    sharedAudioContext
 }) => {
     // DEBUG: Log scroll URL on every render
     console.log('📜 BookPageRenderer - scrollUrl:', page.scrollUrl, '| scrollState:', scrollState, '| pageId:', page.id);
@@ -98,6 +100,11 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const [bubblePopped, setBubblePopped] = useState(false);
     const [bubblePosition, setBubblePosition] = useState({ x: 75, y: 20 }); // Default position (top right area)
+    
+    // Web Audio API refs for routing video audio through shared context (prevents iOS suspension)
+    const videoSourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+    const videoGainNodeRef = useRef<GainNode | null>(null);
+    const connectedVideoRef = useRef<HTMLVideoElement | null>(null); // Track which video is connected
     
     // Video sequence state - double buffer approach for seamless transitions
     const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
@@ -165,6 +172,60 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
     useEffect(() => {
         setCurrentImageIndex(0);
     }, [page.id]);
+    
+    // Connect video to shared AudioContext (routes video audio through same context as TTS)
+    // This prevents iOS from suspending TTS when video loops
+    const connectVideoToSharedContext = React.useCallback((video: HTMLVideoElement) => {
+        if (!sharedAudioContext || !video) return;
+        
+        // Skip if already connected to this video
+        if (connectedVideoRef.current === video && videoSourceNodeRef.current) {
+            return;
+        }
+        
+        try {
+            // Disconnect previous connection if different video
+            if (videoSourceNodeRef.current && connectedVideoRef.current !== video) {
+                videoSourceNodeRef.current.disconnect();
+                videoSourceNodeRef.current = null;
+            }
+            
+            // Create gain node if needed
+            if (!videoGainNodeRef.current) {
+                videoGainNodeRef.current = sharedAudioContext.createGain();
+                videoGainNodeRef.current.gain.value = 1.0;
+                videoGainNodeRef.current.connect(sharedAudioContext.destination);
+            }
+            
+            // Create source from video and connect to gain node
+            videoSourceNodeRef.current = sharedAudioContext.createMediaElementSource(video);
+            videoSourceNodeRef.current.connect(videoGainNodeRef.current);
+            connectedVideoRef.current = video;
+            
+            // Mute the HTML element (audio now routes through Web Audio API)
+            video.muted = true;
+            video.volume = 1.0;
+            
+            console.log('🎬 Video audio connected to shared AudioContext');
+        } catch (err) {
+            // If connection fails (e.g., already connected), just continue with muted video
+            console.warn('🎬 Could not connect video to shared AudioContext:', err);
+            video.muted = true; // Fallback to muted video
+        }
+    }, [sharedAudioContext]);
+    
+    // Cleanup video audio connection on unmount
+    useEffect(() => {
+        return () => {
+            if (videoSourceNodeRef.current) {
+                try {
+                    videoSourceNodeRef.current.disconnect();
+                } catch (e) {}
+                videoSourceNodeRef.current = null;
+            }
+            connectedVideoRef.current = null;
+        };
+    }, []);
     
     // Swipe detection for scroll height changes
     const touchStartY = useRef<number>(0);
@@ -537,20 +598,23 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                         className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full"
                         autoPlay
                         loop
+                        muted={!sharedAudioContext} // Muted only if no shared context (fallback)
                         playsInline
                         preload="auto"
                         onLoadedData={() => {
-                            // Set full volume for video's native audio
-                            if (videoRef.current) {
-                                videoRef.current.volume = 1.0;
-                                videoRef.current.muted = false;
+                            // Connect video audio to shared AudioContext (prevents iOS from suspending TTS)
+                            if (videoRef.current && sharedAudioContext) {
+                                connectVideoToSharedContext(videoRef.current);
                             }
+                        }}
+                        onPlay={() => {
+                            // Ensure audio context is resumed when video plays/loops
+                            onVideoTransition?.();
                         }}
                         style={{
                             objectFit: 'cover',
                             width: '100%',
                             height: '100%',
-                            // Lock video in place
                             position: 'absolute',
                             top: 0,
                             left: 0,

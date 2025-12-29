@@ -140,6 +140,7 @@ const BookReaderPage: React.FC = () => {
 
     // TTS State
     const [playing, setPlaying] = useState(false);
+    const playingRef = useRef(false); // Ref to track playing state for closures
     const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
     const [activeTextBoxIndex, setActiveTextBoxIndex] = useState<number | null>(null);
     const [loadingAudio, setLoadingAudio] = useState(false);
@@ -759,6 +760,7 @@ const BookReaderPage: React.FC = () => {
         }
         // Reset state
         setPlaying(false);
+        playingRef.current = false;
         setActiveTextBoxIndex(null);
         setCurrentWordIndex(-1);
         // Clear MediaSession
@@ -769,6 +771,11 @@ const BookReaderPage: React.FC = () => {
             } catch (e) { }
         }
     }, []);
+
+    // Keep playingRef in sync with playing state for use in closures
+    useEffect(() => {
+        playingRef.current = playing;
+    }, [playing]);
 
     // Effect: Stop TTS audio when component unmounts OR when navigating away
     useEffect(() => {
@@ -2789,11 +2796,13 @@ const BookReaderPage: React.FC = () => {
                         >
                             <Volume2 className="w-4 h-4 text-white" />
                             <span className="text-white text-xs max-w-[100px] truncate">
-                                {/* Show the effective voice being used */}
-                                {voices.find(v => v.voice_id === effectiveVoiceId)?.name || 
-                                 voices.find(v => v.voice_id === effectiveVoiceId)?.customName ||
-                                 clonedVoices.find(v => v.voice_id === effectiveVoiceId)?.name ||
-                                 'Voice'}
+                                {/* Show "Default" when using book's narrator, otherwise show user's selected voice */}
+                                {bookDefaultVoiceId && useBookDefaultVoice 
+                                    ? 'Default'
+                                    : (voices.find(v => v.voice_id === selectedVoiceId)?.name || 
+                                       voices.find(v => v.voice_id === selectedVoiceId)?.customName ||
+                                       clonedVoices.find(v => v.voice_id === selectedVoiceId)?.name ||
+                                       'Voice')}
                             </span>
                             {bookDefaultVoiceId && useBookDefaultVoice && <span className="text-amber-300 text-[10px]">📖</span>}
                         </button>
@@ -3164,19 +3173,22 @@ const BookReaderPage: React.FC = () => {
                             highlightedWordIndex={currentWordIndex}
                             wordAlignment={wordAlignment}
                             onVideoTransition={() => {
-                                // Keep AudioContext active during video transitions
-                                // This prevents TTS from pausing when videos switch
+                                // Keep AudioContext active during video transitions/loops
+                                // This prevents TTS from pausing when videos switch or loop (iOS fix)
+                                console.log('🎬 Video transition detected - resuming audio contexts');
                                 if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
                                     audioContextRef.current.resume().catch(() => {});
                                 }
                                 if (bookMusicCtxRef.current && bookMusicCtxRef.current.state === 'suspended') {
                                     bookMusicCtxRef.current.resume().catch(() => {});
                                 }
-                                // Also ensure any playing TTS audio continues
-                                if (currentAudioRef.current && currentAudioRef.current.paused && playing) {
+                                // Also ensure any playing TTS audio continues (use ref for latest value)
+                                if (currentAudioRef.current && currentAudioRef.current.paused && playingRef.current) {
+                                    console.log('🎬 Resuming paused TTS audio after video transition');
                                     currentAudioRef.current.play().catch(() => {});
                                 }
                             }}
+                            sharedAudioContext={audioContextRef.current}
                         />
                     </div>
 
