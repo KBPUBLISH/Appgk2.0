@@ -1707,12 +1707,13 @@ const BookReaderPage: React.FC = () => {
         touchEndX.current = e.touches[0].clientX;
         touchEndY.current = e.touches[0].clientY;
         
-        // Pull-to-refresh: Only on first page and pulling down from top
-        if (currentPageIndex === 0 && !isRefreshing) {
+        // Pull-to-refresh: Only when scroll is HIDDEN (already swiped down)
+        // This prevents conflict with the scroll show/hide gesture
+        if (scrollState === 'hidden' && !isRefreshing) {
             const pullDelta = e.touches[0].clientY - pullStartY.current;
             
-            // Only allow pull if at the top of the page (pulling down)
-            if (pullDelta > 10 && touchStartY.current < 150) {
+            // Only allow pull if pulling down
+            if (pullDelta > 20) {
                 isPulling.current = true;
                 setPullDistance(Math.min(pullDelta * 0.5, PULL_THRESHOLD * 1.5)); // Dampen the pull
             }
@@ -1720,8 +1721,8 @@ const BookReaderPage: React.FC = () => {
     };
 
     const handleTouchEnd = () => {
-        // Pull-to-refresh: Check if we should refresh
-        if (isPulling.current && pullDistance >= PULL_THRESHOLD) {
+        // Pull-to-refresh: Check if we should refresh (only when scroll is hidden)
+        if (isPulling.current && pullDistance >= PULL_THRESHOLD && scrollState === 'hidden') {
             handleRefresh();
         } else {
             setPullDistance(0);
@@ -3334,8 +3335,8 @@ const BookReaderPage: React.FC = () => {
                 e.stopPropagation();
             }}
         >
-            {/* Pull-to-Refresh Indicator */}
-            {(pullDistance > 0 || isRefreshing) && currentPageIndex === 0 && (
+            {/* Pull-to-Refresh Indicator - Only shows when scroll is hidden */}
+            {(pullDistance > 0 || isRefreshing) && scrollState === 'hidden' && (
                 <div 
                     className="absolute top-0 left-0 right-0 z-[300] flex items-center justify-center transition-all duration-200"
                     style={{ 
@@ -3416,9 +3417,6 @@ const BookReaderPage: React.FC = () => {
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
-
-                        // Restore music before navigating back
-                        // Background music toggle has been removed from Header. Nothing to restore here.
 
                         // Navigate back to book detail page explicitly
                         if (bookId) {
