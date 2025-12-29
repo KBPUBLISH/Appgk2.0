@@ -471,6 +471,7 @@ const BookReaderPage: React.FC = () => {
     const segmentsQueueRef = useRef<Array<{ segment: TextSegment; audioUrl: string; alignment: any }>>([]);
     const isPlayingMultiSegmentRef = useRef(false); // Track if we're in multi-segment playback mode
     const multiSegmentAudioRef = useRef<HTMLAudioElement | null>(null); // Current playing audio in multi-segment mode
+    const multiSegmentPlaybackIdRef = useRef(0); // Unique ID to prevent overlapping playback sessions
     
     const [isPageTurning, setIsPageTurning] = useState(false);
     const [flipState, setFlipState] = useState<{ direction: 'next' | 'prev', isFlipping: boolean } | null>(null);
@@ -980,6 +981,19 @@ const BookReaderPage: React.FC = () => {
             currentAudioRef.current.pause();
             currentAudioRef.current.src = '';
         }
+        // Stop multi-segment TTS audio
+        if (multiSegmentAudioRef.current) {
+            try {
+                multiSegmentAudioRef.current.pause();
+                multiSegmentAudioRef.current.onended = null;
+                multiSegmentAudioRef.current.ontimeupdate = null;
+                multiSegmentAudioRef.current.src = '';
+                multiSegmentAudioRef.current = null;
+            } catch (e) {
+                console.warn('Error stopping multi-segment audio:', e);
+            }
+        }
+        isPlayingMultiSegmentRef.current = false;
         // Stop book background music
         if (bookBackgroundMusicRef.current) {
             bookBackgroundMusicRef.current.pause();
@@ -990,6 +1004,9 @@ const BookReaderPage: React.FC = () => {
         playingRef.current = false;
         setActiveTextBoxIndex(null);
         setCurrentWordIndex(-1);
+        setCurrentSegments([]);
+        setCurrentSegmentIndex(0);
+        currentSegmentIndexRef.current = 0;
         // Clear MediaSession
         if ('mediaSession' in navigator) {
             try {
@@ -2103,40 +2120,31 @@ const BookReaderPage: React.FC = () => {
      * Stop any currently playing multi-segment audio cleanly.
      * Prevents overlapping audio issues.
      */
-    const stopMultiSegmentAudio = () => {
+    const stopMultiSegmentAudio = useCallback(() => {
+        console.log('🛑 stopMultiSegmentAudio called');
         if (multiSegmentAudioRef.current) {
             try {
-                multiSegmentAudioRef.current.pause();
-                multiSegmentAudioRef.current.onended = null;
-                multiSegmentAudioRef.current.ontimeupdate = null;
-                multiSegmentAudioRef.current.onplay = null;
+                const audio = multiSegmentAudioRef.current;
+                // Remove all event listeners to prevent callbacks
+                audio.onended = null;
+                audio.ontimeupdate = null;
+                audio.onplay = null;
+                audio.onpause = null;
+                audio.onerror = null;
+                audio.pause();
+                audio.src = ''; // Clear source to stop loading
                 multiSegmentAudioRef.current = null;
             } catch (e) {
                 console.warn('Error stopping multi-segment audio:', e);
             }
         }
-    };
-    
-    /**
-     * Calculate cumulative word offset for a segment.
-     * This ensures highlighting continues correctly across segments.
-     */
-    const getSegmentWordOffset = (segments: TextSegment[], segmentIdx: number): number => {
-        let offset = 0;
-        for (let i = 0; i < segmentIdx; i++) {
-            // Count words in previous segments (matching how display text is rendered)
-            const segmentText = segments[i].text;
-            const words = segmentText.split(/\s+/).filter(w => w.length > 0);
-            offset += words.length;
-            // Add 1 for the space/quote between segments in display
-            // This accounts for punctuation that appears in displayed text
-        }
-        return offset;
-    };
+        // Increment playback ID to invalidate any in-flight segment plays
+        multiSegmentPlaybackIdRef.current += 1;
+    }, []);
     
     /**
      * Play a single segment of multi-segment TTS.
-     * Called recursively to play all segments in sequence.
+     * Uses playbackId to prevent race conditions and overlapping audio.
      */
     const playSegment = async (
         segment: TextSegment,
@@ -2145,17 +2153,27 @@ const BookReaderPage: React.FC = () => {
         textBoxIndex: number,
         isAutoPlay: boolean,
         currentLang: string,
-        wordOffset: number = 0 // Cumulative word offset for highlighting
+        playbackId: number // Unique ID for this playback session
     ) => {
+        // CRITICAL: Check if this playback session is still valid
+        if (playbackId !== multiSegmentPlaybackIdRef.current) {
+            console.log(`🛑 Playback ${playbackId} cancelled (current: ${multiSegmentPlaybackIdRef.current})`);
+            return;
+        }
+        
+        if (!isPlayingMultiSegmentRef.current) {
+            console.log('🛑 Multi-segment playback was cancelled');
+            return;
+        }
+        
         try {
-            // IMPORTANT: Stop any previous audio BEFORE starting new one
-            // This prevents overlapping audio
-            stopMultiSegmentAudio();
-            
-            // Check if we've been cancelled
-            if (!isPlayingMultiSegmentRef.current) {
-                console.log('🛑 Multi-segment playback was cancelled');
-                return;
+            // Stop any previous audio BEFORE generating new one
+            if (multiSegmentAudioRef.current) {
+                const oldAudio = multiSegmentAudioRef.current;
+                oldAudio.onended = null;
+                oldAudio.ontimeupdate = null;
+                oldAudio.pause();
+                multiSegmentAudioRef.current = null;
             }
             
             // Generate TTS for this segment
@@ -2164,7 +2182,7 @@ const BookReaderPage: React.FC = () => {
                 ? removeEmotionalCues(segment.text) 
                 : processed.processedText;
             
-            console.log(`🎭 Multi-segment ${segmentIdx + 1}/${allSegments.length}: "${ttsText.substring(0, 40)}..." [${segment.isNarrator ? 'Narrator' : segment.characterName}] (wordOffset: ${wordOffset})`);
+            console.log(`🎭 [${playbackId}] Segment ${segmentIdx + 1}/${allSegments.length}: "${ttsText.substring(0, 30)}..." [${segment.isNarrator ? 'Narrator' : segment.characterName}] voice: ${segment.voiceId}`);
             
             const result = await ApiService.generateTTS(
                 ttsText,
@@ -2173,102 +2191,61 @@ const BookReaderPage: React.FC = () => {
                 currentLang !== 'en' ? currentLang : undefined
             );
             
-            if (!result?.audioUrl) {
-                console.error(`Failed to generate audio for segment ${segmentIdx + 1}`);
-                // Try to continue with next segment
-                const nextSegmentIdx = segmentIdx + 1;
-                if (nextSegmentIdx < allSegments.length && isPlayingMultiSegmentRef.current) {
-                    const nextWordOffset = wordOffset + segment.text.split(/\s+/).filter(w => w.length > 0).length;
-                    playSegment(allSegments[nextSegmentIdx], nextSegmentIdx, allSegments, textBoxIndex, isAutoPlay, currentLang, nextWordOffset);
-                }
+            // Check AGAIN if this playback is still valid (TTS generation takes time)
+            if (playbackId !== multiSegmentPlaybackIdRef.current || !isPlayingMultiSegmentRef.current) {
+                console.log(`🛑 Playback ${playbackId} cancelled after TTS generation`);
                 return;
             }
             
-            // Check again if cancelled (TTS generation takes time)
-            if (!isPlayingMultiSegmentRef.current) {
-                console.log('🛑 Multi-segment playback cancelled during TTS generation');
+            if (!result?.audioUrl) {
+                console.error(`Failed to generate audio for segment ${segmentIdx + 1}`);
+                // Skip to next segment
+                const nextSegmentIdx = segmentIdx + 1;
+                if (nextSegmentIdx < allSegments.length) {
+                    playSegment(allSegments[nextSegmentIdx], nextSegmentIdx, allSegments, textBoxIndex, isAutoPlay, currentLang, playbackId);
+                }
                 return;
             }
             
             const audio = new Audio(result.audioUrl);
             multiSegmentAudioRef.current = audio;
             
-            // Calculate words in this segment for highlighting
-            const segmentWords = segment.text.split(/\s+/).filter(w => w.length > 0);
+            // Disable word-by-word highlighting for multi-segment (too complex with different word boundaries)
+            // Just keep the text box highlighted
+            setCurrentWordIndex(-1);
+            setWordAlignment(null);
+            wordAlignmentRef.current = null;
             
-            // Set up word alignment for this segment WITH OFFSET
-            audio.addEventListener('loadedmetadata', () => {
-                const audioDuration = audio.duration;
-                
-                if (segmentWords.length > 0) {
-                    const wordDuration = audioDuration / segmentWords.length;
-                    const alignment = {
-                        words: segmentWords.map((word, idx) => ({
-                            word,
-                            start: idx * wordDuration,
-                            end: (idx + 1) * wordDuration,
-                            // Store the GLOBAL index for highlighting
-                            globalIndex: wordOffset + idx
-                        }))
-                    };
-                    setWordAlignment(alignment);
-                    wordAlignmentRef.current = alignment;
-                }
-            });
-            
-            // Track time for highlighting - use GLOBAL word index
-            let lastWordIdx = -1;
-            audio.ontimeupdate = () => {
-                const alignment = wordAlignmentRef.current;
-                if (alignment?.words) {
-                    for (let i = 0; i < alignment.words.length; i++) {
-                        const w = alignment.words[i];
-                        if (audio.currentTime >= w.start && audio.currentTime < w.end) {
-                            // Use the GLOBAL index for highlighting
-                            const globalIdx = wordOffset + i;
-                            if (globalIdx !== lastWordIdx) {
-                                lastWordIdx = globalIdx;
-                                setCurrentWordIndex(globalIdx);
-                            }
-                            break;
-                        }
-                    }
-                }
-            };
-            
-            // When this segment ends, play the next one or finish
+            // When this segment ends, play the next one
             audio.onended = () => {
-                // Don't clear word index immediately - keep last word highlighted briefly
+                // Check if still valid
+                if (playbackId !== multiSegmentPlaybackIdRef.current || !isPlayingMultiSegmentRef.current) {
+                    console.log(`🛑 Playback ${playbackId} ended but cancelled`);
+                    return;
+                }
+                
                 const nextSegmentIdx = segmentIdx + 1;
                 
-                if (nextSegmentIdx < allSegments.length && isPlayingMultiSegmentRef.current) {
-                    // Play next segment with updated word offset
-                    console.log(`▶️ Playing next segment ${nextSegmentIdx + 1}/${allSegments.length}`);
+                if (nextSegmentIdx < allSegments.length) {
+                    console.log(`▶️ [${playbackId}] Next segment ${nextSegmentIdx + 1}/${allSegments.length}`);
                     currentSegmentIndexRef.current = nextSegmentIdx;
                     setCurrentSegmentIndex(nextSegmentIdx);
-                    
-                    // Calculate new offset: current offset + words in current segment
-                    const nextWordOffset = wordOffset + segmentWords.length;
-                    playSegment(allSegments[nextSegmentIdx], nextSegmentIdx, allSegments, textBoxIndex, isAutoPlay, currentLang, nextWordOffset);
+                    playSegment(allSegments[nextSegmentIdx], nextSegmentIdx, allSegments, textBoxIndex, isAutoPlay, currentLang, playbackId);
                 } else {
-                    // All segments complete - trigger auto-play to next page if enabled
-                    console.log(`✅ All ${allSegments.length} segments complete`);
+                    // All segments complete
+                    console.log(`✅ [${playbackId}] All ${allSegments.length} segments complete`);
                     isPlayingMultiSegmentRef.current = false;
+                    multiSegmentAudioRef.current = null;
                     setCurrentSegments([]);
                     setCurrentSegmentIndex(0);
                     currentSegmentIndexRef.current = 0;
-                    multiSegmentAudioRef.current = null;
-                    setCurrentWordIndex(-1);
-                    setWordAlignment(null);
-                    wordAlignmentRef.current = null;
                     
-                    // Clear playing state
                     setTimeout(() => {
                         setPlaying(false);
                         playingRef.current = false;
                         setActiveTextBoxIndex(null);
                         
-                        // Auto-play: Move to next page if enabled
+                        // Auto-play to next page
                         const currentPageIdx = currentPageIndexRef.current;
                         if (autoPlayModeRef.current && !isAutoPlayingRef.current && currentPageIdx < pages.length - 1) {
                             isAutoPlayingRef.current = true;
@@ -2288,20 +2265,17 @@ const BookReaderPage: React.FC = () => {
                             setTimeout(() => {
                                 setIsPageTurning(false);
                                 setFlipState(null);
-                                if (bookId) {
-                                    readingProgressService.saveProgress(bookId, nextPageIndex);
-                                }
+                                if (bookId) readingProgressService.saveProgress(bookId, nextPageIndex);
                                 
                                 setTimeout(() => {
                                     if (autoPlayModeRef.current && currentPageIndexRef.current === nextPageIndex) {
                                         const nextPage = pages[nextPageIndex];
                                         const nextPageTextBoxes = nextPage?.content?.textBoxes || nextPage?.textBoxes;
-                                        if (nextPage && nextPageTextBoxes && nextPageTextBoxes.length > 0) {
+                                        if (nextPage && nextPageTextBoxes?.length > 0) {
                                             const translatedTextBoxes = getTranslatedTextBoxes(nextPage);
                                             const firstBoxText = translatedTextBoxes[0]?.text || nextPageTextBoxes[0].text;
                                             isAutoPlayingRef.current = false;
-                                            const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
-                                            handlePlayText(firstBoxText, 0, syntheticEvent, true);
+                                            handlePlayText(firstBoxText, 0, { stopPropagation: () => {} } as React.MouseEvent, true);
                                         } else {
                                             setAutoPlayMode(false);
                                             autoPlayModeRef.current = false;
@@ -2313,7 +2287,6 @@ const BookReaderPage: React.FC = () => {
                                 }, 300);
                             }, 800);
                         } else if (autoPlayModeRef.current && currentPageIdx >= pages.length - 1) {
-                            // End of book
                             setAutoPlayMode(false);
                             autoPlayModeRef.current = false;
                             if (bookId) {
@@ -2323,7 +2296,7 @@ const BookReaderPage: React.FC = () => {
                                 handleUnlockRewardVoice();
                             }
                         }
-                    }, 300);
+                    }, 200);
                 }
             };
             
@@ -2333,66 +2306,46 @@ const BookReaderPage: React.FC = () => {
                 setShowLoadingPopup(false);
             };
             
-            audio.onpause = () => {
-                // Only set playing false if intentionally paused (not just ended)
-                if (!audio.ended) {
-                    setPlaying(false);
-                    playingRef.current = false;
+            audio.onerror = (e) => {
+                console.error(`Audio error for segment ${segmentIdx + 1}:`, e);
+                // Try next segment
+                const nextSegmentIdx = segmentIdx + 1;
+                if (nextSegmentIdx < allSegments.length && playbackId === multiSegmentPlaybackIdRef.current) {
+                    playSegment(allSegments[nextSegmentIdx], nextSegmentIdx, allSegments, textBoxIndex, isAutoPlay, currentLang, playbackId);
                 }
             };
             
-            // Play this segment
+            // Wait for audio to be ready then play
+            const playAudio = () => {
+                if (playbackId !== multiSegmentPlaybackIdRef.current) return;
+                audio.play().catch(err => {
+                    console.warn('Segment play failed:', err);
+                });
+            };
+            
             if (audio.readyState >= 3) {
-                audio.play().catch(err => console.warn('Segment play failed:', err));
+                playAudio();
             } else {
-                audio.addEventListener('canplaythrough', () => {
-                    audio.play().catch(err => console.warn('Segment play failed:', err));
-                }, { once: true });
+                audio.addEventListener('canplaythrough', playAudio, { once: true });
                 audio.load();
             }
         } catch (error) {
             console.error(`Error playing segment ${segmentIdx + 1}:`, error);
-            isPlayingMultiSegmentRef.current = false;
-            setPlaying(false);
-            playingRef.current = false;
+            if (playbackId === multiSegmentPlaybackIdRef.current) {
+                isPlayingMultiSegmentRef.current = false;
+                setPlaying(false);
+                playingRef.current = false;
+            }
         }
     };
     
     const handlePlayText = async (text: string, index: number, e: React.MouseEvent, isAutoPlay: boolean = false) => {
         e.stopPropagation();
 
-        // If already playing this text, pause it
+        // If already playing this text, STOP it completely (tap to stop)
         if (playing && activeTextBoxIndex === index) {
-            // Pause multi-segment playback if active (but DON'T clear state - allow resume)
-            if (multiSegmentAudioRef.current) {
-                multiSegmentAudioRef.current.pause();
-                console.log('⏸️ Paused multi-segment audio');
-            }
-            currentAudio?.pause();
-            setPlaying(false);
-            playingRef.current = false;
-            setAutoPlayMode(false);
-            autoPlayModeRef.current = false;
-            return;
-        }
-        
-        // If paused on this text and we have multi-segment audio, resume it
-        if (!playing && activeTextBoxIndex === index && multiSegmentAudioRef.current && isPlayingMultiSegmentRef.current) {
-            console.log('▶️ Resuming multi-segment audio');
-            multiSegmentAudioRef.current.play().catch(err => console.warn('Resume failed:', err));
-            setPlaying(true);
-            playingRef.current = true;
-            if (isAutoPlay) {
-                setAutoPlayMode(true);
-                autoPlayModeRef.current = true;
-            }
-            return;
-        }
-
-        // If playing another text, stop it completely
-        if (playing && activeTextBoxIndex !== index) {
-            stopAudio();
-            // Fully stop multi-segment playback
+            console.log('⏹️ Stopping playback (same text tapped)');
+            // Stop multi-segment playback
             if (isPlayingMultiSegmentRef.current) {
                 stopMultiSegmentAudio();
                 isPlayingMultiSegmentRef.current = false;
@@ -2400,27 +2353,30 @@ const BookReaderPage: React.FC = () => {
                 setCurrentSegmentIndex(0);
                 currentSegmentIndexRef.current = 0;
             }
+            // Stop single-segment audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.src = '';
+                setCurrentAudio(null);
+            }
+            setPlaying(false);
+            playingRef.current = false;
+            setAutoPlayMode(false);
+            autoPlayModeRef.current = false;
+            setActiveTextBoxIndex(null);
+            setCurrentWordIndex(-1);
+            return;
         }
-        
-        // If switching to a new text box, clear any paused multi-segment state
-        if (activeTextBoxIndex !== index && isPlayingMultiSegmentRef.current) {
+
+        // If playing another text, stop it completely first
+        if (playing || isPlayingMultiSegmentRef.current) {
+            console.log('⏹️ Stopping previous playback');
+            stopAudio();
             stopMultiSegmentAudio();
             isPlayingMultiSegmentRef.current = false;
             setCurrentSegments([]);
             setCurrentSegmentIndex(0);
             currentSegmentIndexRef.current = 0;
-        }
-
-        // If we have audio for this text already loaded and paused (single segment), resume it
-        if (activeTextBoxIndex === index && currentAudio && !isPlayingMultiSegmentRef.current) {
-            currentAudio.play();
-            setPlaying(true);
-            playingRef.current = true;
-            if (isAutoPlay) {
-                setAutoPlayMode(true);
-                autoPlayModeRef.current = true;
-            }
-            return;
         }
 
         // Otherwise, generate/fetch new audio
@@ -2451,6 +2407,12 @@ const BookReaderPage: React.FC = () => {
             // If multiple segments, use multi-segment playback
             if (segments.length > 1) {
                 console.log(`🎭 Multi-segment TTS: ${segments.length} segments detected`);
+                
+                // Stop any existing playback first
+                stopMultiSegmentAudio();
+                
+                // Start new playback session with unique ID
+                const playbackId = multiSegmentPlaybackIdRef.current;
                 isPlayingMultiSegmentRef.current = true;
                 setCurrentSegments(segments);
                 setCurrentSegmentIndex(0);
@@ -2462,8 +2424,8 @@ const BookReaderPage: React.FC = () => {
                 }
                 
                 setLoadingAudio(false);
-                // Start playing first segment
-                playSegment(segments[0], 0, segments, index, isAutoPlay, currentLang);
+                // Start playing first segment with playbackId
+                playSegment(segments[0], 0, segments, index, isAutoPlay, currentLang, playbackId);
                 return;
             }
             // ============ END MULTI-SEGMENT ============
