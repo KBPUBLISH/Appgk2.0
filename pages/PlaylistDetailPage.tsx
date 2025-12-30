@@ -521,6 +521,15 @@ const PlaylistDetailPage: React.FC = () => {
                     >
                         <ChevronLeft size={24} className="text-white" />
                     </button>
+                    
+                    {/* Share Button - Top Right */}
+                    <button
+                        onClick={handleShare}
+                        className="w-10 h-10 bg-black/40 backdrop-blur-sm rounded-full border-2 border-white/30 flex items-center justify-center transform transition-transform active:scale-95 hover:bg-black/60"
+                        title="Share"
+                    >
+                        <Share2 size={20} className="text-white" />
+                    </button>
                 </div>
 
                 {/* Playlist Info */}
