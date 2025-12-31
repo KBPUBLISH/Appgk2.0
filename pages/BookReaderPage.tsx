@@ -193,6 +193,7 @@ const BookReaderPage: React.FC = () => {
     // Multi-character voice system
     const [defaultNarratorVoiceId, setDefaultNarratorVoiceId] = useState<string | null>(null);
     const [characterVoices, setCharacterVoices] = useState<Array<{ characterName: string; voiceId: string; color?: string }>>([]);
+    const [voiceSettingsLoaded, setVoiceSettingsLoaded] = useState(false); // Track when voice settings have been checked
     
     // Get the effective voice ID to use for TTS (for narrator - non-character text)
     // Priority: 1. Book's narrator voice, 2. User's selected voice
@@ -924,6 +925,10 @@ const BookReaderPage: React.FC = () => {
                         console.log('🎭 Book has character voices:', charVoices);
                         setCharacterVoices(charVoices);
                     }
+                    
+                    // Mark voice settings as loaded (even if book has no custom voices)
+                    setVoiceSettingsLoaded(true);
+                    console.log('✅ Voice settings loaded for book');
                     
                     // Increment view count in database (when book is OPENED)
                     try {
@@ -2160,6 +2165,7 @@ const BookReaderPage: React.FC = () => {
         // - Not on first page
         // - No voice selected
         // - No pages loaded
+        // - Voice settings not loaded yet (prevents wrong voice on first play)
         if (
             hasAutoPlayedOnStartRef.current ||
             loading ||
@@ -2167,8 +2173,13 @@ const BookReaderPage: React.FC = () => {
             showIntroVideo ||
             currentPageIndex !== 0 ||
             !effectiveVoiceId ||
-            pages.length === 0
+            pages.length === 0 ||
+            !voiceSettingsLoaded
         ) {
+            // Log why we're waiting
+            if (!voiceSettingsLoaded && !hasAutoPlayedOnStartRef.current && pages.length > 0) {
+                console.log('⏳ Auto-play: Waiting for book voice settings to load...');
+            }
             return;
         }
 
@@ -2211,7 +2222,7 @@ const BookReaderPage: React.FC = () => {
             handlePlayText(firstBoxText, 0, syntheticEvent, shouldAutoPlay);
         }, 1500); // 1.5s delay to let intro video fade out and page fully settle
         
-    }, [loading, introVideoChecked, showIntroVideo, currentPageIndex, effectiveVoiceId, pages, translatedContent.size]);
+    }, [loading, introVideoChecked, showIntroVideo, currentPageIndex, effectiveVoiceId, pages, translatedContent.size, voiceSettingsLoaded]);
 
     // Preload background images/videos for upcoming pages to prevent black flash
     const preloadBackgrounds = (startPageIndex: number) => {
