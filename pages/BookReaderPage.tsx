@@ -69,6 +69,7 @@ interface Page {
     scrollMidHeight?: number; // Mid scroll height % (default 30)
     scrollMaxHeight?: number; // Max scroll height % (default 60)
     scrollOffsetY?: number; // Vertical offset from bottom in percentage (default 0)
+    scrollWidth?: number; // Width as percentage (default 100 = full width)
     // Video sequence - multiple videos that play in order
     useVideoSequence?: boolean;
     videoSequence?: VideoSequenceItem[];
@@ -507,6 +508,7 @@ const BookReaderPage: React.FC = () => {
     const autoPlayModeRef = useRef(false);
     const currentPageIndexRef = useRef(0); // Track page index to avoid closure issues
     const isAutoPlayingRef = useRef(false); // Prevent multiple simultaneous auto-play calls
+    const userStoppedPlaybackRef = useRef(false); // Track when user explicitly stopped playback (prevents auto-resume)
     const alignmentWarningShownRef = useRef(false); // Prevent alignment warning spam
     const hasAutoPlayedOnStartRef = useRef(false); // Track if we've auto-played on book start
     
@@ -1543,7 +1545,9 @@ const BookReaderPage: React.FC = () => {
         if (!page) return null;
         
         // Extract scroll URL from all possible locations
-        const extractedScrollUrl = page.scrollUrl || page.files?.scroll?.url || '';
+        // Ensure empty strings are treated as no scroll
+        const rawScrollUrl = page.scrollUrl || page.files?.scroll?.url || '';
+        const extractedScrollUrl = rawScrollUrl.trim() || '';
         
         return {
             ...page,
@@ -1939,6 +1943,9 @@ const BookReaderPage: React.FC = () => {
 
     const stopAudio = () => {
         console.log('🛑 stopAudio called');
+        
+        // Mark that user explicitly stopped playback - prevents auto-resume from pending listeners
+        userStoppedPlaybackRef.current = true;
         
         // Stop single-track audio using ref (more reliable than state)
         if (currentAudioRef.current) {
@@ -2556,9 +2563,9 @@ const BookReaderPage: React.FC = () => {
             
             // When this segment ends, play the next one
             audio.onended = () => {
-                // Check if still valid
-                if (playbackId !== multiSegmentPlaybackIdRef.current || !isPlayingMultiSegmentRef.current) {
-                    console.log(`🛑 Playback ${playbackId} ended but cancelled`);
+                // Check if still valid or if user explicitly stopped playback
+                if (playbackId !== multiSegmentPlaybackIdRef.current || !isPlayingMultiSegmentRef.current || userStoppedPlaybackRef.current) {
+                    console.log(`🛑 Playback ${playbackId} ended but cancelled (userStopped: ${userStoppedPlaybackRef.current})`);
                     return;
                 }
                 
@@ -2692,7 +2699,11 @@ const BookReaderPage: React.FC = () => {
             
             // Wait for audio to be ready then play
             const playAudio = () => {
-                if (playbackId !== multiSegmentPlaybackIdRef.current) return;
+                // Check if playback was cancelled or user explicitly stopped
+                if (playbackId !== multiSegmentPlaybackIdRef.current || userStoppedPlaybackRef.current) {
+                    console.log('🛑 Segment playback cancelled (userStopped:', userStoppedPlaybackRef.current, ')');
+                    return;
+                }
                 audio.play().catch(err => {
                     console.warn('Segment play failed:', err);
                 });
@@ -2728,6 +2739,8 @@ const BookReaderPage: React.FC = () => {
         // If already playing this text, STOP it completely (tap to stop)
         if (playing && activeTextBoxIndex === index) {
             console.log('⏹️ Stopping playback (same text tapped)');
+            // Mark that user explicitly stopped - prevents auto-resume
+            userStoppedPlaybackRef.current = true;
             // Stop multi-segment playback
             if (isPlayingMultiSegmentRef.current) {
                 stopMultiSegmentAudio();
@@ -2779,6 +2792,9 @@ const BookReaderPage: React.FC = () => {
         }
 
         // Otherwise, generate/fetch new audio
+        // Reset user-stopped flag since we're starting fresh playback
+        userStoppedPlaybackRef.current = false;
+        
         setActiveTextBoxIndex(index);
         setLoadingAudio(true);
         setShowLoadingPopup(true); // Show dismissible loading popup
@@ -3332,9 +3348,9 @@ const BookReaderPage: React.FC = () => {
                 // This prevents the first playback from sounding garbled/cut off
                 let playbackCancelled = false;
                 const playWhenReady = () => {
-                    // Check if this playback was cancelled (user paused)
-                    if (playbackCancelled || currentAudioRef.current !== audio) {
-                        console.log('🛑 Playback cancelled, not starting audio');
+                    // Check if this playback was cancelled (user paused or stopped)
+                    if (playbackCancelled || userStoppedPlaybackRef.current || currentAudioRef.current !== audio) {
+                        console.log('🛑 Playback cancelled, not starting audio (userStopped:', userStoppedPlaybackRef.current, ')');
                         return;
                     }
                     audio.play().catch(err => {
@@ -3361,7 +3377,7 @@ const BookReaderPage: React.FC = () => {
                     audio.addEventListener('canplaythrough', playWhenReady, { once: true });
                     // Fallback: if canplaythrough doesn't fire within 3s, try playing anyway
                     setTimeout(() => {
-                        if (playbackCancelled) return; // Don't play if cancelled
+                        if (playbackCancelled || userStoppedPlaybackRef.current) return; // Don't play if cancelled or user stopped
                         if (audio.readyState < 3 && !audio.paused) return; // Already playing
                         if (audio.paused && audio.currentTime === 0) {
                             console.log('🎵 Fallback: playing after timeout');
@@ -4358,9 +4374,9 @@ const BookReaderPage: React.FC = () => {
             <div
                 className={`absolute left-4 z-40 transition-all duration-500 flex items-center gap-3`}
                 style={{
-                    // If no scroll URL, always fix to bottom
+                    // If no scroll URL (or empty string), always fix to bottom
                     // Otherwise position based on scroll state: hidden = bottom, mid = above mid scroll, max = above max scroll
-                    bottom: !currentPage?.scrollUrl 
+                    bottom: (!currentPage?.scrollUrl || currentPage.scrollUrl.trim() === '') 
                         ? '1rem' // No scroll on page - fix to bottom
                         : scrollState === 'hidden' 
                             ? '1rem' 

@@ -41,6 +41,7 @@ interface PageData {
     scrollMidHeight?: number; // Mid scroll height % (default 30)
     scrollMaxHeight?: number; // Max scroll height % (default 60)
     scrollOffsetY?: number; // Vertical offset from bottom in percentage (default 0)
+    scrollWidth?: number; // Width as percentage (default 100 = full width)
     soundEffectUrl?: string;
     // Background audio - extracted video audio or ambient sound that loops with the page
     // Plays as separate <audio> element so it can layer with TTS (unlike video audio on iOS)
@@ -673,7 +674,7 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                     <img
                         src={page.backgroundUrl}
                         alt={`Page ${page.pageNumber}`}
-                        className="w-full h-full object-contain"
+                        className="w-full h-full object-cover"
                         loading="eager"
                         style={{
                             // Lock image in place
@@ -693,15 +694,18 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
             {/* Scroll Image Layer - Three states: hidden, mid, max */}
             {page.scrollUrl && (
                 <div
-                    className={`absolute left-0 right-0 transition-all duration-500 ease-in-out ${
-                        scrollState === 'hidden' ? 'translate-y-full' : 'translate-y-0'
-                    }`}
+                    className="absolute left-1/2 transition-all duration-500 ease-in-out"
                     style={{ 
                         zIndex: 15, // Between z-10 (gradient) and z-20 (text boxes)
                         // Use scrollMidHeight/scrollMaxHeight if set, otherwise fallback to defaults
                         height: scrollState === 'max' 
                             ? `${page.scrollMaxHeight || 60}%` 
                             : `${page.scrollMidHeight || 30}%`,
+                        width: `${page.scrollWidth || 100}%`,
+                        // Center horizontally with translateX, hide scroll with translateY when hidden
+                        transform: scrollState === 'hidden' 
+                            ? 'translateX(-50%) translateY(100%)' 
+                            : 'translateX(-50%)',
                         bottom: `${page.scrollOffsetY || 0}%` // Apply vertical offset
                     }}
                 >
