@@ -4353,16 +4353,20 @@ const BookReaderPage: React.FC = () => {
 
             {/* Wood Play Button with Auto-Play Toggle - Positioned above the scroll based on scroll state */}
             {/* Hidden for Web View pages */}
+            {/* Fixed to bottom when no scroll is present on the page */}
             {!currentPage?.isWebViewPage && (
             <div
                 className={`absolute left-4 z-40 transition-all duration-500 flex items-center gap-3`}
                 style={{
-                    // Position based on scroll state: hidden = bottom, mid = above mid scroll, max = above max scroll
-                    bottom: scrollState === 'hidden' 
-                        ? '1rem' 
-                        : scrollState === 'max'
-                            ? `calc(${currentPage.scrollMaxHeight || 60}% + ${currentPage.scrollOffsetY || 0}% + 1.5rem)` // Above max scroll + offset
-                            : `calc(${currentPage.scrollMidHeight || 30}% + ${currentPage.scrollOffsetY || 0}% + 1.5rem)` // Above mid scroll + offset
+                    // If no scroll URL, always fix to bottom
+                    // Otherwise position based on scroll state: hidden = bottom, mid = above mid scroll, max = above max scroll
+                    bottom: !currentPage?.scrollUrl 
+                        ? '1rem' // No scroll on page - fix to bottom
+                        : scrollState === 'hidden' 
+                            ? '1rem' 
+                            : scrollState === 'max'
+                                ? `calc(${currentPage.scrollMaxHeight || 60}% + ${currentPage.scrollOffsetY || 0}% + 1.5rem)` // Above max scroll + offset
+                                : `calc(${currentPage.scrollMidHeight || 30}% + ${currentPage.scrollOffsetY || 0}% + 1.5rem)` // Above mid scroll + offset
                 }}
             >
                 {/* Main Play Button */}
