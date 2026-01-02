@@ -801,7 +801,11 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                                 fontFamily: box.fontFamily === 'Comic Sans MS' 
                                     ? "'Patrick Hand', 'Comic Sans MS', 'Bubblegum Sans', cursive" 
                                     : (box.fontFamily || "'Patrick Hand', 'Comic Sans MS', cursive"),
-                                fontSize: `${box.fontSize || 24}px`,
+                                // Scale font size to match portal preview appearance
+                                // Portal canvas is 800px but displayed in a smaller preview area (~50% zoom)
+                                // So fonts appear ~2x larger relative to canvas in portal
+                                // Multiply by 1.6 to approximate the visual size from portal
+                                fontSize: `${Math.round((box.fontSize || 24) * 1.6)}px`,
                                 maxHeight: textMaxHeightStyle,
                                 overflowY: 'auto',
                                 textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
