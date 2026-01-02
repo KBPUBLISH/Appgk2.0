@@ -927,8 +927,11 @@ const BookReaderPage: React.FC = () => {
                     }
                     
                     // Mark voice settings as loaded (even if book has no custom voices)
+                    // Also clear any preloaded audio that may have used wrong voice
+                    audioPreloadCacheRef.current.clear();
+                    preloadingInProgressRef.current.clear();
                     setVoiceSettingsLoaded(true);
-                    console.log('✅ Voice settings loaded for book');
+                    console.log('✅ Voice settings loaded for book (cleared audio preload cache)');
                     
                     // Increment view count in database (when book is OPENED)
                     try {
@@ -1952,10 +1955,34 @@ const BookReaderPage: React.FC = () => {
     };
 
     const stopAudio = () => {
-        // Stop single-track audio
+        console.log('🛑 stopAudio called');
+        
+        // Stop single-track audio using ref (more reliable than state)
+        if (currentAudioRef.current) {
+            try {
+                const audio = currentAudioRef.current;
+                // Clear all event handlers to prevent callbacks
+                audio.onended = null;
+                audio.ontimeupdate = null;
+                audio.onplay = null;
+                audio.onpause = null;
+                audio.onerror = null;
+                audio.pause();
+                audio.currentTime = 0;
+                audio.src = ''; // Clear source to prevent continued loading
+                currentAudioRef.current = null;
+            } catch (e) {
+                console.warn('Error stopping single-track audio:', e);
+            }
+        }
+        // Also stop state-based currentAudio (backup)
         if (currentAudio) {
-            currentAudio.pause();
-            currentAudio.currentTime = 0;
+            try {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+            } catch (e) {
+                console.warn('Error stopping currentAudio state:', e);
+            }
         }
         
         // Stop multi-segment TTS audio
@@ -1980,8 +2007,11 @@ const BookReaderPage: React.FC = () => {
         multiSegmentPlaybackIdRef.current += 1; // Invalidate any in-flight segments
         
         setPlaying(false);
+        playingRef.current = false;
         setActiveTextBoxIndex(null);
         setCurrentWordIndex(-1); // Clear any word highlighting
+        setWordAlignment(null); // Clear word alignment data
+        wordAlignmentRef.current = null;
         setAutoPlayMode(false);
         autoPlayModeRef.current = false;
         isAutoPlayingRef.current = false; // Reset auto-play flag
@@ -2143,6 +2173,13 @@ const BookReaderPage: React.FC = () => {
             prevLanguageRef.current = currentLang;
         }
         
+        // IMPORTANT: Don't preload until voice settings are loaded
+        // This prevents preloading with wrong voice before book's custom voice is applied
+        if (!voiceSettingsLoaded) {
+            console.log('⏳ Waiting for voice settings before preloading audio...');
+            return;
+        }
+        
         if (pages.length > 0 && effectiveVoiceId) {
             // For non-English, only preload when translations are ready
             if (currentLang !== 'en' && translatedContent.size === 0) {
@@ -2153,7 +2190,7 @@ const BookReaderPage: React.FC = () => {
             console.log(`🎵 Starting audio preload for ${currentLang}, page ${currentPageIndex + 1}`);
             preloadUpcomingAudio(currentPageIndex);
         }
-    }, [currentPageIndex, effectiveVoiceId, pages.length, selectedLanguage, translatedContent.size]);
+    }, [currentPageIndex, effectiveVoiceId, pages.length, selectedLanguage, translatedContent.size, voiceSettingsLoaded]);
 
     // Auto-play TTS when book first loads (after intro video if any)
     useEffect(() => {
@@ -3310,10 +3347,25 @@ const BookReaderPage: React.FC = () => {
                 
                 // Wait for audio to be ready before playing
                 // This prevents the first playback from sounding garbled/cut off
+                let playbackCancelled = false;
                 const playWhenReady = () => {
+                    // Check if this playback was cancelled (user paused)
+                    if (playbackCancelled || currentAudioRef.current !== audio) {
+                        console.log('🛑 Playback cancelled, not starting audio');
+                        return;
+                    }
                     audio.play().catch(err => {
                         console.warn('Audio play failed:', err);
                     });
+                };
+                
+                // Store reference to audio for cancellation check
+                currentAudioRef.current = audio;
+                
+                // Cancel playback when pause is called
+                audio.onpause = () => {
+                    playbackCancelled = true;
+                    setPlaying(false);
                 };
                 
                 // If audio is already ready (cached), play immediately
@@ -3326,6 +3378,7 @@ const BookReaderPage: React.FC = () => {
                     audio.addEventListener('canplaythrough', playWhenReady, { once: true });
                     // Fallback: if canplaythrough doesn't fire within 3s, try playing anyway
                     setTimeout(() => {
+                        if (playbackCancelled) return; // Don't play if cancelled
                         if (audio.readyState < 3 && !audio.paused) return; // Already playing
                         if (audio.paused && audio.currentTime === 0) {
                             console.log('🎵 Fallback: playing after timeout');
