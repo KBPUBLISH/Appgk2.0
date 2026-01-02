@@ -3956,9 +3956,9 @@ const BookReaderPage: React.FC = () => {
                 )}
             </div>
 
-            {/* Main Reading Area */}
+            {/* Main Reading Area - Use absolute positioning for guaranteed full screen */}
             <div
-                className="flex-1 w-full h-full relative overflow-hidden bg-gray-900"
+                className="absolute inset-0 w-full h-full overflow-hidden bg-gray-900"
                 style={{
                     // Lock background in place - prevent overscroll/bounce
                     overscrollBehavior: 'none',
