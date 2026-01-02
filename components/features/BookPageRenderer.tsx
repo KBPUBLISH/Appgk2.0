@@ -41,6 +41,7 @@ interface PageData {
     scrollMidHeight?: number; // Mid scroll height % (default 30)
     scrollMaxHeight?: number; // Max scroll height % (default 60)
     scrollOffsetY?: number; // Vertical offset from bottom in percentage (default 0)
+    scrollOffsetX?: number; // Horizontal offset from center in percentage (default 0)
     scrollWidth?: number; // Width as percentage (default 100 = full width)
     soundEffectUrl?: string;
     // Background audio - extracted video audio or ambient sound that loops with the page
@@ -694,7 +695,7 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
             {/* Scroll Image Layer - Three states: hidden, mid, max */}
             {page.scrollUrl && (
                 <div
-                    className="absolute left-1/2 transition-all duration-500 ease-in-out"
+                    className="absolute transition-all duration-500 ease-in-out"
                     style={{ 
                         zIndex: 15, // Between z-10 (gradient) and z-20 (text boxes)
                         // Use scrollMidHeight/scrollMaxHeight if set, otherwise fallback to defaults
@@ -702,6 +703,8 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                             ? `${page.scrollMaxHeight || 60}%` 
                             : `${page.scrollMidHeight || 30}%`,
                         width: `${page.scrollWidth || 100}%`,
+                        // Position horizontally: center + offset
+                        left: `calc(50% + ${page.scrollOffsetX || 0}%)`,
                         // Center horizontally with translateX, hide scroll with translateY when hidden
                         transform: scrollState === 'hidden' 
                             ? 'translateX(-50%) translateY(100%)' 

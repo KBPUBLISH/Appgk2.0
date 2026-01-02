@@ -69,6 +69,7 @@ interface Page {
     scrollMidHeight?: number; // Mid scroll height % (default 30)
     scrollMaxHeight?: number; // Max scroll height % (default 60)
     scrollOffsetY?: number; // Vertical offset from bottom in percentage (default 0)
+    scrollOffsetX?: number; // Horizontal offset from center in percentage (default 0)
     scrollWidth?: number; // Width as percentage (default 100 = full width)
     // Video sequence - multiple videos that play in order
     useVideoSequence?: boolean;
