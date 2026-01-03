@@ -725,36 +725,39 @@ const BookReaderPage: React.FC = () => {
         }
     }, []);
     
-    // Resume AudioContext AND unlock iOS audio session on first user interaction
-    // iOS requires playing HTML5 audio to "unlock" the audio session for Web Audio API
+    // Unlock iOS audio session AND resume AudioContext on first user interaction
+    // iOS requires playing HTML5 audio to fully unlock the audio session for Web Audio API
+    const audioUnlockedRef = useRef(false);
+    
     useEffect(() => {
-        const unlockAudioSession = () => {
-            // Step 1: Resume AudioContext
-            if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-                audioContextRef.current.resume().then(() => {
-                    console.log('🔊 AudioContext resumed after user interaction');
-                }).catch(() => {});
-            }
+        const unlockAudioSession = async () => {
+            if (audioUnlockedRef.current) return;
             
-            // Step 2: Play a brief silent HTML5 audio to unlock iOS audio session
-            // This allows Web Audio API sounds to play even when ringer is off
             try {
-                const silentAudio = new Audio();
-                // Create a tiny silent audio data URL (smallest valid MP3)
+                // Step 1: Resume AudioContext
+                if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+                    await audioContextRef.current.resume();
+                    console.log('🔊 AudioContext resumed');
+                }
+                
+                // Step 2: Play a brief silent HTML5 audio to unlock iOS audio session
+                // This is what allows Web Audio API to work on iOS
+                const silentAudio = document.createElement('audio');
+                silentAudio.setAttribute('playsinline', 'true');
+                silentAudio.setAttribute('webkit-playsinline', 'true');
+                // Tiny silent MP3
                 silentAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAgAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAbD/////////////////////////////////////////////////////////////////';
-                silentAudio.volume = 0.01; // Very low but not zero
-                silentAudio.play().then(() => {
-                    console.log('🔊 iOS audio session unlocked via HTML5 Audio');
-                    // Stop immediately after playing
-                    setTimeout(() => {
-                        silentAudio.pause();
-                        silentAudio.src = '';
-                    }, 100);
-                }).catch((err) => {
-                    console.log('🔊 Audio unlock skipped (expected on non-iOS):', err.name);
-                });
+                
+                await silentAudio.play();
+                silentAudio.pause();
+                silentAudio.remove();
+                
+                audioUnlockedRef.current = true;
+                console.log('🔊 iOS audio session unlocked via HTML5 Audio');
             } catch (e) {
-                console.log('🔊 Audio unlock not available:', e);
+                console.log('🔊 Audio unlock attempt:', e);
+                // Still mark as attempted so we don't spam
+                audioUnlockedRef.current = true;
             }
         };
         

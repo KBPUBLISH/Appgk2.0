@@ -819,42 +819,11 @@ const App: React.FC = () => {
     };
   }, [isDespia]);
 
-  // iOS Audio Session Unlock - Plays silent HTML5 audio on first touch to unlock audio session
-  // This allows Web Audio API (page turn sounds, game TTS) to play even when ringer is off
-  useEffect(() => {
-    const unlockAudioSession = () => {
-      try {
-        // Create and play a brief silent audio to unlock iOS audio session
-        const silentAudio = new Audio();
-        silentAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAgAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAbD/////////////////////////////////////////////////////////////////';
-        silentAudio.volume = 0.01;
-        silentAudio.play().then(() => {
-          console.log('🔊 iOS audio session unlocked globally');
-          setTimeout(() => {
-            silentAudio.pause();
-            silentAudio.src = '';
-          }, 100);
-        }).catch(() => {
-          // Expected on non-iOS or before user interaction
-        });
-        
-        // Also try to resume any suspended AudioContext
-        if ((window as any).AudioContext || (window as any).webkitAudioContext) {
-          const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-          const tempCtx = new Ctx();
-          if (tempCtx.state === 'suspended') {
-            tempCtx.resume().catch(() => {});
-          }
-          // Don't close - let it stay open to keep session unlocked
-        }
-      } catch (e) {
-        // Audio unlock not available
-      }
-    };
-    
-    document.addEventListener('touchstart', unlockAudioSession, { once: true });
-    document.addEventListener('click', unlockAudioSession, { once: true });
-  }, [isDespia]);
+  // iOS Audio Session Unlock - REMOVED
+  // After investigation, iOS silent mode cannot be overridden from web code.
+  // Audio playing when ringer is off requires native iOS configuration:
+  // AVAudioSession.sharedInstance().setCategory(.playback)
+  // This must be configured in the Despia native iOS project settings.
 
   return (
     <ErrorBoundary>

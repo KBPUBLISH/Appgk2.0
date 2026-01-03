@@ -12,11 +12,43 @@ interface GameWebViewProps {
 const GameWebView: React.FC<GameWebViewProps> = ({ url, title, onClose }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const { currentPlaylist } = useAudio();
   
   // Check if MiniPlayer is visible (playlist is playing)
   const hasMiniPlayer = !!currentPlaylist;
+
+  // Unlock audio session before game loads - helps iframe inherit unlocked state
+  useEffect(() => {
+    const unlockAudio = async () => {
+      try {
+        // Create and resume an AudioContext to unlock iOS audio
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          await ctx.resume();
+          
+          // Play a brief silent tone to fully unlock
+          const oscillator = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          gainNode.gain.value = 0.001; // Nearly silent
+          oscillator.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          oscillator.start();
+          oscillator.stop(ctx.currentTime + 0.1);
+          
+          console.log('🎮 Game audio context unlocked');
+        }
+        setAudioUnlocked(true);
+      } catch (e) {
+        console.log('🎮 Audio unlock not needed:', e);
+        setAudioUnlocked(true);
+      }
+    };
+    
+    unlockAudio();
+  }, []);
 
   useEffect(() => {
     // Reset loading state when URL changes
@@ -99,17 +131,19 @@ const GameWebView: React.FC<GameWebViewProps> = ({ url, title, onClose }) => {
         </div>
       )}
 
-      {/* WebView iframe */}
-      <iframe
-        ref={iframeRef}
-        src={url}
-        className="flex-1 w-full border-0"
-        onLoad={handleLoad}
-        onError={handleError}
-        allow="fullscreen; autoplay; encrypted-media; picture-in-picture; speaker; microphone"
-        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-top-navigation allow-presentation"
-        title={title}
-      />
+      {/* WebView iframe - only load after audio is unlocked */}
+      {audioUnlocked && (
+        <iframe
+          ref={iframeRef}
+          src={url}
+          className="flex-1 w-full border-0"
+          onLoad={handleLoad}
+          onError={handleError}
+          allow="fullscreen; autoplay; encrypted-media; picture-in-picture; speaker; microphone; web-share"
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-top-navigation allow-presentation"
+          title={title}
+        />
+      )}
     </div>
   );
 };
