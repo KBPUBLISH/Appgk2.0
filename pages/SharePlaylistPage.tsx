@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Play, Pause, Music, Clock, Download, Sparkles, ChevronRight, Volume2 } from 'lucide-react';
 import { getApiBaseUrl } from '../services/apiService';
@@ -23,8 +23,24 @@ interface Playlist {
 }
 
 const SharePlaylistPage: React.FC = () => {
-    const { playlistId } = useParams<{ playlistId: string }>();
+    const { playlistId: rawPlaylistId } = useParams<{ playlistId: string }>();
     const navigate = useNavigate();
+    
+    // Clean the playlist ID - remove any URL-encoded text that might be appended
+    // Some platforms append share text to the URL (e.g., "id%20some%20text")
+    const playlistId = useMemo(() => {
+        if (!rawPlaylistId) return '';
+        // Take only the first part before any space or special characters
+        // MongoDB IDs are 24 hex characters
+        const cleaned = decodeURIComponent(rawPlaylistId).split(/[\s%]/)[0];
+        // Validate it looks like a MongoDB ObjectId (24 hex chars)
+        if (/^[a-f0-9]{24}$/i.test(cleaned)) {
+            return cleaned;
+        }
+        // If not valid, try to extract first 24 hex chars
+        const match = rawPlaylistId.match(/^[a-f0-9]{24}/i);
+        return match ? match[0] : rawPlaylistId.split('%')[0];
+    }, [rawPlaylistId]);
     const [playlist, setPlaylist] = useState<Playlist | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);

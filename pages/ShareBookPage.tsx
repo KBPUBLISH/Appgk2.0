@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { BookOpen, Clock, Star, Download, Sparkles, ChevronRight, User, Calendar } from 'lucide-react';
+import { BookOpen, Clock, Star, Download, Sparkles, ChevronRight, User } from 'lucide-react';
 import { getApiBaseUrl } from '../services/apiService';
 
 interface Book {
@@ -18,8 +18,24 @@ interface Book {
 }
 
 const ShareBookPage: React.FC = () => {
-    const { bookId } = useParams<{ bookId: string }>();
+    const { bookId: rawBookId } = useParams<{ bookId: string }>();
     const navigate = useNavigate();
+    
+    // Clean the book ID - remove any URL-encoded text that might be appended
+    // Some platforms append share text to the URL (e.g., "id%20some%20text")
+    const bookId = useMemo(() => {
+        if (!rawBookId) return '';
+        // Take only the first part before any space or special characters
+        // MongoDB IDs are 24 hex characters
+        const cleaned = decodeURIComponent(rawBookId).split(/[\s%]/)[0];
+        // Validate it looks like a MongoDB ObjectId (24 hex chars)
+        if (/^[a-f0-9]{24}$/i.test(cleaned)) {
+            return cleaned;
+        }
+        // If not valid, try to extract first 24 hex chars
+        const match = rawBookId.match(/^[a-f0-9]{24}/i);
+        return match ? match[0] : rawBookId.split('%')[0];
+    }, [rawBookId]);
     const [book, setBook] = useState<Book | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
