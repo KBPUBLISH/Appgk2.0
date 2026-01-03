@@ -260,11 +260,21 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                     const highlightedSpan = textBoxRef.querySelector(`[data-word-index="${highlightedWordIndex}"]`) as HTMLElement;
                     
                     if (highlightedSpan) {
-                        // Scroll the highlighted word into view with some padding
-                        highlightedSpan.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'center',
-                            inline: 'nearest'
+                        // Calculate scroll position within the container (not the whole page)
+                        const containerRect = textBoxRef.getBoundingClientRect();
+                        const spanRect = highlightedSpan.getBoundingClientRect();
+                        
+                        // Calculate where the span is relative to the container's visible area
+                        const spanTopRelative = spanRect.top - containerRect.top + textBoxRef.scrollTop;
+                        const containerVisibleHeight = containerRect.height;
+                        
+                        // Calculate target scroll position to center the word
+                        const targetScrollTop = spanTopRelative - (containerVisibleHeight / 2) + (spanRect.height / 2);
+                        
+                        // Smooth scroll within the text container only
+                        textBoxRef.scrollTo({
+                            top: Math.max(0, targetScrollTop),
+                            behavior: 'smooth'
                         });
                     }
                 }, 50); // Small delay to ensure DOM update
@@ -738,8 +748,16 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
 
             {/* Text Boxes Layer - Below swipe zone */}
             {/* Text boxes layer - z-50 to appear above play button (z-40) */}
+            {/* When scroll exists, clip text to scroll bounds to prevent overflow */}
             <div
                 className="absolute inset-0 pointer-events-none z-50"
+                style={page.scrollUrl ? {
+                    // Clip to the scroll area - text should not appear above it
+                    clipPath: scrollState === 'hidden' 
+                        ? 'inset(100% 0 0 0)' // Hide all when scroll is hidden
+                        : `inset(${100 - (scrollState === 'max' ? (page.scrollMaxHeight || 60) : (page.scrollMidHeight || 30)) - (page.scrollOffsetY || 0)}% 0 0 0)`,
+                    transition: 'clip-path 0.5s ease-in-out',
+                } : {}}
             >
                 {page.textBoxes?.map((box, idx) => {
                     // Validate box has required position properties
@@ -761,21 +779,20 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                     const isActive = activeTextBoxIndex === idx;
                     const shouldHideTextBoxes = page.scrollUrl && scrollState === 'hidden';
                     
-                    // Calculate text position - MATCH portal exactly
-                    // Portal formula: max(box.y%, calc(100% - scrollHeight% - scrollOffsetY% + 12px))
+                    // Calculate text position
                     let textTopStyle: string;
                     let textMaxHeightStyle: string;
                     
                     if (page.scrollUrl) {
-                        // Calculate where the scroll starts (from top)
-                        // Add 5% buffer to ensure text is well inside the scroll area
-                        const scrollStartPercent = 100 - currentScrollHeightNum - scrollOffset + 5;
-                        // Text must start at or below the scroll top (never above it)
+                        // Position text inside scroll area with small buffer from top
+                        const scrollStartPercent = 100 - currentScrollHeightNum - scrollOffset + 3;
+                        // Text starts at scroll top + buffer, or boxY if it's lower
                         const effectiveTop = Math.max(boxY, scrollStartPercent);
                         textTopStyle = `${effectiveTop}%`;
-                        textMaxHeightStyle = `calc(100% - ${effectiveTop}% - 40px)`;
+                        // Max height leaves room at bottom for UI
+                        textMaxHeightStyle = `calc(100% - ${effectiveTop}% - 30px)`;
                     } else {
-                        // No scroll - match portal exactly
+                        // No scroll - use boxY position directly
                         textTopStyle = `${boxY}%`;
                         textMaxHeightStyle = `calc(100% - ${boxY}% - 40px)`;
                     }
