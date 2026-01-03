@@ -3563,18 +3563,11 @@ const BookReaderPage: React.FC = () => {
                     src={introVideoUrl}
                     className="w-full h-full object-contain"
                     autoPlay
-                    muted // Required for autoplay on iOS/mobile
                     playsInline
-                    webkit-playsinline="true"
                     onEnded={() => setShowIntroVideo(false)}
                     onError={(e) => {
                         console.warn('Intro video failed to load, skipping:', e);
                         setShowIntroVideo(false);
-                    }}
-                    onCanPlay={(e) => {
-                        // Try to play with sound after user interaction policy is satisfied
-                        const video = e.currentTarget;
-                        video.play().catch(err => console.warn('Video play error:', err));
                     }}
                 />
                 {/* Skip button */}
