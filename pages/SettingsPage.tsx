@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Volume2, Bell, Shield, FileText, LogOut, Crown, HelpCircle, Mic, Trash2, RefreshCw, CheckCircle, AlertCircle, Globe, Check, ChevronRight } from 'lucide-react';
+import { ChevronLeft, Volume2, Bell, Shield, FileText, LogOut, Crown, HelpCircle, Mic, Trash2, RefreshCw, CheckCircle, AlertCircle, Globe, Check, ChevronRight, UserPlus, LogIn } from 'lucide-react';
 import WoodButton from '../components/ui/WoodButton';
 import { useUser } from '../context/UserContext';
 import { useAudio } from '../context/AudioContext';
@@ -472,7 +472,31 @@ const SettingsPage: React.FC = () => {
                             <p className="text-[#8B4513] text-base font-bold truncate">{userEmail}</p>
                         </div>
                     </section>
-                ) : null;
+                ) : (
+                    /* Sign In / Sign Up Section - Show when NOT signed in */
+                    <section className="bg-[#fff8e1] rounded-2xl p-5 border-2 border-[#eecaa0] shadow-sm">
+                        <h3 className="font-display font-bold text-[#8B4513] text-lg mb-3 uppercase tracking-wide opacity-80">Account</h3>
+                        <p className="text-[#5c2e0b] text-sm mb-4 opacity-70">
+                            Sign in to sync your progress across devices, restore purchases, and more!
+                        </p>
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => navigate('/signin')}
+                                className="w-full flex items-center justify-center gap-2 bg-[#8B4513] hover:bg-[#A0522D] text-[#f3e5ab] font-bold py-3 px-4 rounded-xl border-2 border-[#5c2e0b] shadow-md transition-all active:scale-95"
+                            >
+                                <LogIn size={20} />
+                                <span>SIGN IN</span>
+                            </button>
+                            <button
+                                onClick={() => navigate('/onboarding')}
+                                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-[#5c2e0b] font-bold py-3 px-4 rounded-xl border-2 border-[#B8860B] shadow-md transition-all active:scale-95"
+                            >
+                                <UserPlus size={20} />
+                                <span>CREATE ACCOUNT</span>
+                            </button>
+                        </div>
+                    </section>
+                );
             })()}
 
             {/* Subscription */}
@@ -607,46 +631,48 @@ const SettingsPage: React.FC = () => {
                 </button>
             </section>
 
-            {/* Logout */}
-            <button 
-                onClick={() => {
-                    console.log('🚪 LOGOUT: Starting clean logout...');
-                    
-                    // STEP 1: Sign out from auth service FIRST (clears tokens)
-                    authService.signOut();
-                    
-                    // STEP 2: Clear ALL localStorage - be aggressive
-                    try {
-                      localStorage.clear(); // Nuclear option - clear everything
-                    } catch (e) {
-                      // Fallback: manual clear
-                      const allKeys = Object.keys(localStorage);
-                      allKeys.forEach(k => localStorage.removeItem(k));
-                    }
-                    
-                    // STEP 3: Clear sessionStorage
-                    try {
-                      sessionStorage.clear();
-                    } catch (e) {
-                      console.log('sessionStorage clear failed');
-                    }
-                    
-                    // STEP 4: DON'T call resetUser() - it sets default values that cause ghost state
-                    // The page reload will handle fresh state
-                    
-                    // STEP 5: Force hard navigation with cache bust
-                    // Use replace to prevent back button from returning here
-                    const logoutUrl = window.location.origin + window.location.pathname + '?logout=' + Date.now();
-                    console.log('🚪 LOGOUT: Redirecting to:', logoutUrl);
-                    
-                    // Force immediate redirect
-                    window.location.replace(logoutUrl);
-                }}
-                className="w-full bg-[#ffcdd2] hover:bg-[#ef9a9a] text-[#c62828] font-bold py-4 rounded-xl border-b-4 border-[#e57373] active:border-b-0 active:translate-y-1 shadow-sm flex items-center justify-center gap-2 transition-all"
-            >
-                <LogOut size={20} />
-                <span>LOG OUT</span>
-            </button>
+            {/* Logout - Only show when signed in */}
+            {(authService.getUser()?.email || localStorage.getItem('godlykids_user_email')) && (
+                <button 
+                    onClick={() => {
+                        console.log('🚪 LOGOUT: Starting clean logout...');
+                        
+                        // STEP 1: Sign out from auth service FIRST (clears tokens)
+                        authService.signOut();
+                        
+                        // STEP 2: Clear ALL localStorage - be aggressive
+                        try {
+                          localStorage.clear(); // Nuclear option - clear everything
+                        } catch (e) {
+                          // Fallback: manual clear
+                          const allKeys = Object.keys(localStorage);
+                          allKeys.forEach(k => localStorage.removeItem(k));
+                        }
+                        
+                        // STEP 3: Clear sessionStorage
+                        try {
+                          sessionStorage.clear();
+                        } catch (e) {
+                          console.log('sessionStorage clear failed');
+                        }
+                        
+                        // STEP 4: DON'T call resetUser() - it sets default values that cause ghost state
+                        // The page reload will handle fresh state
+                        
+                        // STEP 5: Force hard navigation with cache bust
+                        // Use replace to prevent back button from returning here
+                        const logoutUrl = window.location.origin + window.location.pathname + '?logout=' + Date.now();
+                        console.log('🚪 LOGOUT: Redirecting to:', logoutUrl);
+                        
+                        // Force immediate redirect
+                        window.location.replace(logoutUrl);
+                    }}
+                    className="w-full bg-[#ffcdd2] hover:bg-[#ef9a9a] text-[#c62828] font-bold py-4 rounded-xl border-b-4 border-[#e57373] active:border-b-0 active:translate-y-1 shadow-sm flex items-center justify-center gap-2 transition-all"
+                >
+                    <LogOut size={20} />
+                    <span>LOG OUT</span>
+                </button>
+            )}
             
             <div className="text-center text-[#8B4513]/40 text-[10px] font-bold font-mono pt-4 pb-8">
                 Version 1.0.3 (Build 52) • ID: 8F29A
