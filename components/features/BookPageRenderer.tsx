@@ -805,8 +805,10 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                                     : `${box.fontSize || 24}px`,
                                 maxHeight: textMaxHeightStyle,
                                 overflowY: 'auto',
-                                // White glow/shadow behind text for readability over images
-                                textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 16px rgba(255,255,255,0.7), 1px 1px 4px rgba(255,255,255,0.8)',
+                                // Text shadow/glow for readability - color controlled by shadowColor setting
+                                textShadow: box.shadowColor === 'black'
+                                    ? '0 0 8px rgba(0,0,0,0.9), 0 0 16px rgba(0,0,0,0.7), 1px 1px 4px rgba(0,0,0,0.8)'
+                                    : '0 0 8px rgba(255,255,255,0.9), 0 0 16px rgba(255,255,255,0.7), 1px 1px 4px rgba(255,255,255,0.8)',
                                 scrollBehavior: 'smooth',
                                 // Only use opacity for smooth hide/show - no translateY to avoid layout jump
                                 opacity: shouldHideTextBoxes ? 0 : 1,
