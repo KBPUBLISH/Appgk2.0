@@ -576,7 +576,7 @@ const PanoramaBackground: React.FC = () => {
   }, [location.pathname]);
 
   return (
-    <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-[#0f172a]">
+    <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-[#1a3a52]">
       {/* 
         The "World" Container - 600vw wide.
         Translates horizontally based on current page.

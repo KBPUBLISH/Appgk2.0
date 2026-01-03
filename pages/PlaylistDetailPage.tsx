@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Crown, Play, Pause, Music, Headphones, Heart, Bookmark, Hammer, Wrench, Lock, Check, Share2 } from 'lucide-react';
 import { getApiBaseUrl } from '../services/apiService';
@@ -156,8 +156,23 @@ interface Playlist {
 }
 
 const PlaylistDetailPage: React.FC = () => {
-    const { playlistId } = useParams();
+    const { playlistId: rawPlaylistId } = useParams();
     const navigate = useNavigate();
+    
+    // Clean the playlist ID - when shared, extra text might be appended after the ID
+    // MongoDB ObjectIds are 24 hex characters
+    const playlistId = useMemo(() => {
+        if (!rawPlaylistId) return '';
+        // Decode URL and take only the first part before any space or special characters
+        const cleaned = decodeURIComponent(rawPlaylistId).split(/[\s%]/)[0];
+        // Validate it looks like a MongoDB ObjectId (24 hex chars)
+        if (/^[a-f0-9]{24}$/i.test(cleaned)) {
+            return cleaned;
+        }
+        // If not valid, try to extract first 24 hex chars
+        const match = rawPlaylistId.match(/^[a-f0-9]{24}/i);
+        return match ? match[0] : rawPlaylistId.split('%')[0];
+    }, [rawPlaylistId]);
     const { currentPlaylist, currentTrackIndex, isPlaying, togglePlayPause, playPlaylist } = useAudio();
     const { t, translateText, currentLanguage } = useLanguage();
     const { isSubscribed } = useUser();

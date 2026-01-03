@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Heart, BookOpen, Crown, PlayCircle, Headphones, Disc, Lock, Globe, Bookmark, Plus, ArrowLeft, Share2 } from 'lucide-react';
 import { useBooks } from '../context/BooksContext';
@@ -47,8 +47,23 @@ const AUDIO_CHAPTERS = [
 ];
 
 const BookDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id: rawId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  
+  // Clean the ID - when shared, extra text might be appended after the ID
+  // MongoDB ObjectIds are 24 hex characters
+  const id = useMemo(() => {
+    if (!rawId) return '';
+    // Decode URL and take only the first part before any space or special characters
+    const cleaned = decodeURIComponent(rawId).split(/[\s%]/)[0];
+    // Validate it looks like a MongoDB ObjectId (24 hex chars)
+    if (/^[a-f0-9]{24}$/i.test(cleaned)) {
+      return cleaned;
+    }
+    // If not valid, try to extract first 24 hex chars
+    const match = rawId.match(/^[a-f0-9]{24}/i);
+    return match ? match[0] : rawId.split('%')[0];
+  }, [rawId]);
   const location = useLocation();
   const { books, loading } = useBooks();
   useAudio(); // keep hook call if needed elsewhere; background music UI is removed
