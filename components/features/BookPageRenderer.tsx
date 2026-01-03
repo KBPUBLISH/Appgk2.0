@@ -748,14 +748,15 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
 
             {/* Text Boxes Layer - Below swipe zone */}
             {/* Text boxes layer - z-50 to appear above play button (z-40) */}
-            {/* When scroll exists, clip text to scroll bounds to prevent overflow */}
+            {/* When scroll exists, clip text to scroll bounds (top AND bottom) to prevent overflow */}
             <div
                 className="absolute inset-0 pointer-events-none z-50"
                 style={page.scrollUrl ? {
-                    // Clip to the scroll area - text should not appear above it
+                    // Clip to the scroll area - text should not appear above OR below it
+                    // inset(top right bottom left) - clips from each edge
                     clipPath: scrollState === 'hidden' 
                         ? 'inset(100% 0 0 0)' // Hide all when scroll is hidden
-                        : `inset(${100 - (scrollState === 'max' ? (page.scrollMaxHeight || 60) : (page.scrollMidHeight || 30)) - (page.scrollOffsetY || 0)}% 0 0 0)`,
+                        : `inset(${100 - (scrollState === 'max' ? (page.scrollMaxHeight || 60) : (page.scrollMidHeight || 30)) - (page.scrollOffsetY || 0)}% 0 ${(page.scrollOffsetY || 0) + 5}% 0)`,
                     transition: 'clip-path 0.5s ease-in-out',
                 } : {}}
             >
@@ -789,8 +790,11 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                         // Text starts at scroll top + buffer, or boxY if it's lower
                         const effectiveTop = Math.max(boxY, scrollStartPercent);
                         textTopStyle = `${effectiveTop}%`;
-                        // Max height leaves room at bottom for UI
-                        textMaxHeightStyle = `calc(100% - ${effectiveTop}% - 30px)`;
+                        // Max height: from effectiveTop to bottom of scroll (with buffer)
+                        // Scroll bottom is at scrollOffset% from viewport bottom
+                        // So max height = (100% - scrollOffset% - buffer) - effectiveTop%
+                        const scrollBottomBuffer = scrollOffset + 8; // 8% buffer from scroll bottom
+                        textMaxHeightStyle = `calc(${100 - scrollBottomBuffer}% - ${effectiveTop}%)`;
                     } else {
                         // No scroll - use boxY position directly
                         textTopStyle = `${boxY}%`;
