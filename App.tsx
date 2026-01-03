@@ -461,6 +461,8 @@ import VideoLessonDemo from './pages/VideoLessonDemo';
 import GameWebViewPage from './pages/GameWebViewPage';
 import NewUserWelcomePage, { shouldShowWelcome } from './pages/NewUserWelcomePage';
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
+import SharePlaylistPage from './pages/SharePlaylistPage';
+import ShareBookPage from './pages/ShareBookPage';
 
 // Home page wrapper - shows welcome screen for new users who completed onboarding
 const HomePageWithWelcomeCheck: React.FC = () => {
@@ -837,6 +839,11 @@ const App: React.FC = () => {
               <Layout>
                 <Routes>
                   <Route path="/" element={<LandingPage />} />
+                  {/* Public shareable links - no authentication required */}
+                  <Route path="/share/playlist/:playlistId" element={<SharePlaylistPage />} />
+                  <Route path="/share/book/:bookId" element={<ShareBookPage />} />
+                  <Route path="/s/p/:playlistId" element={<SharePlaylistPage />} /> {/* Short URL */}
+                  <Route path="/s/b/:bookId" element={<ShareBookPage />} /> {/* Short URL */}
                   <Route path="/signin" element={<SignInPage />} />
                   <Route path="/sign-in" element={<SignInPage />} />
                   <Route path="/reset-password" element={<ResetPasswordPage />} />
