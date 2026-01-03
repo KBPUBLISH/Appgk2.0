@@ -767,10 +767,13 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                     let textMaxHeightStyle: string;
                     
                     if (page.scrollUrl) {
-                        // Match portal: max(box.y%, scrollTopPosition)
-                        const scrollTopCalc = `calc(100% - ${currentScrollHeightNum}% - ${scrollOffset}%)`;
-                        textTopStyle = `max(${boxY}%, ${scrollTopCalc})`;
-                        textMaxHeightStyle = `calc(100% - max(${boxY}%, ${scrollTopCalc}) - 40px)`;
+                        // Calculate where the scroll starts (from top)
+                        // Add 5% buffer to ensure text is well inside the scroll area
+                        const scrollStartPercent = 100 - currentScrollHeightNum - scrollOffset + 5;
+                        // Text must start at or below the scroll top (never above it)
+                        const effectiveTop = Math.max(boxY, scrollStartPercent);
+                        textTopStyle = `${effectiveTop}%`;
+                        textMaxHeightStyle = `calc(100% - ${effectiveTop}% - 40px)`;
                     } else {
                         // No scroll - match portal exactly
                         textTopStyle = `${boxY}%`;
