@@ -1067,10 +1067,6 @@ export const ApiService = {
 
       const response = await fetchWithTimeout(`${baseUrl}books/${id}${cacheBuster}`, {
         method: 'GET',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-        },
       });
 
       if (response.ok) {
@@ -1194,10 +1190,6 @@ export const ApiService = {
 
       const response = await fetchWithTimeout(`${baseUrl}pages/book/${bookId}${cacheBuster}`, {
         method: 'GET',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-        },
       });
 
       if (response.ok) {
