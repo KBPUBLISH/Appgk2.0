@@ -1214,14 +1214,16 @@ export const ApiService = {
     text: string, 
     voiceId: string, 
     bookId?: string,
-    languageCode?: string
+    languageCode?: string,
+    pageNumber?: number,
+    textBoxIndex?: number
   ): Promise<{ audioUrl: string; alignment: any } | null> => {
     try {
       const baseUrl = getApiBaseUrl();
       const response = await fetchWithTimeout(`${baseUrl}tts/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voiceId, bookId, languageCode }),
+        body: JSON.stringify({ text, voiceId, bookId, languageCode, pageNumber, textBoxIndex }),
         timeout: 60000 // 60 seconds for TTS generation (can take longer for longer texts)
       });
 

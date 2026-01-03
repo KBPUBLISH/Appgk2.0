@@ -2224,7 +2224,9 @@ const BookReaderPage: React.FC = () => {
                             ttsText,
                             voiceForText, // Use character or narrator voice
                             bookId || undefined,
-                            currentLang !== 'en' ? currentLang : undefined
+                            currentLang !== 'en' ? currentLang : undefined,
+                            pageIndex + 1, // Page number (1-based for readability in storage)
+                            textBoxIndex // Text box index
                         );
                         
                         if (result && result.audioUrl) {
@@ -2543,7 +2545,9 @@ const BookReaderPage: React.FC = () => {
                 ttsText,
                 segment.voiceId,
                 bookId || undefined,
-                currentLang !== 'en' ? currentLang : undefined
+                currentLang !== 'en' ? currentLang : undefined,
+                currentPageIndexRef.current + 1, // Page number (1-based)
+                textBoxIndex
             );
             
             // Check AGAIN if this playback is still valid (TTS generation takes time)
@@ -3017,7 +3021,9 @@ const BookReaderPage: React.FC = () => {
                     ttsText,
                     voiceForText, // Use character or narrator voice
                     bookId || undefined,
-                    currentLang !== 'en' ? currentLang : undefined
+                    currentLang !== 'en' ? currentLang : undefined,
+                    actualPageIndex + 1, // Page number (1-based)
+                    index // Text box index
                 ) || undefined;
             }
 
