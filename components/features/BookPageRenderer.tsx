@@ -781,12 +781,14 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                         textMaxHeightStyle = `calc(100% - ${boxY}% - 100px)`;
                     }
 
+                    const showBg = box.showBackground === true;
+                    
                     return (
                         <div
                             key={idx}
                             ref={(el) => { textBoxRefs.current[idx] = el; }}
                             data-scroll-container="true"
-                            className="absolute pointer-events-auto overflow-y-auto p-2 pt-8 group"
+                            className="absolute pointer-events-auto overflow-y-auto group"
                             style={{
                                 // Add safe area padding for landscape mode (notch/Dynamic Island)
                                 // Use calc to ensure minimum 3% from edge + safe area
@@ -807,21 +809,17 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                                     : `${box.fontSize || 24}px`,
                                 maxHeight: textMaxHeightStyle,
                                 overflowY: 'auto',
-                                // Apply strong shadow for readability when no background box
-                                // Use multi-layer shadow for better visibility over any background
-                                textShadow: box.showBackground 
-                                    ? '1px 1px 2px rgba(255,255,255,0.8)' // Light shadow when background is shown
-                                    : '0 0 8px rgba(0,0,0,0.9), 0 0 16px rgba(0,0,0,0.7), 2px 2px 4px rgba(0,0,0,0.8), -1px -1px 3px rgba(0,0,0,0.5)', // Strong outline shadow for no background
+                                // White glow/shadow behind text for readability over images
+                                textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 16px rgba(255,255,255,0.7), 1px 1px 4px rgba(255,255,255,0.8)',
                                 scrollBehavior: 'smooth',
                                 // Only use opacity for smooth hide/show - no translateY to avoid layout jump
                                 opacity: shouldHideTextBoxes ? 0 : 1,
                                 transition: 'opacity 0.4s ease-in-out, top 0.5s ease-in-out',
                                 pointerEvents: shouldHideTextBoxes ? 'none' : 'auto',
-                                // Show background if enabled
-                                backgroundColor: box.showBackground ? (box.backgroundColor || 'rgba(255,255,255,0.85)') : 'transparent',
-                                borderRadius: box.showBackground ? '12px' : '0',
-                                // Only add padding when background is shown - otherwise text positions exactly where specified
-                                padding: box.showBackground ? '12px 16px' : '0',
+                                // Show background box if user explicitly enabled it
+                                backgroundColor: showBg ? (box.backgroundColor || 'rgba(255,255,255,0.85)') : 'transparent',
+                                borderRadius: showBg ? '12px' : '0',
+                                padding: showBg ? '10px 14px' : '0',
                             }}
                             onClick={(e) => {
                                 e.stopPropagation(); // Prevent scroll toggle when tapping text
