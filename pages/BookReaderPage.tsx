@@ -896,10 +896,17 @@ const BookReaderPage: React.FC = () => {
                     
                     // Check for intro video (stored in rawData from API)
                     const introVideo = rawData?.introVideoUrl || (book as any)?.introVideoUrl;
+                    console.log('🎬 Intro video check:', { 
+                        rawDataIntro: rawData?.introVideoUrl, 
+                        bookIntro: (book as any)?.introVideoUrl,
+                        found: !!introVideo 
+                    });
                     if (introVideo) {
                         console.log('🎬 Found intro video:', introVideo);
                         setIntroVideoUrl(introVideo);
                         setShowIntroVideo(true);
+                    } else {
+                        console.log('🎬 No intro video for this book');
                     }
                     // Mark that we've checked for intro video (whether found or not)
                     setIntroVideoChecked(true);
@@ -924,9 +931,18 @@ const BookReaderPage: React.FC = () => {
                     // Load multi-character voice settings
                     const narratorVoice = rawData?.defaultNarratorVoiceId || (book as any)?.defaultNarratorVoiceId;
                     const charVoices = rawData?.characterVoices || (book as any)?.characterVoices;
+                    console.log('🎭 Voice settings check:', {
+                        defaultVoice: defaultVoice,
+                        narratorVoice: narratorVoice,
+                        rawDataNarrator: rawData?.defaultNarratorVoiceId,
+                        bookNarrator: (book as any)?.defaultNarratorVoiceId,
+                        charVoicesCount: charVoices?.length || 0
+                    });
                     if (narratorVoice) {
                         console.log('🎭 Book has default narrator voice:', narratorVoice);
                         setDefaultNarratorVoiceId(narratorVoice);
+                    } else {
+                        console.log('🎭 No default narrator voice for this book');
                     }
                     if (charVoices && Array.isArray(charVoices) && charVoices.length > 0) {
                         console.log('🎭 Book has character voices:', charVoices);
@@ -2299,6 +2315,19 @@ const BookReaderPage: React.FC = () => {
             const translatedTextBoxes = getTranslatedTextBoxes(currentPage);
             const firstBoxText = translatedTextBoxes[0]?.text || pageTextBoxes[0].text;
             
+            // Set up sequential playback queue for all text boxes AFTER the first one
+            if (translatedTextBoxes.length > 1) {
+                console.log(`📚 Auto-play: Setting up sequential playback for ${translatedTextBoxes.length} text boxes`);
+                isSequentialPlaybackRef.current = true;
+                pendingTextBoxesRef.current = translatedTextBoxes.slice(1).map((tb, i) => ({
+                    text: tb.text,
+                    index: i + 1
+                }));
+            } else {
+                pendingTextBoxesRef.current = [];
+                isSequentialPlaybackRef.current = false;
+            }
+            
             // Create synthetic event and trigger playback
             const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
             handlePlayText(firstBoxText, 0, syntheticEvent, shouldAutoPlay);
@@ -3534,11 +3563,18 @@ const BookReaderPage: React.FC = () => {
                     src={introVideoUrl}
                     className="w-full h-full object-contain"
                     autoPlay
+                    muted // Required for autoplay on iOS/mobile
                     playsInline
+                    webkit-playsinline="true"
                     onEnded={() => setShowIntroVideo(false)}
-                    onError={() => {
-                        console.warn('Intro video failed to load, skipping');
+                    onError={(e) => {
+                        console.warn('Intro video failed to load, skipping:', e);
                         setShowIntroVideo(false);
+                    }}
+                    onCanPlay={(e) => {
+                        // Try to play with sound after user interaction policy is satisfied
+                        const video = e.currentTarget;
+                        video.play().catch(err => console.warn('Video play error:', err));
                     }}
                 />
                 {/* Skip button */}
