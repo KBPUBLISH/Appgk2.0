@@ -739,12 +739,7 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
             {/* Text Boxes Layer - Below swipe zone */}
             {/* Text boxes layer - z-50 to appear above play button (z-40) */}
             <div
-                className="absolute left-0 right-0 top-0 pointer-events-none z-50"
-                style={{
-                    // When no scroll overlay, reduce height to leave space for play button (~120px)
-                    // This ensures text boxes positioned at bottom % don't go behind the UI
-                    height: !page.scrollUrl ? 'calc(100% - 120px)' : '100%',
-                }}
+                className="absolute inset-0 pointer-events-none z-50"
             >
                 {page.textBoxes?.map((box, idx) => {
                     // Validate box has required position properties
@@ -781,9 +776,9 @@ export const BookPageRenderer: React.FC<BookPageRendererProps> = ({
                         textMaxHeightStyle = `calc(${currentScrollHeightNum}% - 60px)`;
                     } else {
                         // No scroll - use absolute position
-                        // Container is already sized to account for bottom UI
+                        // Give text box plenty of height to scroll, stopping 100px from bottom for play button
                         textTopStyle = `${boxY}%`;
-                        textMaxHeightStyle = `calc(100% - ${boxY}% - 20px)`;
+                        textMaxHeightStyle = `calc(100% - ${boxY}% - 100px)`;
                     }
 
                     return (
