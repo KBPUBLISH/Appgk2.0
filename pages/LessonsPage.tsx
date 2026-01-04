@@ -116,16 +116,46 @@ const LessonsPage: React.FC = () => {
         weekDays.push(date);
     }
 
-    // Filter Daily Verse lessons - only show today's or latest available
+    // Filter Daily Verse lessons - Auto-rotate based on day of year
     const dailyVerseLessons = lessons.filter(l => l.type === 'Daily Verse' && !isLocked(l));
-    const todaysDailyVerse = dailyVerseLessons.find(l => {
-        if (!l.scheduledDate) return false;
-        const scheduled = new Date(l.scheduledDate);
-        scheduled.setHours(0, 0, 0, 0);
-        const todayDate = new Date();
-        todayDate.setHours(0, 0, 0, 0);
-        return scheduled.getTime() === todayDate.getTime();
-    }) || dailyVerseLessons[0]; // Fallback to first available
+    
+    // Auto-rotate logic: Pick today's verse based on day of year, prioritize unwatched
+    const getTodaysDailyVerse = () => {
+        if (dailyVerseLessons.length === 0) return null;
+        
+        // Sort by order or creation date for consistent ordering
+        const sortedVerses = [...dailyVerseLessons].sort((a, b) => {
+            // Sort by _id (which contains timestamp) for consistent ordering
+            return a._id.localeCompare(b._id);
+        });
+        
+        // Get day of year (1-365)
+        const now = new Date();
+        const start = new Date(now.getFullYear(), 0, 0);
+        const diff = now.getTime() - start.getTime();
+        const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+        
+        // Calculate which verse index for today (cycles through all verses)
+        const todayIndex = dayOfYear % sortedVerses.length;
+        
+        // First, try to show today's scheduled verse (unwatched)
+        const scheduledVerse = sortedVerses[todayIndex];
+        if (scheduledVerse && !isCompleted(scheduledVerse._id)) {
+            return scheduledVerse;
+        }
+        
+        // If today's verse is already watched, find the next unwatched one
+        const unwatchedVerses = sortedVerses.filter(v => !isCompleted(v._id));
+        if (unwatchedVerses.length > 0) {
+            // Return the first unwatched verse (encourages catching up)
+            return unwatchedVerses[0];
+        }
+        
+        // All verses watched - show today's scheduled verse anyway (they can rewatch)
+        return scheduledVerse || sortedVerses[0];
+    };
+    
+    const todaysDailyVerse = getTodaysDailyVerse();
 
     // Filter out Daily Verse from regular lessons
     const regularLessons = lessons.filter(l => l.type !== 'Daily Verse');
