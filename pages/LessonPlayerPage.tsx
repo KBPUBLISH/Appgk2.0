@@ -130,6 +130,11 @@ const LessonPlayerPage: React.FC = () => {
     const voiceDropdownRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    
+    // Daily Verse coin reward state
+    const [showCoinReward, setShowCoinReward] = useState(false);
+    const [coinRewardAmount, setCoinRewardAmount] = useState(0);
+    const dailyVerseCoinsGivenRef = useRef(false);
 
     useEffect(() => {
         if (lessonId) {
@@ -185,6 +190,26 @@ const LessonPlayerPage: React.FC = () => {
             }
         };
     }, [lessonId, musicEnabled, setMusicPaused]);
+
+    // Daily Verse: Award 50 coins when video is watched
+    useEffect(() => {
+        if (videoWatched && lesson?.type === 'Daily Verse' && !dailyVerseCoinsGivenRef.current) {
+            const rewardAmount = lesson.coinReward || 50;
+            dailyVerseCoinsGivenRef.current = true;
+            
+            // Slight delay to let transition to devotional happen first
+            setTimeout(() => {
+                addCoins(rewardAmount, `Daily Verse - ${lesson.title}`, 'lesson');
+                setCoinRewardAmount(rewardAmount);
+                setShowCoinReward(true);
+                
+                // Hide after 3 seconds
+                setTimeout(() => {
+                    setShowCoinReward(false);
+                }, 3000);
+            }, 500);
+        }
+    }, [videoWatched, lesson, addCoins]);
 
     // Translate devotional and quiz content when lesson loads or language changes
     useEffect(() => {
@@ -1772,6 +1797,41 @@ const LessonPlayerPage: React.FC = () => {
                                 )}
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+            
+            {/* Daily Verse Coin Reward Animation */}
+            {showCoinReward && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+                    <div className="animate-in zoom-in-50 fade-in duration-500 flex flex-col items-center">
+                        {/* Floating coins animation */}
+                        <div className="relative w-32 h-32 mb-4">
+                            {/* Background glow */}
+                            <div className="absolute inset-0 bg-[#FFD700]/30 rounded-full animate-pulse blur-xl"></div>
+                            {/* Coin icon */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="relative">
+                                    <div className="w-24 h-24 bg-gradient-to-br from-[#FFD700] via-[#FFC107] to-[#FF8F00] rounded-full shadow-lg shadow-[#FFD700]/50 flex items-center justify-center border-4 border-[#FFE082]">
+                                        <span className="text-[#5c2e0b] font-black text-4xl">$</span>
+                                    </div>
+                                    {/* Sparkles */}
+                                    <div className="absolute -top-2 -right-2 text-[#FFD700] animate-ping">✨</div>
+                                    <div className="absolute -bottom-2 -left-2 text-[#FFD700] animate-ping delay-100">✨</div>
+                                    <div className="absolute top-1/2 -right-4 text-[#FFD700] animate-ping delay-200">✨</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Text */}
+                        <div className="bg-[#5c2e0b]/90 backdrop-blur-md rounded-2xl px-8 py-4 shadow-lg border-2 border-[#FFD700]">
+                            <p className="text-[#FFD700] font-black text-3xl text-center animate-bounce">
+                                +{coinRewardAmount} COINS!
+                            </p>
+                            <p className="text-white/80 text-sm text-center mt-1">
+                                Great job watching the verse! 🌟
+                            </p>
+                        </div>
                     </div>
                 </div>
             )}

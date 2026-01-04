@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, Lock, Check, Calendar, Book, FlaskConical, Calculator, Hourglass, Languages, Palette, Cpu, Video } from 'lucide-react';
+import { ArrowLeft, Play, Lock, Check, Calendar, Book, FlaskConical, Calculator, Hourglass, Languages, Palette, Cpu, Video, Sparkles, Coins } from 'lucide-react';
 import { ApiService } from '../services/apiService';
 import { isCompleted, isLocked } from '../services/lessonService';
 
@@ -8,6 +8,7 @@ interface Lesson {
     _id: string;
     title: string;
     description?: string;
+    type?: string;
     video: {
         url: string;
         thumbnail?: string;
@@ -15,16 +16,20 @@ interface Lesson {
         type?: 'Bible' | 'Science' | 'Math' | 'History' | 'English' | 'Art' | 'Technology';
     };
     scheduledDate?: string;
+    coinReward?: number;
 }
 
 const getLessonIcon = (type: string) => {
     switch (type) {
-        case 'Bible': return <Book className="w-4 h-4 text-white" />;
+        case 'Bible': 
+        case 'Bible Study': return <Book className="w-4 h-4 text-white" />;
+        case 'Daily Verse': return <Sparkles className="w-4 h-4 text-white" />;
         case 'Science': return <FlaskConical className="w-4 h-4 text-white" />;
         case 'Math': return <Calculator className="w-4 h-4 text-white" />;
         case 'History': return <Hourglass className="w-4 h-4 text-white" />;
         case 'English': return <Languages className="w-4 h-4 text-white" />;
-        case 'Art': return <Palette className="w-4 h-4 text-white" />;
+        case 'Art': 
+        case 'Arts & Crafts': return <Palette className="w-4 h-4 text-white" />;
         case 'Technology': return <Cpu className="w-4 h-4 text-white" />;
         default: return <Video className="w-4 h-4 text-white" />;
     }
@@ -111,6 +116,20 @@ const LessonsPage: React.FC = () => {
         weekDays.push(date);
     }
 
+    // Filter Daily Verse lessons - only show today's or latest available
+    const dailyVerseLessons = lessons.filter(l => l.type === 'Daily Verse' && !isLocked(l));
+    const todaysDailyVerse = dailyVerseLessons.find(l => {
+        if (!l.scheduledDate) return false;
+        const scheduled = new Date(l.scheduledDate);
+        scheduled.setHours(0, 0, 0, 0);
+        const todayDate = new Date();
+        todayDate.setHours(0, 0, 0, 0);
+        return scheduled.getTime() === todayDate.getTime();
+    }) || dailyVerseLessons[0]; // Fallback to first available
+
+    // Filter out Daily Verse from regular lessons
+    const regularLessons = lessons.filter(l => l.type !== 'Daily Verse');
+
     return (
         <div className="h-full overflow-y-auto pb-32">
             <div className="max-w-4xl mx-auto px-4 py-6">
@@ -119,6 +138,82 @@ const LessonsPage: React.FC = () => {
                     <h1 className="text-3xl font-bold text-white mb-2">Daily Lessons</h1>
                     <p className="text-white/80">Watch, learn, and grow each day!</p>
                 </div>
+
+                {/* ✨ Verse of the Day - Featured Section */}
+                {todaysDailyVerse && (
+                    <div className="mb-8">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Sparkles className="w-6 h-6 text-[#FFD700]" />
+                            <h2 className="text-xl font-bold text-[#FFD700]">Verse of the Day</h2>
+                            <div className="flex items-center gap-1 ml-auto bg-[#FFD700]/20 rounded-full px-3 py-1">
+                                <Coins className="w-4 h-4 text-[#FFD700]" />
+                                <span className="text-[#FFD700] text-sm font-bold">+50 Coins</span>
+                            </div>
+                        </div>
+                        
+                        {/* Large Featured Card */}
+                        <div
+                            className="relative w-full aspect-video rounded-2xl overflow-hidden cursor-pointer transform hover:scale-[1.02] transition-all duration-300 shadow-lg shadow-[#FFD700]/20"
+                            onClick={() => handleLessonClick(todaysDailyVerse)}
+                        >
+                            {/* Background Image */}
+                            {todaysDailyVerse.video?.thumbnail ? (
+                                <img
+                                    src={todaysDailyVerse.video.thumbnail}
+                                    alt={todaysDailyVerse.title}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-600 via-yellow-500 to-orange-500">
+                                    <Sparkles className="w-24 h-24 text-white/30" />
+                                </div>
+                            )}
+                            
+                            {/* Golden Gradient Overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-amber-500/20" />
+                            
+                            {/* Completed Overlay */}
+                            {isCompleted(todaysDailyVerse._id) && (
+                                <div className="absolute inset-0 bg-green-500/30 flex items-center justify-center">
+                                    <div className="bg-green-500 rounded-full p-4">
+                                        <Check className="w-12 h-12 text-white" />
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Play Button */}
+                            {!isCompleted(todaysDailyVerse._id) && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="bg-[#FFD700] rounded-full p-5 shadow-lg shadow-black/30 transform hover:scale-110 transition-transform">
+                                        <Play className="w-10 h-10 text-[#5c2e0b] fill-[#5c2e0b]" />
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Title & Description */}
+                            <div className="absolute bottom-0 left-0 right-0 p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="bg-[#FFD700] rounded-full px-3 py-1">
+                                        <span className="text-[#5c2e0b] text-xs font-bold">✨ TODAY'S VERSE</span>
+                                    </div>
+                                </div>
+                                <h3 className="text-white text-xl font-bold mb-1 drop-shadow-lg">
+                                    {todaysDailyVerse.title}
+                                </h3>
+                                {todaysDailyVerse.description && (
+                                    <p className="text-white/80 text-sm line-clamp-2">
+                                        {todaysDailyVerse.description}
+                                    </p>
+                                )}
+                            </div>
+                            
+                            {/* Sparkle decorations */}
+                            <div className="absolute top-4 right-4">
+                                <Sparkles className="w-8 h-8 text-[#FFD700] animate-pulse" />
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Week View - Portrait Style Thumbnails */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
@@ -219,8 +314,8 @@ const LessonsPage: React.FC = () => {
                     })}
                 </div>
 
-                {/* Available Lessons (Past and Today) */}
-                {lessons.filter(l => {
+                {/* Available Lessons (Past and Today) - Excludes Daily Verse */}
+                {regularLessons.filter(l => {
                     const locked = isLocked(l);
                     const completed = isCompleted(l._id);
                     return !locked || completed; // Show if not locked, or if completed
@@ -228,7 +323,7 @@ const LessonsPage: React.FC = () => {
                         <div className="mb-6">
                             <h2 className="text-xl font-bold text-white mb-4">Available Lessons</h2>
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                {lessons
+                                {regularLessons
                                     .filter(l => {
                                         const locked = isLocked(l);
                                         const completed = isCompleted(l._id); // Fix: Pass lesson._id
