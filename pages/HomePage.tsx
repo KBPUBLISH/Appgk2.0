@@ -880,7 +880,7 @@ const HomePage: React.FC = () => {
         {/* Welcome Video - Plays once per session above Week's Progress */}
         {showWelcomeVideo && (
           <div className="flex flex-col items-center mb-4">
-            <div className="relative aspect-[9/16] w-[calc((100%-16px)/3)] rounded-lg overflow-hidden bg-transparent">
+            <div className="relative aspect-[9/16] w-32 sm:w-40 md:w-48 max-w-[200px] rounded-lg overflow-hidden bg-transparent">
               <video
                 ref={welcomeVideoRef}
                 src="/assets/videos/welcome.mp4"
