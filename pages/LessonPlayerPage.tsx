@@ -203,6 +203,12 @@ const LessonPlayerPage: React.FC = () => {
                 setCoinRewardAmount(rewardAmount);
                 setShowCoinReward(true);
                 
+                // Save for HomePage animation when user goes back
+                localStorage.setItem('godlykids_pending_coin_reward', JSON.stringify({
+                    amount: rewardAmount,
+                    source: `Daily Verse completed!`
+                }));
+                
                 // Hide after 3 seconds
                 setTimeout(() => {
                     setShowCoinReward(false);
@@ -800,6 +806,14 @@ const LessonPlayerPage: React.FC = () => {
         // Award coins: 10 per correct answer
         const coinsEarned = correct * 10;
         addCoins(coinsEarned, `Lesson Quiz - ${correct} correct`, 'lesson');
+        
+        // Save for HomePage animation when user goes back
+        if (coinsEarned > 0) {
+            localStorage.setItem('godlykids_pending_coin_reward', JSON.stringify({
+                amount: coinsEarned,
+                source: `Quiz completed - ${correct} correct!`
+            }));
+        }
 
         // Mark activity as completed
         setActivityCompleted(true);

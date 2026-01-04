@@ -93,6 +93,11 @@ const HomePage: React.FC = () => {
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
   const [showEmailSignup, setShowEmailSignup] = useState(false);
   
+  // Coin reward animation state (triggered when returning from lessons)
+  const [showCoinReward, setShowCoinReward] = useState(false);
+  const [coinRewardAmount, setCoinRewardAmount] = useState(0);
+  const [coinRewardSource, setCoinRewardSource] = useState('');
+  
   // Clear any old game engagement localStorage on mount (legacy cleanup)
   useEffect(() => {
     localStorage.removeItem('memory_game_engaged');
@@ -119,6 +124,31 @@ const HomePage: React.FC = () => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
+  }, []);
+
+  // Check for pending coin reward animation (from lessons)
+  useEffect(() => {
+    const pendingReward = localStorage.getItem('godlykids_pending_coin_reward');
+    if (pendingReward) {
+      try {
+        const { amount, source } = JSON.parse(pendingReward);
+        localStorage.removeItem('godlykids_pending_coin_reward');
+        
+        // Small delay to let the page render first
+        setTimeout(() => {
+          setCoinRewardAmount(amount);
+          setCoinRewardSource(source);
+          setShowCoinReward(true);
+          
+          // Auto-hide after 3.5 seconds
+          setTimeout(() => {
+            setShowCoinReward(false);
+          }, 3500);
+        }, 300);
+      } catch (e) {
+        localStorage.removeItem('godlykids_pending_coin_reward');
+      }
+    }
   }, []);
   
   // Game purchase state - tracks purchased games to update UI without reload
@@ -1071,8 +1101,7 @@ const HomePage: React.FC = () => {
               <div 
                 className="relative rounded-2xl overflow-hidden py-6 px-4 border-2 border-[#1E88E5]/50 shadow-lg"
                 style={{
-                  background: 'linear-gradient(180deg, #1565C0 0%, #1976D2 40%, #42A5F5 70%, #64B5F6 100%)',
-                  minHeight: dayLessons.length <= 2 ? 'calc(100vh - 320px)' : 'auto'
+                  background: 'linear-gradient(180deg, #1565C0 0%, #1976D2 40%, #42A5F5 70%, #64B5F6 100%)'
                 }}
               >
                 {/* Sun decoration */}
@@ -1997,6 +2026,41 @@ const HomePage: React.FC = () => {
             <div>
               <p className="text-[#5c2e0b] font-display font-bold text-sm">Game Unlocked!</p>
               <p className="text-[#5c2e0b]/80 font-display text-xs">{unlockSuccess.gameName} is now available</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Coin Reward Animation (from lessons) */}
+      {showCoinReward && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+          <div className="animate-in zoom-in-50 fade-in duration-500 flex flex-col items-center">
+            {/* Floating coins animation */}
+            <div className="relative w-32 h-32 mb-4">
+              {/* Background glow */}
+              <div className="absolute inset-0 bg-[#FFD700]/30 rounded-full animate-pulse blur-xl"></div>
+              {/* Coin icon */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="relative">
+                  <div className="w-24 h-24 bg-gradient-to-br from-[#FFD700] via-[#FFC107] to-[#FF8F00] rounded-full shadow-lg shadow-[#FFD700]/50 flex items-center justify-center border-4 border-[#FFE082] animate-bounce">
+                    <span className="text-[#5c2e0b] font-black text-4xl">$</span>
+                  </div>
+                  {/* Sparkles */}
+                  <div className="absolute -top-2 -right-2 text-[#FFD700] animate-ping">✨</div>
+                  <div className="absolute -bottom-2 -left-2 text-[#FFD700] animate-ping" style={{ animationDelay: '0.1s' }}>✨</div>
+                  <div className="absolute top-1/2 -right-4 text-[#FFD700] animate-ping" style={{ animationDelay: '0.2s' }}>✨</div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Text */}
+            <div className="bg-[#5c2e0b]/90 backdrop-blur-md rounded-2xl px-8 py-4 shadow-lg border-2 border-[#FFD700]">
+              <p className="text-[#FFD700] font-black text-3xl text-center font-display">
+                +{coinRewardAmount} COINS!
+              </p>
+              <p className="text-white/80 text-sm text-center mt-1">
+                {coinRewardSource} 🌟
+              </p>
             </div>
           </div>
         </div>
