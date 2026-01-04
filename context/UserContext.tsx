@@ -368,104 +368,144 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     redeemedCodes: string[];
   } | null>(saved?.parentEconomyData ?? null);
 
-  // --- SYNC FULL PROFILE FROM CLOUD ON APP LOAD ---
+  // --- SYNC FULL PROFILE FROM CLOUD ON APP LOAD AND SIGN IN ---
   // This loads profile data from backend when signing in on a new device
+  // CRITICAL: When user signs in, ALWAYS load their cloud profile to prevent data loss
   const [hasLoadedFromCloud, setHasLoadedFromCloud] = useState(false);
   
-  useEffect(() => {
-    const syncProfileFromCloud = async () => {
-      try {
-        const user = authService.getUser();
-        const userId = user?.email || user?._id || user?.id || localStorage.getItem('godlykids_user_email') || localStorage.getItem('device_id');
-        
-        if (!userId) {
-          console.log('☁️ No userId available for cloud sync');
-          return;
-        }
-        
-        console.log('☁️ Loading profile from cloud for:', userId);
-        
-        // Load full profile from cloud
-        const cloudProfile = await profileService.loadFromCloud(userId);
-        
-        if (cloudProfile) {
-          console.log('☁️ Cloud profile found:', {
-            parentName: cloudProfile.parentName,
-            kidsCount: cloudProfile.kids?.length || 0,
-            coins: cloudProfile.coins
-          });
-          
-          // Check if local data is empty/default (new device)
-          const localIsEmpty = parentName === 'Parent' && kids.length === 0;
-          const cloudHasData = cloudProfile.parentName || cloudProfile.kids?.length > 0;
-          
-          if (localIsEmpty && cloudHasData) {
-            console.log('☁️ Local data is empty, loading full profile from cloud');
-            
-            // Load parent name
-            if (cloudProfile.parentName) {
-              setParentName(cloudProfile.parentName);
-            }
-            
-            // Load kid profiles
-            if (cloudProfile.kids && cloudProfile.kids.length > 0) {
-              setKids(cloudProfile.kids);
-            }
-            
-            // Load equipped items
-            if (cloudProfile.equippedAvatar) {
-              setEquippedAvatar(cloudProfile.equippedAvatar);
-            }
-            if (cloudProfile.equippedShip) {
-              setEquippedShip(cloudProfile.equippedShip);
-            }
-            if (cloudProfile.equippedWheel) {
-              setEquippedWheel(cloudProfile.equippedWheel);
-            }
-            if (cloudProfile.equippedPet) {
-              setEquippedPet(cloudProfile.equippedPet);
-            }
-            
-            // Load unlocked items
-            if (cloudProfile.unlockedVoices && cloudProfile.unlockedVoices.length > 0) {
-              setUnlockedVoices(cloudProfile.unlockedVoices);
-            }
-            
-            console.log('☁️ Profile loaded from cloud successfully!');
-          }
-          
-          // Always sync coins from cloud (take the higher value)
-          if (cloudProfile.coins > coins) {
-            const difference = cloudProfile.coins - coins;
-            console.log(`☁️ Syncing ${difference} coins from cloud`);
-            setCoins(cloudProfile.coins);
-            setCoinTransactions(prev => [{
-              id: `cloud-sync-${Date.now()}`,
-              amount: difference,
-              reason: 'Synced from cloud',
-              source: 'referral',
-              timestamp: Date.now()
-            }, ...prev]);
-          }
-        } else {
-          console.log('☁️ No cloud profile found, using local data');
-        }
-        
+  // Core function to load profile from cloud - can be called on mount OR on sign in
+  const loadProfileFromCloud = useCallback(async (forceLoad: boolean = false) => {
+    try {
+      const user = authService.getUser();
+      const userEmail = user?.email || localStorage.getItem('godlykids_user_email');
+      
+      // Only load from cloud if user is signed in with email
+      if (!userEmail) {
+        console.log('☁️ No email - anonymous user, skipping cloud sync');
         setHasLoadedFromCloud(true);
-      } catch (error) {
-        console.warn('☁️ Failed to sync profile from cloud:', error);
-        setHasLoadedFromCloud(true);
+        return;
       }
-    };
-    
-    // Only sync if we have an authenticated user (email)
+      
+      console.log('☁️ Loading profile from cloud for:', userEmail, forceLoad ? '(forced after sign in)' : '');
+      
+      // Load full profile from cloud using EMAIL (not deviceId)
+      const cloudProfile = await profileService.loadFromCloud(userEmail);
+      
+      if (cloudProfile) {
+        console.log('☁️ Cloud profile found:', {
+          parentName: cloudProfile.parentName,
+          kidsCount: cloudProfile.kids?.length || 0,
+          coins: cloudProfile.coins,
+          unlockedVoices: cloudProfile.unlockedVoices?.length || 0
+        });
+        
+        const cloudHasData = cloudProfile.parentName || 
+                            (cloudProfile.kids && cloudProfile.kids.length > 0) ||
+                            cloudProfile.coins > 500;
+        
+        // If this is a sign-in event (forceLoad=true) or cloud has meaningful data,
+        // ALWAYS prioritize cloud data over local anonymous data
+        if (forceLoad || cloudHasData) {
+          console.log('☁️ Loading profile from cloud (priority over local)');
+          
+          // Load parent name if set in cloud
+          if (cloudProfile.parentName && cloudProfile.parentName !== 'Parent') {
+            setParentName(cloudProfile.parentName);
+          }
+          
+          // Load kid profiles - cloud data takes priority
+          if (cloudProfile.kids && cloudProfile.kids.length > 0) {
+            console.log(`☁️ Loading ${cloudProfile.kids.length} kid profile(s) from cloud`);
+            setKids(cloudProfile.kids);
+          }
+          
+          // Load equipped items
+          if (cloudProfile.equippedAvatar) {
+            setEquippedAvatar(cloudProfile.equippedAvatar);
+          }
+          if (cloudProfile.equippedShip) {
+            setEquippedShip(cloudProfile.equippedShip);
+          }
+          if (cloudProfile.equippedWheel) {
+            setEquippedWheel(cloudProfile.equippedWheel);
+          }
+          if (cloudProfile.equippedPet) {
+            setEquippedPet(cloudProfile.equippedPet);
+          }
+          
+          // Load unlocked items - these are account progress, MUST be preserved
+          if (cloudProfile.unlockedVoices && cloudProfile.unlockedVoices.length > 0) {
+            console.log(`☁️ Loading ${cloudProfile.unlockedVoices.length} unlocked voice(s) from cloud`);
+            setUnlockedVoices(cloudProfile.unlockedVoices);
+          }
+          
+          // Load default voice if set
+          if (cloudProfile.defaultVoiceId) {
+            localStorage.setItem('godlykids_default_voice', cloudProfile.defaultVoiceId);
+          }
+          
+          console.log('☁️ Profile loaded from cloud successfully!');
+        }
+        
+        // ALWAYS sync coins - take the HIGHER value to prevent coin loss
+        if (cloudProfile.coins && cloudProfile.coins > coins) {
+          const difference = cloudProfile.coins - coins;
+          console.log(`☁️ Syncing ${difference} coins from cloud (cloud: ${cloudProfile.coins}, local: ${coins})`);
+          setCoins(cloudProfile.coins);
+          setCoinTransactions(prev => [{
+            id: `cloud-sync-${Date.now()}`,
+            amount: difference,
+            reason: 'Synced from cloud',
+            source: 'referral',
+            timestamp: Date.now()
+          }, ...prev]);
+        }
+      } else {
+        console.log('☁️ No cloud profile found for this email');
+        
+        // If user just signed in but has no cloud profile, save their current local data
+        // This handles: new user signs up, or existing user who never synced
+        if (forceLoad) {
+          console.log('☁️ First sign-in detected, saving current local data to cloud');
+          // The regular save effect will handle this
+        }
+      }
+      
+      setHasLoadedFromCloud(true);
+    } catch (error) {
+      console.warn('☁️ Failed to sync profile from cloud:', error);
+      setHasLoadedFromCloud(true);
+    }
+  }, [coins, setParentName, setKids, setEquippedAvatar, setEquippedShip, setEquippedWheel, setEquippedPet, setUnlockedVoices, setCoins, setCoinTransactions]);
+  
+  // Load from cloud on initial mount if already signed in
+  useEffect(() => {
     const user = authService.getUser();
     if (user?.email) {
-      syncProfileFromCloud();
+      loadProfileFromCloud(false);
     } else {
       setHasLoadedFromCloud(true);
     }
   }, []); // Run once on mount
+  
+  // CRITICAL: Listen for sign-in events and reload profile from cloud
+  // This ensures user's cloud data is loaded even if they sign in AFTER the app loads
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const user = authService.getUser();
+      if (user?.email) {
+        console.log('🔐 Auth token updated - user signed in, loading cloud profile...');
+        // Force load from cloud to get user's saved data
+        loadProfileFromCloud(true);
+      }
+    };
+    
+    window.addEventListener('authTokenUpdated', handleAuthChange);
+    
+    return () => {
+      window.removeEventListener('authTokenUpdated', handleAuthChange);
+    };
+  }, [loadProfileFromCloud]);
 
   // --- SYNC PROFILE TO BACKEND (including kids) ---
   const syncProfileToBackend = useCallback(async (kidsToSync?: any[]) => {
@@ -595,6 +635,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const userId = user?.email || localStorage.getItem('godlykids_user_email');
     if (userId && hasLoadedFromCloud) {
       // Save important profile data to cloud for cross-device sync
+      const defaultVoice = localStorage.getItem('godlykids_default_voice');
       profileService.saveToCloud(userId, {
         parentName,
         kids: kids.map(k => ({
@@ -610,6 +651,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         equippedWheel,
         equippedPet,
         unlockedVoices,
+        defaultVoiceId: defaultVoice || null,
       });
     }
   }, [
